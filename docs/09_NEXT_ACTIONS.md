@@ -18,13 +18,14 @@
 - 当前阶段：第 1 周 Agent Loop。
 - 已完成：项目文档初始化、最小 Python 包结构、message schema、mock LLM、最小 Agent Loop、Agent Loop 测试、示例脚本回归测试。
 - 已补充长期教学规则：后续不要先给出现成完整代码；先给逻辑、调用链、代码位置、测试目标和验收标准，让用户自己写；写完后先评审、再注释、再给规范参考代码用于对比。
+- 已补充长期代码规范：新增或修改代码中的注释默认使用中文。
 - 当前阻塞：无。
 
 ## 下一次应该继续做什么
 
 继续第 1 周 Day 2：Tool System 入门。
 
-教学执行方式：先讲 Tool System 的直觉、原理和调用链，再给 `src/pca/tools/base.py`、`src/pca/tools/registry.py`、`tests/test_tools.py` 的实现目标和验收标准；不要直接给完整代码，等用户写完后进行代码评审、注释和参考实现对比。
+教学执行方式：先讲 Tool System 的直觉、原理和调用链，再给 `src/pca/tools/base.py`、`src/pca/tools/registry.py`、`tests/test_tools.py` 的实现目标和验收标准；不要直接给完整代码，等用户写完后进行代码评审、中文注释和参考实现对比。
 
 建议任务：
 
