@@ -1,0 +1,11 @@
+[project]
+name = "personal-coding-assistant"
+version = "0.1.0"
+description = "A learning-first Personal Coding Assistant Agent implementation."
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
