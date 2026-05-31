@@ -4,9 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from src.pca.core.messages import Message
-
-# from pca.core.messages import Message
+from pca.core.messages import Message
 
 
 ToolFunction = Callable[[dict[str, Any]], Any]
@@ -69,4 +67,3 @@ class AgentLoop:
                 )
 
         raise RuntimeError("Agent loop exceeded max_turns.")
-

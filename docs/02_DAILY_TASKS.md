@@ -1,5 +1,35 @@
 # Daily Tasks
 
+## 2026-05-31
+
+日期：2026-05-31  
+当前阶段：第 1 周 Agent Loop -> Tool System 准备  
+当前模块：Day 1 学习验收与 Day 2 准备  
+预计用时：15 分钟
+
+### 1. 今日学习目标
+
+- 确认用户已经读懂 Day 1 最小 Agent Loop 代码。
+- 检查用户是否能用自己的话解释 Agent Loop、Message history、ToolCall、mock LLM 和 max_turns。
+- 判断是否可以进入第 1 周 Day 2：Tool System 入门。
+
+### 2. 今日检查结果
+
+- 用户已完成 5 个检查问题。
+- Agent Loop 的解释已经抓住核心：`user input -> LLM -> tool_call -> tool_result 写回 message history -> LLM -> final answer`。
+- Message history 的理解已经到位：它是 Agent 的短期工作记忆和可回放轨迹。
+- ToolCall 与普通函数调用的区别已基本掌握：ToolCall 是 LLM 发出的结构化调用意图，普通函数调用是程序逻辑直接执行。
+- mock LLM 的意义已掌握：排除真实 LLM 的随机性、网络和 API 干扰，专注验证 Agent Loop 控制流。
+- max_turns 的风险意识已建立：避免幻觉、工具错误或停止条件失败导致无限循环、成本失控和内存增长。
+
+### 3. 完成情况
+
+- Day 1 学习验收通过。
+- 已修复核心模块和测试中不规范的 `src.pca...` 导入，统一为标准 `pca...` 导入。
+- 已运行 `python -m pytest -q`，结果为 `2 passed, 1 warning`。
+- 当前无阻塞。
+- 下一次继续项目时进入第 1 周 Day 2：Tool System 入门。
+
 ## 2026-05-27
 
 日期：2026-05-27  
@@ -16,12 +46,14 @@
 - 已更新项目教学规则。
 - 已写入 Codex 长期记忆更新说明。
 - 已补充代码注释默认使用中文的长期要求。
+- 已补充每日任务必须包含资料推荐、所需知识和网页版视频 / 课程页面的长期要求。
 
 ### 3. 完成情况
 
 - 已把“不先给出现成完整代码”的教学方式写入 `AGENTS.md`。
 - 已把同样规则写入 `docs/CODEX_PROJECT_BRIEF.md`。
 - 已把“新增或修改代码注释默认使用中文”的要求写入项目规则和长期提示词。
+- 已把“每日任务增加资料推荐、所需知识、网页版视频 / 课程页面”的要求写入项目规则和长期提示词。
 - 下一次继续项目时，仍从 Tool System 入门开始，但教学方式按新规则执行。
 
 ## 2026-05-26

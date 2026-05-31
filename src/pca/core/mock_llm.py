@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from src.pca.core.messages import Message
+from pca.core.messages import Message
 
 
 class ScriptedLLM:
@@ -20,4 +20,3 @@ class ScriptedLLM:
         response = self._responses[self._index]
         self._index += 1
         return response
-

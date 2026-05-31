@@ -1,5 +1,5 @@
-from src.pca.core.agent_loop import AgentLoop
-from src.pca.core.messages import Message, ToolCall
+from pca.core.agent_loop import AgentLoop
+from pca.core.messages import Message, ToolCall
 
 
 class ScriptedLLM:
