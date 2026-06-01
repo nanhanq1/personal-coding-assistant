@@ -1,5 +1,67 @@
 # Daily Tasks
 
+## 2026-06-01
+
+日期：2026-06-01  
+当前阶段：第 1 周 Tool System  
+当前模块：Day 2 Tool 抽象与 ToolRegistry  
+预计用时：1-1.5 小时
+
+### 1. 今日学习目标
+
+- 理解为什么 Agent 不能长期依赖 `dict[str, callable]` 管理工具。
+- 理解 `ToolCall`、`Tool`、`ToolRegistry` 和 `AgentLoop` 的职责边界。
+- 实现工具注册、查找、执行和错误处理的最小闭环。
+- 把 `AgentLoop` 从直接调用函数升级为通过 `ToolRegistry.run(...)` 执行工具。
+
+### 2. 所需前置知识
+
+- Python `dataclass` 的基本用法。
+- `Callable[[dict[str, Any]], Any]` 这种函数类型标注的含义。
+- 字典查找、重复 key、`KeyError` 的语义。
+- Day 1 的 `ToolCall -> tool_result -> assistant final answer` 调用链。
+
+### 3. 今日必须理解的知识点
+
+- `ToolCall` 是 LLM 发出的结构化调用意图，不是真正执行工具。
+- `Tool` 是程序侧对真实工具函数的包装，包含名称、描述和执行入口。
+- `ToolRegistry` 是工具系统的路由表，负责注册、查找和执行工具。
+- `AgentLoop` 不应该关心具体工具函数，只需要把 `tool_call.name` 和 `tool_call.arguments` 交给 registry。
+
+### 4. 今日代码任务
+
+- 实现 `src/pca/tools/base.py` 的 `Tool` 数据结构。
+- 实现 `src/pca/tools/registry.py` 的 `ToolRegistry`。
+- 新增 `tests/test_tools.py`，覆盖注册、获取、执行、重复注册和未知工具。
+- 更新 `src/pca/core/agent_loop.py`，让 Agent Loop 通过 `ToolRegistry` 执行工具。
+- 更新 `examples/01_minimal_agent.py`，保持示例脚本可从仓库根目录直接运行。
+
+### 5. 今日资料推荐
+
+- OpenAI Agents SDK：重点看 Tools 概念，理解工具为什么需要描述和统一执行接口。
+- mini-SWE-agent：继续观察它如何把工具执行结果写回 trajectory。
+- 视频搜索关键词：`AI agent tool registry Python`、`tool calling agent from scratch`。
+- 复习资料：ReAct 论文中 action / observation 的交替结构。
+
+### 6. 今日输出物
+
+- `Tool` 抽象。
+- `ToolRegistry`。
+- 工具系统单元测试。
+- Agent Loop 与 ToolRegistry 的集成测试。
+- 可运行示例脚本。
+- Day 2 架构决策记录。
+
+### 7. 完成情况
+
+- 已完成 `Tool` 和 `ToolRegistry` 的最小实现。
+- 已完成工具注册、查找、执行、重复注册和未知工具的测试。
+- 已将 `AgentLoop` 从裸 `dict[str, callable]` 升级为使用 `ToolRegistry`。
+- 已修复示例脚本导入顺序，保证 `python examples/01_minimal_agent.py` 可从仓库根目录运行。
+- 已运行 `python -m pytest -q`，结果为 `8 passed, 1 warning`。
+- 当前 warning 是 `.pytest_cache` 写入权限问题，不影响功能验收。
+- 下一次继续项目时进入第 1 周 Day 3：文件工具 `read_file` / `write_file` 入门。
+
 ## 2026-05-31
 
 日期：2026-05-31  

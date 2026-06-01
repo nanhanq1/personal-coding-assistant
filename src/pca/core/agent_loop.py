@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 from pca.core.messages import Message
 from pca.tools.registry import ToolRegistry
-
-ToolFunction = Callable[[dict[str, Any]], Any]
 
 
 class LLM(Protocol):
@@ -54,6 +51,7 @@ class AgentLoop:
                 )
 
             for tool_call in assistant_message.tool_calls:
+                # AgentLoop 只负责按 ToolCall 路由，不关心具体工具函数如何实现。
                 tool_result = self._tools.run(tool_call.name, tool_call.arguments)
                 messages.append(
                     Message(

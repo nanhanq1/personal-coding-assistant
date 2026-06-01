@@ -1,5 +1,35 @@
 # Implementation Log
 
+## 2026-06-01
+
+### 本次完成
+
+- 完成第 1 周 Day 2：Tool System 入门。
+- 新增 `Tool` 抽象，用名称、描述和 handler 包装一个可执行工具。
+- 新增 `ToolRegistry`，统一负责工具注册、查找、执行和错误处理。
+- 将 `AgentLoop` 从直接使用 `dict[str, callable]` 升级为通过 `ToolRegistry.run(...)` 执行工具。
+- 更新 `examples/01_minimal_agent.py`，让示例也走 `ToolRegistry`。
+- 评审并修复两类问题：registry 内部字段名不一致、示例脚本导入顺序错误。
+
+### 修改文件
+
+- 修改 `src/pca/tools/base.py`，实现 `Tool`。
+- 修改 `src/pca/tools/registry.py`，实现 `ToolRegistry`。
+- 修改 `src/pca/core/agent_loop.py`，接入工具注册表。
+- 修改 `tests/test_tools.py`，覆盖工具系统行为。
+- 修改 `tests/test_agent_loop.py`，覆盖 Agent Loop 与 ToolRegistry 的集成。
+- 修改 `examples/01_minimal_agent.py`，更新示例脚本的工具注册方式。
+- 更新 `docs/02_DAILY_TASKS.md`、`docs/06_ARCHITECTURE_DECISIONS.md`、`docs/07_IMPLEMENTATION_LOG.md`、`docs/09_NEXT_ACTIONS.md`。
+
+### 架构决策
+
+- 新增 ADR-0002：第 1 周 Day 2 使用 `ToolRegistry` 管理工具调用。
+
+### 验证
+
+- 运行 `python -m pytest -q`：`8 passed, 1 warning in 0.14s`。
+- warning 来自 `.pytest_cache` 写入权限：`WinError 5`，不影响功能测试结果。
+
 ## 2026-05-31
 
 ### 本次完成
