@@ -29,8 +29,8 @@ def test_tool_registry_basic_operations():
     assert result == "hello"
 
     # 4. 检查工具是否存在
-    assert registry.exists("echo") == True
-    assert registry.exists("nonexistent") == False
+    assert registry.exists("echo") is True
+    assert registry.exists("nonexistent") is False
 
     # 5. 列出所有工具
     assert registry.list_tools() == ["echo"]
@@ -82,13 +82,13 @@ def test_unregister_tool():
     registry.register(tool)
 
     # 注销前应该存在
-    assert registry.exists("test") == True
+    assert registry.exists("test") is True
 
     # 注销工具
     registry.unregister("test")
 
     # 注销后应该不存在
-    assert registry.exists("test") == False
+    assert registry.exists("test") is False
 
     # 再次注销应该抛出 KeyError
     with pytest.raises(KeyError, match="Unknown tool: test"):

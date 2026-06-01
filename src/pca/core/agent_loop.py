@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from pca.core.messages import Message
-
+from pca.tools.registry import ToolRegistry
 
 ToolFunction = Callable[[dict[str, Any]], Any]
 
@@ -31,7 +31,7 @@ class AgentLoop:
     def __init__(
         self,
         llm: LLM,
-        tools: dict[str, ToolFunction],
+        tools: ToolRegistry,
         max_turns: int = 8,
     ):
         self._llm = llm
@@ -54,10 +54,7 @@ class AgentLoop:
                 )
 
             for tool_call in assistant_message.tool_calls:
-                tool = self._tools.get(tool_call.name)
-                if tool is None:
-                    raise KeyError(f"Unknown tool: {tool_call.name}")
-                tool_result = tool(tool_call.arguments)
+                tool_result = self._tools.run(tool_call.name, tool_call.arguments)
                 messages.append(
                     Message(
                         role="tool",

@@ -1,4 +1,4 @@
-"""Tool base abstractions will be implemented in Week 1 Day 2."""
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
