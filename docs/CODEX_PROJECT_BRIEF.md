@@ -210,6 +210,13 @@ personal-coding-assistant/
 2. 所需知识：列出当天写代码前必须补齐的概念、接口、设计模式或 Python 语法点。
 3. 网页版视频 / 课程页面：优先给公开视频网页、课程页面或明确搜索关键词，避免只给泛泛名称。
 
+资料推荐和视频推荐必须满足：
+
+1. 必须给出有效、正确、可访问的链接，不能只给资料名或视频名。
+2. 优先使用官方文档、官方课程页面、GitHub 仓库、公开课程网页、公开视频网页。
+3. 如果链接可能过期、迁移或不确定，推荐前必须先验证；不能验证时要明确说明不确定性，并给出可验证的搜索入口或官方主页。
+4. 视频推荐优先给网页版视频或课程页面链接，不要只给平台名称或搜索关键词；搜索关键词只能作为补充。
+
 每日面试题必须至少包含：
 
 1. 概念理解题：考察当天模块解决什么问题。
@@ -237,11 +244,11 @@ personal-coding-assistant/
 
 ## 九、推荐资料库
 
-持续维护 `docs/04_RESOURCE_LIBRARY.md`，优先推荐官方文档、GitHub、视频搜索关键词、论文或技术报告。
+持续维护 `docs/04_RESOURCE_LIBRARY.md`，优先推荐官方文档、GitHub、视频课程页面、论文或技术报告，并为资料和视频推荐提供有效、正确、可访问的链接。
 
 官方文档 / GitHub：learn-claude-code、mini-SWE-agent、OpenAI Agents SDK、MCP Specification、LangGraph Docs、Aider Docs、Cline Docs、OpenHands Docs / GitHub、Mem0 Docs、Letta Docs、Graphiti / Zep Docs、LlamaIndex Docs。
 
-视频 / 课程搜索关键词：AI Agents from scratch tool calling tutorial、Claude Code architecture agent harness、OpenAI Agents SDK tutorial tools handoffs tracing、LangGraph StateGraph tutorial human in the loop、Aider repo map explained、Cline Plan Act MCP tutorial、OpenHands software agent SDK runtime sandbox、MCP server from scratch Python、Mem0 AI agent memory tutorial、Letta stateful agents memory tutorial、Graphiti Zep temporal knowledge graph agent memory、LlamaIndex workflows agentic RAG tutorial、Hugging Face AI Agents Course、DeepLearning.AI AI Agents in LangGraph。
+视频 / 课程页面：推荐时必须优先给可访问的网页版视频或课程页面链接；搜索关键词只能作为补充。可选方向包括 AI Agents from scratch tool calling tutorial、Claude Code architecture agent harness、OpenAI Agents SDK tutorial tools handoffs tracing、LangGraph StateGraph tutorial human in the loop、Aider repo map explained、Cline Plan Act MCP tutorial、OpenHands software agent SDK runtime sandbox、MCP server from scratch Python、Mem0 AI agent memory tutorial、Letta stateful agents memory tutorial、Graphiti Zep temporal knowledge graph agent memory、LlamaIndex workflows agentic RAG tutorial、Hugging Face AI Agents Course、DeepLearning.AI AI Agents in LangGraph。
 
 论文 / 技术报告：ReAct、Toolformer、SWE-bench、Reflexion、MemGPT / Letta、Mem0、Zep / Graphiti、Voyager、WebArena、Generative Agents。推荐论文时按“论文解决的问题 -> 核心思想 -> 和本项目的关系 -> 应该读哪几节”讲解。
 
