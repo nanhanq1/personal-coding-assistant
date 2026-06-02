@@ -1,5 +1,30 @@
 # Implementation Log
 
+## 2026-06-02
+
+### 本次完成
+
+- 完成第 1 周 Day 2 的收尾复核。
+- 确认当前工作区在收尾前没有未提交变更。
+- 运行项目测试，确认 Tool System、Agent Loop 集成和示例回归测试仍然通过。
+- 更新收尾文档，明确下一次继续项目时进入第 1 周 Day 3：文件工具入门。
+
+### 修改文件
+
+- 更新 `docs/02_DAILY_TASKS.md`，补充 2026-06-02 收尾复核任务。
+- 更新 `docs/07_IMPLEMENTATION_LOG.md`，记录本次收尾、测试和修改文件。
+- 更新 `docs/09_NEXT_ACTIONS.md`，刷新最新测试结果和下一次继续入口。
+
+### 架构决策
+
+- 本次没有新增架构决策。
+- `docs/06_ARCHITECTURE_DECISIONS.md` 无需更新。
+
+### 验证
+
+- 运行 `python -m pytest -q`：`8 passed, 1 warning in 0.16s`。
+- warning 来自 `.pytest_cache` 写入权限：`WinError 5`，不影响功能测试结果。
+
 ## 2026-06-01
 
 ### 本次完成

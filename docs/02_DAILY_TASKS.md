@@ -1,5 +1,56 @@
 # Daily Tasks
 
+## 2026-06-02
+
+日期：2026-06-02  
+当前阶段：第 1 周 Day 2 收尾复核  
+当前模块：Tool System 文档收尾与测试确认  
+预计用时：15 分钟
+
+### 1. 今日学习目标
+
+- 确认 Day 2 Tool System 的代码和文档处于可继续状态。
+- 复核当前测试结果，保证下一次可以直接进入 Day 3 文件工具。
+- 明确本次没有新增架构决策，后续仍沿用 `ToolRegistry` 作为工具路由入口。
+
+### 2. 所需前置知识
+
+- 能读懂 `Tool`、`ToolRegistry` 和 `AgentLoop` 的职责边界。
+- 能理解 `python -m pytest -q` 的通过结果与 warning 的区别。
+- 能根据 `docs/09_NEXT_ACTIONS.md` 判断下一次继续项目的入口。
+
+### 3. 今日必须理解的知识点
+
+- 收尾复核不是新增功能开发，而是确认当前状态、测试结果和下一步入口。
+- 当前 `.pytest_cache` warning 是本地缓存目录写入权限问题，不代表业务测试失败。
+- Day 3 文件工具会建立在 Day 2 的 `ToolRegistry` 之上。
+
+### 4. 今日代码任务
+
+- 本次没有新增或修改业务代码。
+- 运行项目测试，确认 Day 2 代码仍然通过。
+- 更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
+
+### 5. 今日资料推荐
+
+- pytest 官方文档：重点看 test discovery、warning summary 和 cache provider。
+- Python pathlib 官方文档：为 Day 3 文件工具提前理解路径对象。
+- 视频搜索关键词：`pytest warning cacheprovider WinError 5`、`Python pathlib file read write tutorial`。
+- 预习资料：OpenAI Agents SDK Tools 文档中关于工具输入输出的描述方式。
+
+### 6. 今日输出物
+
+- Day 2 收尾复核记录。
+- 最新测试结果记录。
+- Day 3 继续指令确认。
+
+### 7. 完成情况
+
+- 已运行 `python -m pytest -q`，结果为 `8 passed, 1 warning in 0.16s`。
+- 当前 warning 仍是 `.pytest_cache` 写入权限问题，不影响功能验收。
+- 已确认本次没有新增架构决策，`docs/06_ARCHITECTURE_DECISIONS.md` 无需更新。
+- 下一次继续项目时进入第 1 周 Day 3：文件工具 `read_file` / `write_file` 入门。
+
 ## 2026-06-01
 
 日期：2026-06-01  
