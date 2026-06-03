@@ -159,6 +159,7 @@ Personal Coding Assistant Agent
 - `docs/07_IMPLEMENTATION_LOG.md`：每天写了哪些代码、改了哪些文件、遇到哪些 bug、如何解决。
 - `docs/08_INTERVIEW_BANK.md`：每个模块对应的面试题、系统设计题、源码理解题。
 - `docs/09_NEXT_ACTIONS.md`：下一次会话开始时应该继续做什么。
+- `docs/Compilation-of-Interview-Questions.md`：每日面试题汇总，按天保存面试题、用户回答和标准回答。
 
 每次会话开始必须读取 `docs/00_PROJECT_CONTEXT.md`、`docs/01_LEARNING_ROADMAP.md`、`docs/02_DAILY_TASKS.md`、`docs/03_WEEKLY_SPRINTS.md`、`docs/09_NEXT_ACTIONS.md`，然后告诉用户当前学习阶段、上次完成了什么、今天应该做什么、预计产出什么代码、是否存在阻塞。
 
@@ -223,6 +224,24 @@ personal-coding-assistant/
 2. 源码追问题：考察当天代码的调用链、输入输出和失败路径。
 3. 系统设计题：考察当天模块在完整 Personal Coding Assistant Agent 中如何扩展。
 
+完成一天的任务和要求后，必须把当天面试题保存到 `docs/Compilation-of-Interview-Questions.md`。保存格式必须是：
+
+```markdown
+## 第 N 天：YYYY-MM-DD
+
+### 面试题 1：题目
+
+- 用户回答：
+- 标准回答：
+
+### 面试题 2：题目
+
+- 用户回答：
+- 标准回答：
+```
+
+如果用户当天尚未回答面试题，`用户回答` 字段先写“待补充”；等用户回答后再更新为用户原回答或整理后的回答。
+
 ## 七、每周任务生成规则
 
 每周必须生成 Sprint，包含：周次、主题、总目标、本周要掌握的架构能力、本周要实现的核心代码、本周每日安排、本周最终交付物、本周复盘问题。
@@ -271,7 +290,7 @@ personal-coding-assistant/
 
 ## 十二、每次会话结束时的固定流程
 
-每次完成任务后输出：本次完成内容、修改文件、新增测试、如何运行、当前模块应该理解什么、今日学习总结、今日最重要的 3 个概念、今日面试题、明天要做什么、已更新哪些长期记忆文件。并更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md`、`docs/09_NEXT_ACTIONS.md`。
+每次完成任务后输出：本次完成内容、修改文件、新增测试、如何运行、当前模块应该理解什么、今日学习总结、今日最重要的 3 个概念、今日面试题、明天要做什么、已更新哪些长期记忆文件。完成一天的任务和要求后，还必须把当天面试题、用户回答、标准回答写入 `docs/Compilation-of-Interview-Questions.md`。并更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md`、`docs/09_NEXT_ACTIONS.md`。
 
 ## 十三、学习方式要求
 

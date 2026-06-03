@@ -1,5 +1,22 @@
 # Implementation Log
 
+## 2026-06-03
+
+### 本次完成
+
+- 补全 `docs/Compilation-of-Interview-Questions.md` 中第 1 天和第 2 天的面试题归档内容。
+- 第 1 天用户回答根据 2026-05-31 学习验收记录和记忆摘要整理，避免伪造逐字原文。
+- 第 2 天当前没有找到用户面试题回答记录，因此用户回答字段标记为“待补充”。
+- 同步更新 `docs/08_INTERVIEW_BANK.md`，增加 Tool System 面试题。
+- 补充每日面试题归档规则：完成一天任务和要求后，必须把当天面试题保存到 `docs/Compilation-of-Interview-Questions.md`。
+- 规定归档标题格式为“第几天 + 年月日”，内容包含面试题、用户回答和标准回答。
+- 新增 `docs/Compilation-of-Interview-Questions.md`，作为每日面试题汇总文件。
+- 同步更新 `AGENTS.md`、`docs/CODEX_PROJECT_BRIEF.md`、`docs/02_DAILY_TASKS.md` 和 `docs/09_NEXT_ACTIONS.md`。
+
+### 验证
+
+- 本次只修改文档，未涉及业务代码。
+
 ## 2026-06-02
 
 ### 本次完成

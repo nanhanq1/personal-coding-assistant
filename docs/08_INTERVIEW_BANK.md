@@ -22,3 +22,16 @@ mock LLM 让我们稳定复现 tool call 和 final answer，从而先测试 Agen
 4. 为什么今天先用 mock LLM，不直接接入真实 API？
 5. `tool_call -> tool_result -> continue` 这个链路和 ReAct 有什么关系？
 
+## Tool System
+
+### 1. 为什么 Agent 不能长期依赖 `dict[str, callable]` 管理工具？
+
+因为这种方式只能跑通最小 Demo，缺少工具描述、统一注册入口、参数约束、错误处理和权限扩展点。工具数量增加后，Agent Loop 会被具体工具细节污染，不利于后续接入文件工具、shell 工具、权限系统和 MCP。
+
+### 2. `ToolCall`、`Tool`、`ToolRegistry` 和 `AgentLoop` 的职责分别是什么？
+
+`ToolCall` 是 LLM 发出的结构化调用意图；`Tool` 是程序侧对真实工具函数的包装；`ToolRegistry` 是工具注册、查找和执行的统一路由；`AgentLoop` 只负责控制消息循环，把 tool call 交给 registry 执行，并把结果写回 history。
+
+### 3. Day 2 的 `ToolRegistry` 距离工业级工具系统还缺什么？
+
+还缺参数 schema 校验、权限审批、危险工具拦截、超时重试、异步执行、执行日志、trace、结构化错误、工具版本管理和 MCP 工具桥接。
