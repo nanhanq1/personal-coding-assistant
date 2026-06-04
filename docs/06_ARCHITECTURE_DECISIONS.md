@@ -1,5 +1,37 @@
 # Architecture Decisions
 
+## ADR-0003：第 1 周 Day 3 文件工具必须限制在 workspace_root 内
+
+日期：2026-06-04
+
+### 背景
+
+Day 3 开始实现 `read_file` 和 `write_file`。文件工具是 Coding Agent 的第一类真实能力，但如果工具直接接受任意路径，就可能读取或覆盖工作区外的文件。
+
+### 决策
+
+文件工具统一通过 `_resolve_workspace_path(arguments)` 解析路径：
+
+- `arguments["path"]` 是要读写的目标路径。
+- `arguments["workspace_root"]` 是允许读写的工作区根目录；未传入时默认使用当前工作目录。
+- 相对路径先拼到 `workspace_root` 下再解析。
+- 绝对路径必须仍然位于 `workspace_root` 内。
+- 路径越界时抛出 `ValueError`。
+
+### 理由
+
+- 让文件工具从第一天开始具备基本安全边界。
+- 让测试可以用 `tmp_path` 构造隔离工作区，不污染真实项目文件。
+- 为后续权限系统、审计日志和 workspace abstraction 留出清晰接入点。
+- 区分“非法路径”和“文件不存在”两类错误，方便 Agent 后续做恢复策略。
+
+### 暂不采用
+
+- 暂不实现完整权限审批。
+- 暂不实现文件编辑 diff。
+- 暂不实现二进制文件处理。
+- 暂不自动创建缺失的父目录。
+
 ## ADR-0002：第 1 周 Day 2 使用 ToolRegistry 管理工具调用
 
 日期：2026-06-01

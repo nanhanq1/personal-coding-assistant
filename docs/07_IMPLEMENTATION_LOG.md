@@ -1,5 +1,36 @@
 # Implementation Log
 
+## 2026-06-04
+
+### 本次完成
+
+- 评审用户实现的 Day 3 文件工具代码和测试。
+- 修复 `read_file` / `write_file` 的类型标注、路径校验、编码和异常语义。
+- 新增 `_resolve_workspace_path(...)`，把工具参数中的路径解析到 `workspace_root` 内。
+- 将路径越界从“文件不存在时碰巧失败”改为明确抛出 `ValueError`。
+- 允许 `write_file` 写入空字符串，避免把合法空文件内容误判为缺少内容。
+- 重写 `tests/test_file_tools.py`，覆盖文件读写、空内容、缺少内容、空路径、路径越界和 `ToolRegistry` 集成。
+- 更新 `docs/02_DAILY_TASKS.md`、`docs/04_RESOURCE_LIBRARY.md`、`docs/06_ARCHITECTURE_DECISIONS.md` 和 `docs/09_NEXT_ACTIONS.md`。
+
+### 修改文件
+
+- 修改 `src/pca/tools/file_tools.py`，实现 Day 3 文件工具。
+- 修改 `tests/test_file_tools.py`，补全文件工具测试。
+- 更新 `docs/02_DAILY_TASKS.md`，记录 Day 3 当前进度。
+- 更新 `docs/04_RESOURCE_LIBRARY.md`，补充文件工具相关资料链接。
+- 更新 `docs/06_ARCHITECTURE_DECISIONS.md`，新增 ADR-0003。
+- 更新 `docs/07_IMPLEMENTATION_LOG.md`，记录本次评审和补充。
+- 更新 `docs/09_NEXT_ACTIONS.md`，刷新下一步任务。
+
+### 架构决策
+
+- 新增 ADR-0003：第 1 周 Day 3 文件工具必须限制在 `workspace_root` 内。
+
+### 验证
+
+- 运行 `python -m pytest tests\test_file_tools.py -q`：`8 passed in 0.09s`。
+- 运行 `python -m pytest -q`：`16 passed in 0.22s`。
+
 ## 2026-06-03
 
 ### 本次完成

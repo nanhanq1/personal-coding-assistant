@@ -15,7 +15,7 @@
 
 ## 当前进度
 
-- 当前阶段：第 1 周 Day 2 已完成，准备进入 Day 3 文件工具。
+- 当前阶段：第 1 周 Day 3 文件工具已完成第一轮评审和补充，准备进入 Day 3 复盘与面试题回答。
 - 已完成：项目文档初始化、最小 Python 包结构、message schema、mock LLM、最小 Agent Loop、Agent Loop 测试、示例脚本回归测试。
 - 已完成 Day 1 学习验收：用户已经读懂代码，并能解释 Agent Loop、Message history、ToolCall、mock LLM 和 max_turns。
 - 已修复 Day 1 遗留导入问题：核心模块和测试统一使用标准 `pca...` 导入。
@@ -32,26 +32,29 @@
 - 已补全第 1 天和第 2 天的面试题归档内容：第 1 天用户回答根据学习验收记录整理；第 2 天当前没有找到用户原回答记录，用户回答字段先标记为“待补充”。
 - 已完成 2026-06-02 收尾复核：当前没有新增业务代码，测试仍然通过。
 - 最新测试结果：`python -m pytest -q` 为 `8 passed, 1 warning in 0.16s`；warning 来自 `.pytest_cache` 写入权限，不影响功能验收。
+- 已完成 Day 3 文件工具第一轮实现和评审：`read_file` / `write_file` 通过 `workspace_root` 限制读写范围。
+- 已补充 `tests/test_file_tools.py`，覆盖读取、写入、空内容、缺少内容、空路径、路径越界和 `ToolRegistry` 集成。
+- 最新测试结果：`python -m pytest tests\test_file_tools.py -q` 为 `8 passed`；`python -m pytest -q` 为 `16 passed`。
+- 已新增 ADR-0003：文件工具必须限制在 `workspace_root` 内。
 - 当前阻塞：无。
 
 ## 下一次应该继续做什么
 
-继续第 1 周 Day 3：文件工具入门。
+继续第 1 周 Day 3：文件工具复盘与面试题回答。
 
-教学执行方式：先讲文件工具为什么是 Coding Agent 的第一类真实能力，再讲路径、workspace 边界、输入输出和失败场景；不要直接给完整代码，先给 `read_file` / `write_file` 的目标文件、函数签名、测试目标和验收标准，等用户写完后进行代码评审、中文注释和参考实现对比。完成对比后，指出当前文件工具代码处于整体项目的哪个阶段，以及它在整体架构、完整代码、安全性和容错性方面仍存在哪些问题。每日任务中必须补充资料推荐、所需前置知识、当天必须理解的知识点、面试题和网页版视频 / 课程页面；资料和视频推荐必须提供有效、正确、可访问链接，链接不确定时先验证。完成一天任务后，必须把当天面试题、用户回答和标准回答保存到 `docs/Compilation-of-Interview-Questions.md`。
+教学执行方式：先复盘用户原实现中的问题，再讲补充后的 `workspace_root` 路径边界、`tmp_path` 测试方式和 `ToolRegistry` 集成链路。然后让用户回答 Day 3 面试题；完成回答后，把 Day 3 面试题、用户回答和标准回答保存到 `docs/Compilation-of-Interview-Questions.md`。之后再进入 Day 4 shell runtime。
 
 建议任务：
 
-1. 讲解文件工具在 Coding Agent 中解决什么问题。
-2. 设计 `read_file` 工具的输入输出和错误处理。
-3. 设计 `write_file` 工具的输入输出和安全边界。
-4. 在 `src/pca/tools/file_tools.py` 中实现最小文件工具。
-5. 编写 `tests/test_file_tools.py`，覆盖读取、写入、文件不存在和路径边界。
-6. 将文件工具注册进 `ToolRegistry` 的示例或测试中。
-7. 更新学习笔记、实现日志和 next actions。
+1. 复盘 `read_file` / `write_file` 的调用链。
+2. 解释为什么路径越界应抛 `ValueError`，文件不存在应抛 `FileNotFoundError`。
+3. 解释为什么空字符串是合法文件内容。
+4. 让用户回答 Day 3 面试题。
+5. 将 Day 3 面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
+6. 完成 Day 3 收尾后进入第 1 周 Day 4：shell runtime 雏形。
 
 ## 用户下次应发送的指令
 
 ```text
-继续项目，开始第 1 周 Day 3：文件工具入门。请先讲直觉、原理、调用链、目标文件、输入输出和验收测试，不要直接给完整代码。
+继续项目，完成第 1 周 Day 3：文件工具复盘和面试题归档，然后进入 Day 4：shell runtime 雏形。
 ```

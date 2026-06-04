@@ -25,6 +25,14 @@
 - 建议阅读：优先看工具 name、description、arguments、result 这几个字段如何贯穿一次调用。
 - 和本项目的关系：Day 2 的 `Tool` / `ToolRegistry` 是后续文件工具、shell runtime、权限系统和 MCP tool bridge 的基础。
 
+### Day 3 文件工具资料
+
+- Python `pathlib` 官方文档：https://docs.python.org/3/library/pathlib.html
+- pytest `tmp_path` 官方文档：https://docs.pytest.org/en/stable/how-to/tmp_path.html
+- OpenAI Agents SDK Tools 文档：https://openai.github.io/openai-agents-python/tools/
+- Microsoft Learn Python on Windows 路径说明：https://learn.microsoft.com/en-us/windows/python/
+- Real Python `pathlib` 视频课程：https://realpython.com/videos/pathlib-python-overview/
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |
@@ -34,6 +42,8 @@
 | `Claude Code architecture agent harness` | 理解 Claude Code-like harness |
 | `OpenAI Agents SDK tutorial tools handoffs tracing` | 学习标准 Agent SDK |
 | `mini SWE agent architecture bash trajectory` | 学习 shell runtime 和 trajectory |
+| `Python pathlib tutorial` | 学习路径解析和文件读写 |
+| `pytest tmp_path tutorial` | 学习隔离文件系统测试 |
 
 ## 长期资料池
 

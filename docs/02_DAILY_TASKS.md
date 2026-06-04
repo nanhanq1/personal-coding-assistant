@@ -1,5 +1,65 @@
 # Daily Tasks
 
+## 2026-06-04
+
+日期：2026-06-04
+当前阶段：第 1 周 Day 3 文件工具
+当前模块：`read_file` / `write_file` 代码评审、补充实现与测试
+预计用时：1 小时
+
+### 1. 今日学习目标
+
+- 理解文件工具为什么是 Coding Agent 从“会调用函数”走向“能操作代码库”的第一步。
+- 理解路径解析、工作区边界和文件读写错误的职责划分。
+- 学会用测试验证安全边界，而不是依赖某个系统路径不存在来碰巧通过。
+- 理解文件工具如何继续复用 Day 2 的 `Tool` / `ToolRegistry` 抽象。
+
+### 2. 所需前置知识
+
+- Python `pathlib.Path` 的路径拼接、`resolve()`、`read_text()` 和 `write_text()`。
+- pytest `tmp_path` fixture。
+- `ValueError`、`KeyError`、`FileNotFoundError` 的区别。
+- Day 2 调用链：`AgentLoop -> ToolRegistry.run(...) -> Tool.run(...) -> handler(arguments)`。
+
+### 3. 今日必须理解的知识点
+
+- `read_file` / `write_file` 的参数来自 LLM 生成的 `ToolCall.arguments`，因此必须做输入校验。
+- 文件工具不能只关心“能读写”，还必须限制在 `workspace_root` 内。
+- 空字符串是合法文件内容，不能把空内容和缺少内容混为一谈。
+- `tmp_path` 让文件读写测试不污染真实项目文件。
+
+### 4. 今日代码任务
+
+- 评审用户实现的 `src/pca/tools/file_tools.py` 和 `tests/test_file_tools.py`。
+- 修复类型标注、路径校验、编码、异常语义和 workspace 边界问题。
+- 补充 `workspace_root` 路径解析逻辑。
+- 补充文件读写、空内容、缺少内容、路径越界和 `ToolRegistry` 集成测试。
+
+### 5. 今日资料推荐
+
+- Python `pathlib` 官方文档：https://docs.python.org/3/library/pathlib.html
+- pytest `tmp_path` 官方文档：https://docs.pytest.org/en/stable/how-to/tmp_path.html
+- OpenAI Agents SDK Tools 文档：https://openai.github.io/openai-agents-python/tools/
+- Microsoft Learn Python on Windows 路径说明：https://learn.microsoft.com/en-us/windows/python/
+- 视频 / 课程页面：Real Python `pathlib` 视频课程：https://realpython.com/videos/pathlib-python-overview/
+
+### 6. 今日输出物
+
+- `read_file(arguments: dict[str, Any]) -> str`
+- `write_file(arguments: dict[str, Any]) -> str`
+- `_resolve_workspace_path(...)`
+- `tests/test_file_tools.py`
+- ADR-0003：文件工具必须限制在 `workspace_root` 内
+
+### 7. 完成情况
+
+- 已完成第一轮代码评审和补充实现。
+- 已将文件工具限制在 `workspace_root` 内。
+- 已补充测试：读取、写入、空内容、缺少内容、空路径、路径越界和 `ToolRegistry` 集成。
+- 已运行 `python -m pytest tests\test_file_tools.py -q`，结果为 `8 passed`。
+- 已运行 `python -m pytest -q`，结果为 `16 passed`。
+- 下一步需要完成 Day 3 复盘和面试题回答，然后再进入 Day 4 shell runtime。
+
 ## 2026-06-03
 
 日期：2026-06-03  
