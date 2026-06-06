@@ -1,5 +1,68 @@
 # Learning Notes
 
+## Shell Runtime：第 4 天
+
+### 1. 直觉
+
+shell runtime 是 Coding Agent 真正“动手执行命令”的地方。文件工具只影响文件内容，shell 命令可以运行测试、启动进程、读取环境变量、卡住进程，甚至执行破坏性操作，所以必须先有清晰边界。
+
+### 2. 一句话解释
+
+`ShellRuntime` 负责受控执行命令，`ShellCommandTool` 负责把 Agent 的工具调用转发给 runtime。
+
+### 3. 核心调用链
+
+```text
+LLM 生成 ToolCall
+  -> AgentLoop 读取 tool_call.name 和 tool_call.arguments
+  -> ToolRegistry.run(name, arguments)
+  -> ShellCommandTool.run(arguments)
+  -> ShellRuntime.run(arguments)
+  -> subprocess.run(...)
+  -> 返回 stdout / stderr / returncode / timed_out
+  -> AgentLoop 把结果写回 message history
+```
+
+### 4. 流程图
+
+```mermaid
+flowchart TD
+    A["LLM outputs run_command ToolCall"] --> B["AgentLoop"]
+    B --> C["ToolRegistry.run"]
+    C --> D["ShellCommandTool"]
+    D --> E["ShellRuntime"]
+    E --> F["Validate command, cwd, timeout"]
+    F --> G{"cwd inside workspace_root?"}
+    G -- "No" --> H["Raise ValueError"]
+    G -- "Yes" --> I["subprocess.run"]
+    I --> J["stdout / stderr / returncode / timed_out"]
+    J --> K["Append tool result to message history"]
+```
+
+### 5. 技术原理
+
+- `command` 必须是非空字符串。
+- 相对 `cwd` 必须以 `workspace_root` 为基准解析。
+- 解析后的 `cwd` 必须位于 `workspace_root` 内。
+- `timeout_seconds` 要先规范化成正浮点数，再传给 `subprocess.run(...)`。
+- 命令自身失败要保留 `returncode`，参数错误要直接抛 `ValueError`。
+- `stdout` 给 Agent 看正常输出，`stderr` 给 Agent 判断错误原因，`returncode` 判断命令是否成功，`timed_out` 判断是否需要停止或重试。
+
+### 6. 当前代码位置
+
+- runtime：`src/pca/runtime/shell_runtime.py`
+- tool：`src/pca/tools/shell_tools.py`
+- 测试：`tests/test_shell_runtime.py`
+- 架构决策：`docs/06_ARCHITECTURE_DECISIONS.md` 中的 ADR-0004
+
+### 7. 工业级增强方向
+
+- 接入权限系统，执行危险命令前请求用户确认。
+- 增加命令 allowlist / denylist 和风险分类。
+- 增加审计日志，记录命令、工作目录、退出码、耗时和 trace id。
+- 增加进程树清理，避免超时后留下子进程。
+- 增加 sandbox / docker runtime，减少宿主机风险。
+
 ## Agent Loop：第 1 天
 
 ### 1. 直觉

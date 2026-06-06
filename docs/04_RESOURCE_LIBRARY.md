@@ -33,6 +33,13 @@
 - Microsoft Learn Python on Windows 路径说明：https://learn.microsoft.com/en-us/windows/python/
 - Real Python `pathlib` 视频课程：https://realpython.com/videos/pathlib-python-overview/
 
+### Day 4 shell runtime 资料
+
+- Python `subprocess` 官方文档：https://docs.python.org/3/library/subprocess.html
+- pytest monkeypatch 官方文档：https://docs.pytest.org/en/stable/how-to/monkeypatch.html
+- PowerShell `pwsh` 命令行说明：https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_pwsh
+- Python `locale` 官方文档：https://docs.python.org/3/library/locale.html
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |
@@ -44,6 +51,8 @@
 | `mini SWE agent architecture bash trajectory` | 学习 shell runtime 和 trajectory |
 | `Python pathlib tutorial` | 学习路径解析和文件读写 |
 | `pytest tmp_path tutorial` | 学习隔离文件系统测试 |
+| `Python subprocess timeout cwd stdout stderr tutorial` | 学习命令执行输入输出和超时 |
+| `shell command sandbox workspace root safety` | 学习 shell runtime 安全边界 |
 
 ## 长期资料池
 

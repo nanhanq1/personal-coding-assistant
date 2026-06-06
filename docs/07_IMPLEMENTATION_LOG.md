@@ -1,5 +1,39 @@
 # Implementation Log
 
+## 2026-06-06
+
+### 本次完成
+
+- 更新长期教学要求：把“不能直接给代码 / 必须先让用户自己写”调整为“先讲清代码逻辑并确认理解，再给出完整、安全、全面、工程级代码”。
+- 同步更新 `AGENTS.md`、`docs/CODEX_PROJECT_BRIEF.md`、`docs/02_DAILY_TASKS.md` 和 `docs/09_NEXT_ACTIONS.md`。
+- 评审用户重新修改的文件工具和 shell runtime 代码。
+- 修复 `ReadFileTool`、`WriteFileTool`、`ShellCommandTool` 继承 `Tool` 后缺少 `handler` 的初始化问题。
+- 修复 `write_file` 缺少 `content` 时的异常语义。
+- 修复 shell runtime 的 `cwd` 解析，让相对路径以 `workspace_root` 为基准。
+- 修复 Windows 下子进程输出中文路径时的解码问题，改用本机 locale。
+- 调整文件工具测试中的平台假设：符号链接无权限时跳过，`..` 路径测试保持在工作区内。
+- 新增并修复 `tests/test_shell_runtime.py`，覆盖命令成功、失败、工作目录、超时、环境变量、输出捕获和 `ToolRegistry` 集成。
+- 根据代码评审发现的问题，将 shell 执行逻辑从 `src/pca/tools/shell_tools.py` 拆分到 `src/pca/runtime/shell_runtime.py`。
+- 新增 `ShellRuntime`，由 runtime 层负责参数校验、`cwd` 解析、环境变量合并、`subprocess.run(...)` 调用和超时结果封装。
+- 简化 `ShellCommandTool`，让它只负责注册 `run_command` 工具并转发给 runtime。
+- 修复 `timeout_seconds` 字符串数字会传入 `subprocess.run(...)` 触发 TypeError 的问题，统一规范化为正浮点数。
+- 保留命令自身失败的 `returncode`，但让工具参数错误直接抛 `ValueError`。
+- 将 `tests/test_shell_runtime.py` 中的 Python 子进程命令改为使用 `sys.executable`，减少 PATH 依赖。
+- 更新 `docs/02_DAILY_TASKS.md`、`docs/04_RESOURCE_LIBRARY.md`、`docs/06_ARCHITECTURE_DECISIONS.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
+
+### 架构决策
+
+- 新增 ADR-0004：第 1 周 Day 4 shell runtime 先实现受工作区限制的同步命令执行。
+- 更新 ADR-0003：`write_file` 写入嵌套路径时会自动创建缺失的父目录。
+- 补充 ADR-0004：shell 执行逻辑属于 runtime 层，tool 层只负责包装和转发。
+
+### 验证
+
+- 先运行 `python -m pytest tests\test_shell_runtime.py -q` 观察 RED：失败原因为 `pca.runtime.shell_runtime` 中尚无 `run_command`。
+- 拆分实现后运行 `python -m pytest tests\test_shell_runtime.py -q`：`17 passed`。
+- 运行 `python -m pytest tests\test_file_tools.py tests\test_shell_runtime.py -q`：`37 passed, 1 skipped`。
+- 运行 `python -m pytest -q`：`45 passed, 1 skipped`。
+
 ## 2026-06-05
 
 ### 本次完成

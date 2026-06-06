@@ -1,5 +1,70 @@
 # Daily Tasks
 
+## 2026-06-06
+
+日期：2026-06-06
+当前阶段：第 1 周 Day 4 shell runtime 工程化拆分
+当前模块：`ShellRuntime` / `ShellCommandTool` / `run_command`
+预计用时：1 小时
+
+### 1. 今日学习目标
+
+- 理解 shell runtime 为什么比文件工具更危险。
+- 理解命令执行必须记录 `stdout`、`stderr`、`returncode` 和超时状态。
+- 理解工作目录必须限制在 `workspace_root` 内。
+- 理解 Windows 输出编码和符号链接权限会影响测试设计。
+
+### 2. 所需前置知识
+
+- Python `subprocess.run(...)`。
+- `cwd`、`timeout`、`env`、`stdout`、`stderr`、`returncode`。
+- Day 2 的 `Tool` / `ToolRegistry` 调用链。
+- Day 3 的 `workspace_root` 边界思想。
+
+### 3. 今日必须理解的知识点
+
+- `Tool` 是包装器，工具类如果继承它，必须在初始化时传入 `handler`。
+- shell 命令会对真实运行环境产生影响，因此必须先限制 `cwd`。
+- 相对 `cwd` 应以 `workspace_root` 为基准解析，而不是以当前进程目录为基准。
+- Windows 下子进程输出路径可能包含中文字符，解码应使用本机 locale。
+
+### 4. 今日代码任务
+
+- 评审并修复 `src/pca/tools/file_tools.py` 中工具类继承 `Tool` 的初始化问题。
+- 实现并修复 `src/pca/tools/shell_tools.py` 的 `ShellCommandTool`。
+- 新增 `tests/test_shell_runtime.py`，覆盖成功命令、失败命令、工作目录、超时、环境变量、stdout/stderr 和 `ToolRegistry` 集成。
+- 调整 `tests/test_file_tools.py` 中与平台权限和路径语义不一致的测试。
+
+### 5. 今日资料推荐
+
+- Python `subprocess` 官方文档：https://docs.python.org/3/library/subprocess.html
+- pytest monkeypatch 官方文档：https://docs.pytest.org/en/stable/how-to/monkeypatch.html
+- PowerShell `pwsh` 命令行说明：https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_pwsh
+- Python `locale` 官方文档：https://docs.python.org/3/library/locale.html
+
+### 6. 今日输出物
+
+- `ShellCommandTool`
+- `ShellRuntime.run(arguments: dict[str, Any]) -> dict[str, Any]`
+- `run_command(arguments: dict[str, Any]) -> dict[str, Any]`
+- `tests/test_shell_runtime.py`
+- ADR-0004：shell runtime 先实现受工作区限制的同步命令执行
+
+### 7. 完成情况
+
+- 已修复工具类继承 `Tool` 时缺少 `handler` 的问题。
+- 已实现 `ShellCommandTool` 和函数形式 `run_command(...)`。
+- 已补充 shell runtime 测试。
+- 已修正文件工具测试中的平台假设。
+- 已将 subprocess 执行逻辑从 `ShellCommandTool` 拆到 `ShellRuntime`，让 tool 层只负责工具包装和注册。
+- 已修复 `timeout_seconds` 字符串数字会传入 `subprocess.run(...)` 导致 TypeError 的问题。
+- 已让非法 `timeout_seconds` 在参数边界抛 `ValueError`，不再被伪装成命令执行失败。
+- 已将测试中的子进程 Python 命令改为使用 `sys.executable`，降低 PATH 依赖。
+- 已更新教学要求：从“不能直接给代码”调整为“先让被教学者真正理解代码逻辑，再给出完整、安全、全面、工程级代码”。
+- 已运行 `python -m pytest tests\test_file_tools.py tests\test_shell_runtime.py -q`，结果为 `37 passed, 1 skipped`。
+- 已运行 `python -m pytest -q`，结果为 `45 passed, 1 skipped`。
+- 下一步需要复盘 Day 4 shell runtime，并让用户回答 Day 4 面试题。
+
 ## 2026-06-05
 
 日期：2026-06-05

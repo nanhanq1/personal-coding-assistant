@@ -1,5 +1,43 @@
 # Architecture Decisions
 
+## ADR-0004：第 1 周 Day 4 shell runtime 先实现受工作区限制的同步命令执行
+
+日期：2026-06-06
+
+### 背景
+
+Day 4 开始实现 shell runtime。相比文件工具，shell 命令可以执行任意程序、访问环境变量、创建文件、删除文件或长时间运行，因此必须先定义最小安全边界。
+
+### 决策
+
+新增 `ShellRuntime`、`ShellCommandTool` 和 `run_command(arguments)`：
+
+- 必须提供 `command`、`workspace_root` 和 `timeout_seconds`。
+- `cwd` 可选，默认相对于 `workspace_root` 的当前目录。
+- 相对 `cwd` 以 `workspace_root` 为基准解析。
+- 解析后的 `cwd` 必须位于 `workspace_root` 内，否则抛 `ValueError`。
+- 命令执行逻辑位于 `src/pca/runtime/shell_runtime.py`，通过 `subprocess.run(...)` 同步执行。
+- `ShellCommandTool` 位于 `src/pca/tools/shell_tools.py`，只负责把工具调用转发给 runtime。
+- `timeout_seconds` 会被规范化为正浮点数后再传给 `subprocess.run(...)`。
+- 参数校验错误直接抛 `ValueError`，不伪装成命令执行失败。
+- 返回值包含 `stdout`、`stderr`、`returncode` 和 `timed_out`。
+- 超时时返回 `returncode=-1` 和 `timed_out=True`。
+
+### 理由
+
+- 让 Day 4 先具备可测试的最小 runtime 行为。
+- 保留命令输出、错误输出、退出码和超时状态，方便后续 Agent 判断下一步。
+- 将工作目录边界前置，避免 shell 命令默认在未授权目录中执行。
+- 保持 runtime 层和 tool 层分离，后续可以把本地 runtime 替换为 sandbox、docker 或远程 runtime。
+- 为后续权限系统、危险命令检测、审计日志和 sandbox runtime 留出扩展点。
+
+### 暂不采用
+
+- 暂不实现危险命令审批。
+- 暂不实现异步命令和流式输出。
+- 暂不实现进程树清理。
+- 暂不实现跨平台 shell 解析抽象。
+
 ## ADR-0003：第 1 周 Day 3 文件工具必须限制在 workspace_root 内
 
 日期：2026-06-04
@@ -17,6 +55,7 @@ Day 3 开始实现 `read_file` 和 `write_file`。文件工具是 Coding Agent �
 - 相对路径先拼到 `workspace_root` 下再解析。
 - 绝对路径必须仍然位于 `workspace_root` 内。
 - 路径越界时抛出 `ValueError`。
+- `write_file` 写入嵌套路径时会自动创建缺失的父目录。
 
 ### 理由
 
@@ -30,7 +69,6 @@ Day 3 开始实现 `read_file` 和 `write_file`。文件工具是 Coding Agent �
 - 暂不实现完整权限审批。
 - 暂不实现文件编辑 diff。
 - 暂不实现二进制文件处理。
-- 暂不自动创建缺失的父目录。
 
 ## ADR-0002：第 1 周 Day 2 使用 ToolRegistry 管理工具调用
 
