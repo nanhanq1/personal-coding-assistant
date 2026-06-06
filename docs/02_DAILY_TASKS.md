@@ -1,5 +1,34 @@
 # Daily Tasks
 
+## 2026-06-05
+
+日期：2026-06-05
+当前阶段：第 1 周 Day 3 收尾
+当前模块：文件工具面试题评审与归档
+预计用时：20 分钟
+
+### 1. 今日学习目标
+
+- 检查用户对文件工具四个核心问题的理解是否到位。
+- 将 Day 3 面试题、用户回答和标准回答沉淀到每日面试题归档。
+- 明确 Day 3 文件工具在整体架构中的位置，并准备进入 Day 4 shell runtime。
+
+### 2. 今日输出物
+
+- 已评审 Day 3 四个面试题回答。
+- 已更新 `docs/Compilation-of-Interview-Questions.md`，追加第 3 天记录。
+- 已更新 `docs/05_LEARNING_NOTES.md`，补充 Day 3 文件工具学习笔记和流程图。
+- 已更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
+
+### 3. 完成情况
+
+- 用户已能说明 LLM 只能生成文本，真实写入需要文件工具。
+- 用户已能说明 `read_file` 返回值进入上下文后帮助 LLM 决策。
+- 用户已能指出 workspace 边界的安全意义。
+- 用户已能区分 `ToolCall` 的调用意图和 `read_file()` 的真实执行。
+- 已补齐 Day 3 学习笔记、调用链、流程图、检查问题和工业级增强方向。
+- 已使用项目内临时目录运行 `python -m pytest -q`，结果为 `16 passed`。
+
 ## 2026-06-04
 
 日期：2026-06-04
@@ -57,8 +86,10 @@
 - 已将文件工具限制在 `workspace_root` 内。
 - 已补充测试：读取、写入、空内容、缺少内容、空路径、路径越界和 `ToolRegistry` 集成。
 - 已运行 `python -m pytest tests\test_file_tools.py -q`，结果为 `8 passed`。
-- 已运行 `python -m pytest -q`，结果为 `16 passed`。
-- 下一步需要完成 Day 3 复盘和面试题回答，然后再进入 Day 4 shell runtime。
+- 已使用项目内临时目录运行 `python -m pytest -q`，结果为 `16 passed`。
+- 已完成 Day 3 面试题回答评审，并归档到 `docs/Compilation-of-Interview-Questions.md`。
+- 已补齐 Day 3 学习笔记和流程图。
+- 下一步进入第 1 周 Day 4：shell runtime 雏形。
 
 ## 2026-06-03
 

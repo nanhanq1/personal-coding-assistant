@@ -15,7 +15,7 @@
 
 ## 当前进度
 
-- 当前阶段：第 1 周 Day 3 文件工具已完成第一轮评审和补充，准备进入 Day 3 复盘与面试题回答。
+- 当前阶段：第 1 周 Day 3 文件工具已完成，准备进入 Day 4 shell runtime 雏形。
 - 已完成：项目文档初始化、最小 Python 包结构、message schema、mock LLM、最小 Agent Loop、Agent Loop 测试、示例脚本回归测试。
 - 已完成 Day 1 学习验收：用户已经读懂代码，并能解释 Agent Loop、Message history、ToolCall、mock LLM 和 max_turns。
 - 已修复 Day 1 遗留导入问题：核心模块和测试统一使用标准 `pca...` 导入。
@@ -36,25 +36,27 @@
 - 已补充 `tests/test_file_tools.py`，覆盖读取、写入、空内容、缺少内容、空路径、路径越界和 `ToolRegistry` 集成。
 - 最新测试结果：`python -m pytest tests\test_file_tools.py -q` 为 `8 passed`；`python -m pytest -q` 为 `16 passed`。
 - 已新增 ADR-0003：文件工具必须限制在 `workspace_root` 内。
+- 已完成 Day 3 面试题回答评审，并将第 3 天记录追加到 `docs/Compilation-of-Interview-Questions.md`。
+- 已补齐 `docs/05_LEARNING_NOTES.md` 的 Day 3 文件工具学习笔记、调用链、流程图、检查问题和工业级增强方向。
 - 当前阻塞：无。
 
 ## 下一次应该继续做什么
 
-继续第 1 周 Day 3：文件工具复盘与面试题回答。
+继续第 1 周 Day 4：shell runtime 雏形。
 
-教学执行方式：先复盘用户原实现中的问题，再讲补充后的 `workspace_root` 路径边界、`tmp_path` 测试方式和 `ToolRegistry` 集成链路。然后让用户回答 Day 3 面试题；完成回答后，把 Day 3 面试题、用户回答和标准回答保存到 `docs/Compilation-of-Interview-Questions.md`。之后再进入 Day 4 shell runtime。
+教学执行方式：先讲 shell runtime 为什么比文件工具更危险，再讲命令输入输出、工作目录、超时、返回码、stderr/stdout 和安全边界；不要直接给完整代码，先给目标文件、函数签名、测试目标和验收标准，等用户写完后进行代码评审、中文注释和参考实现对比。
 
 建议任务：
 
-1. 复盘 `read_file` / `write_file` 的调用链。
-2. 解释为什么路径越界应抛 `ValueError`，文件不存在应抛 `FileNotFoundError`。
-3. 解释为什么空字符串是合法文件内容。
-4. 让用户回答 Day 3 面试题。
-5. 将 Day 3 面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
-6. 完成 Day 3 收尾后进入第 1 周 Day 4：shell runtime 雏形。
+1. 讲解 shell runtime 在 Coding Agent 中解决什么问题。
+2. 设计 `run_command` / `run_bash` 的输入输出和错误处理。
+3. 先用 mock 或受限 subprocess 实现最小命令执行。
+4. 编写测试覆盖成功命令、失败命令、工作目录、超时和 stdout/stderr。
+5. 明确 shell runtime 与后续权限系统的边界。
+6. 更新学习笔记、实现日志、架构决策和 next actions。
 
 ## 用户下次应发送的指令
 
 ```text
-继续项目，完成第 1 周 Day 3：文件工具复盘和面试题归档，然后进入 Day 4：shell runtime 雏形。
+继续项目，开始第 1 周 Day 4：shell runtime 雏形。请先讲直觉、原理、调用链、目标文件、输入输出和验收测试，不要直接给完整代码。
 ```

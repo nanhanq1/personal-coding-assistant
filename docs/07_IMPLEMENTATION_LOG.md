@@ -1,5 +1,19 @@
 # Implementation Log
 
+## 2026-06-05
+
+### 本次完成
+
+- 补齐 `docs/05_LEARNING_NOTES.md` 的 Day 3 文件工具学习笔记、调用链、流程图、检查问题和工业级增强方向。
+- 评审用户对 Day 3 文件工具四个面试题的回答。
+- 将第 3 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
+- 明确补充点：message history 可用于复盘和重新推理，但完整回滚需要 checkpoint、git diff 或 workspace snapshot。
+- 更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`，把项目推进到 Day 4 shell runtime。
+
+### 验证
+
+- 运行 `python -m pytest -q`：`16 passed`。
+
 ## 2026-06-04
 
 ### 本次完成
