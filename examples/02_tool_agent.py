@@ -1,2 +1,1 @@
-"""Placeholder for Week 1 Day 2."""
-
+"""第 1 周 Day 2 工具 Agent 示例占位文件。"""

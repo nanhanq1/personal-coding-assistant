@@ -1,5 +1,47 @@
 # Learning Notes
 
+## 工业级代码审查：2026-06-06
+
+### 1. 直觉
+
+“代码能跑”只说明 happy path 成立；“工业级代码”还要回答坏输入、工具失败、目录错误、超时、密钥泄露和后续恢复怎么办。
+
+### 2. 本次审查出的关键问题
+
+- 早期实验脚本在源码中硬编码 API key，这是高风险凭据泄露问题。
+- 实验脚本导入时就创建真实 OpenAI client，会让包导入依赖网络配置和第三方 SDK。
+- `Tool`、`ToolRegistry`、`Message` 和 `ToolCall` 没有在边界处拒绝坏数据。
+- `AgentLoop` 直接抛出工具异常，导致 LLM 看不到失败原因，也无法恢复。
+- 文件工具读目录时依赖 Windows 的 `PermissionError`，错误语义不稳定。
+- shell runtime 对不存在的工作区、无效 `cwd`、超大超时值和空环境变量名缺少前置校验。
+
+### 3. 加固后的调用链
+
+```text
+user_input
+  -> AgentLoop 校验输入和 max_turns
+  -> LLM.complete(messages) 必须返回 Message
+  -> Message / ToolCall 校验消息结构
+  -> ToolRegistry 校验工具名和 arguments
+  -> Tool.run 校验 arguments 是 dict
+  -> FileTool / ShellRuntime 做工作区、目录、超时、环境变量边界校验
+  -> 成功结果或工具错误写回 message history
+  -> LLM 可以继续恢复或给出最终回答
+```
+
+### 4. 本次保留的对比材料
+
+- 修改前代码快照：`docs/code_reviews/2026-06-06-before-industrial-refactor/`
+- 安全说明：快照中的旧版 API key 已替换为 `<REDACTED_API_KEY>`。
+- 当前正式源码已新增测试，防止 `src/` 再出现硬编码 key。
+
+### 5. 当前仍不是完整工业级的地方
+
+- shell runtime 仍使用本机 shell，同步执行，还没有权限审批、命令风险分类、sandbox 和进程树清理。
+- 文件工具还没有 diff 编辑、文件大小上限、二进制检测和写入前审批。
+- Responses API 实验脚本仍只是学习材料，不是正式 LLM adapter。
+- 错误回写目前是字符串形式，后续应升级为结构化 tool result 和可观测日志。
+
 ## Shell Runtime：第 4 天
 
 ### 1. 直觉

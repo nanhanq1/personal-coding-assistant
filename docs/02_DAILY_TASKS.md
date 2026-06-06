@@ -3,8 +3,8 @@
 ## 2026-06-06
 
 日期：2026-06-06
-当前阶段：第 1 周 Day 4 shell runtime 工程化拆分
-当前模块：`ShellRuntime` / `ShellCommandTool` / `run_command`
+当前阶段：第 1 周 Day 4 shell runtime 工程化拆分与工业级代码审查
+当前模块：`AgentLoop` / `ToolRegistry` / `FileTool` / `ShellRuntime` / Responses API 实验脚本
 预计用时：1 小时
 
 ### 1. 今日学习目标
@@ -13,6 +13,7 @@
 - 理解命令执行必须记录 `stdout`、`stderr`、`returncode` 和超时状态。
 - 理解工作目录必须限制在 `workspace_root` 内。
 - 理解 Windows 输出编码和符号链接权限会影响测试设计。
+- 理解工业级代码审查不只看 happy path，还必须看坏输入、工具失败、密钥、目录和超时边界。
 
 ### 2. 所需前置知识
 
@@ -27,6 +28,8 @@
 - shell 命令会对真实运行环境产生影响，因此必须先限制 `cwd`。
 - 相对 `cwd` 应以 `workspace_root` 为基准解析，而不是以当前进程目录为基准。
 - Windows 下子进程输出路径可能包含中文字符，解码应使用本机 locale。
+- API key 不能硬编码在源码中，实验脚本也不能导入时就创建真实 client。
+- 工具失败要进入 `message history`，让 LLM 有机会恢复，而不是直接丢失轨迹。
 
 ### 4. 今日代码任务
 
@@ -34,6 +37,8 @@
 - 实现并修复 `src/pca/tools/shell_tools.py` 的 `ShellCommandTool`。
 - 新增 `tests/test_shell_runtime.py`，覆盖成功命令、失败命令、工作目录、超时、环境变量、stdout/stderr 和 `ToolRegistry` 集成。
 - 调整 `tests/test_file_tools.py` 中与平台权限和路径语义不一致的测试。
+- 对当前已实现代码做工业级审查，并保留修改前快照用于对比。
+- 补充工具元数据、消息结构、AgentLoop、文件工具、shell runtime 和 API 实验脚本的安全边界测试。
 
 ### 5. 今日资料推荐
 
@@ -61,8 +66,19 @@
 - 已让非法 `timeout_seconds` 在参数边界抛 `ValueError`，不再被伪装成命令执行失败。
 - 已将测试中的子进程 Python 命令改为使用 `sys.executable`，降低 PATH 依赖。
 - 已更新教学要求：从“不能直接给代码”调整为“先让被教学者真正理解代码逻辑，再给出完整、安全、全面、工程级代码”。
+- 已创建修改前代码快照：`docs/code_reviews/2026-06-06-before-industrial-refactor/`，其中旧版 API key 已脱敏。
+- 已移除正式源码中的硬编码 API key，Responses API 实验脚本改为从环境变量惰性创建 client。
+- 已补充 `tests/test_api_experiments.py`，防止 `src/` 再出现硬编码 key，并验证实验模块导入时不创建真实 client。
+- 已为 `Tool`、`ToolRegistry`、`Message`、`ToolCall`、`ScriptedLLM`、`AgentLoop`、文件工具和 shell runtime 增加更严格边界校验。
+- 已将占位源码和示例的说明文字改为中文。
+- 已按用户要求，在核心修改后的新源码中加入“修改前旧代码”注释片段，方便直接对比；涉及 API key 的旧代码片段已脱敏。
 - 已运行 `python -m pytest tests\test_file_tools.py tests\test_shell_runtime.py -q`，结果为 `37 passed, 1 skipped`。
 - 已运行 `python -m pytest -q`，结果为 `45 passed, 1 skipped`。
+- 已运行工业级加固目标测试：`python -m pytest tests\test_tools.py tests\test_agent_loop.py tests\test_file_tools.py tests\test_shell_runtime.py tests\test_api_experiments.py -q`，结果为 `61 passed, 1 skipped`。
+- 已运行最新全量测试：`python -m pytest -q`，结果为 `62 passed, 1 skipped`。
+- 已运行 `python examples\01_minimal_agent.py`，示例输出完整 `user -> assistant -> tool -> assistant` 链路。
+- 已运行 `python -m compileall src examples -q`，源码和示例均可编译。
+- 已扫描 `src/` 和修改前快照，未再发现 `sk-` 字面量。
 - 下一步需要复盘 Day 4 shell runtime，并让用户回答 Day 4 面试题。
 
 ## 2026-06-05

@@ -1,2 +1,1 @@
-"""MCP client will be implemented in Week 8."""
-
+"""MCP client 占位模块，计划在第 8 周实现。"""

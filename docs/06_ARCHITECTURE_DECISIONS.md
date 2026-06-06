@@ -1,5 +1,41 @@
 # Architecture Decisions
 
+## ADR-0005：工业级加固必须先处理输入校验、错误回写和密钥边界
+
+日期：2026-06-06
+
+### 背景
+
+本次对当前所有已实现代码进行审查时发现，核心运行路径已经能完成最小 Agent Loop、文件工具和 shell runtime，但仍存在工业级边界不足：
+
+- 早期 Responses API 实验脚本把 API key 硬编码在源码中，并在模块导入时创建真实 client。
+- `Tool`、`ToolRegistry`、`Message` 和 `ToolCall` 对外部输入缺少结构校验。
+- `AgentLoop` 遇到工具失败时会直接抛异常，LLM 无法基于错误信息恢复。
+- 文件工具和 shell runtime 对目录、工作区根目录、环境变量和超时上限的校验还不完整。
+
+### 决策
+
+- API 实验脚本只能惰性创建 client，密钥必须来自 `PCA_OPENAI_API_KEY` 或 `OPENAI_API_KEY` 环境变量。
+- 正式源码中不得出现硬编码 API key；新增测试扫描 `src/` 下的 Python 文件防止回归。
+- `Tool`、`ToolRegistry`、`Message`、`ToolCall` 和 `ScriptedLLM` 在边界处做类型和结构校验。
+- `AgentLoop` 对工具执行异常进行捕获，并把错误作为 `role="tool"` 的消息写回 `message history`，让 LLM 有机会恢复。
+- 文件工具要求 `workspace_root` 是已存在目录，读取目录时抛稳定的 `IsADirectoryError`，写入内容必须是字符串。
+- shell runtime 要求 `workspace_root` 和 `cwd` 都是已存在目录，限制 `timeout_seconds` 上限，并拒绝空环境变量名。
+- 修改前代码快照保存在 `docs/code_reviews/2026-06-06-before-industrial-refactor/`，其中旧版敏感 key 已脱敏。
+
+### 理由
+
+- Agent 接收的参数最终来自 LLM 或用户输入，不能默认可信。
+- 工具失败是 Agent 正常运行的一部分，保留错误轨迹比直接中断更利于恢复和调试。
+- API key 属于凭据，不应出现在源码、测试或备份快照中。
+- 运行前校验能把平台相关异常转换为稳定、可测试、可解释的错误语义。
+
+### 暂不采用
+
+- 暂不提前实现完整权限系统、风险分类器和审批流；这些仍留到第 3 周。
+- 暂不把 Responses API 实验脚本升级为正式 LLM adapter；当前主路径继续使用 mock LLM。
+- 暂不实现完整 sandbox、进程树清理和命令 allowlist；这些仍属于后续 runtime 模块。
+
 ## ADR-0004：第 1 周 Day 4 shell runtime 先实现受工作区限制的同步命令执行
 
 日期：2026-06-06

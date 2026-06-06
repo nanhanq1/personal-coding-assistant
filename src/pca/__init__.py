@@ -1,2 +1,1 @@
-"""Personal Coding Assistant Agent package."""
-
+"""Personal Coding Assistant Agent 项目主包。"""

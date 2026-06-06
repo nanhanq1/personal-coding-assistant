@@ -1,2 +1,1 @@
-"""Long-term memory package."""
-
+"""长期记忆相关模块包。"""

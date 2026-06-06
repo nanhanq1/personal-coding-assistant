@@ -11,7 +11,7 @@ from pca.tools.registry import ToolRegistry
 
 
 def main() -> None:
-    """Run the Day 1 minimal Agent Loop demo."""
+    """运行第 1 天最小 Agent Loop 示例。"""
 
     llm = ScriptedLLM(
         responses=[

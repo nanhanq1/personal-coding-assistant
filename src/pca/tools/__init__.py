@@ -1,2 +1,1 @@
-"""Tool abstractions and built-in coding tools."""
-
+"""工具抽象与内置 coding 工具模块包。"""

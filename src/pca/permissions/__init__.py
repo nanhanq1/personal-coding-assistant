@@ -1,2 +1,1 @@
-"""Permission and approval system package."""
-
+"""权限与审批系统相关模块包。"""

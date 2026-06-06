@@ -1,2 +1,1 @@
-"""Prompt builder will be implemented in Week 5."""
-
+"""提示词构建器占位模块，计划在第 5 周实现。"""

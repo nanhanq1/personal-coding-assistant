@@ -1,2 +1,1 @@
-"""Human approval flow will be implemented in Week 3."""
-
+"""人工审批流程占位模块，计划在第 3 周实现。"""

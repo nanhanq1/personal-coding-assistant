@@ -1,2 +1,1 @@
-"""Context compressor will be implemented in Week 6."""
-
+"""上下文压缩器占位模块，计划在第 6 周实现。"""

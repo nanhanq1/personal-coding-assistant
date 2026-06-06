@@ -4,6 +4,23 @@
 
 ### 本次完成
 
+- 完成当前所有已实现代码的工业级审查，覆盖 `src/`、`tests/` 和 `examples/`。
+- 创建修改前代码快照：`docs/code_reviews/2026-06-06-before-industrial-refactor/`，用于后续对比；旧版硬编码 API key 已在快照中脱敏。
+- 发现并修复早期 Responses API 实验脚本中的硬编码 API key 问题。
+- 将 `src/pca/response_test.py` 和 `src/pca/mini_LLM_01.py` 改为惰性创建 OpenAI client，只从 `PCA_OPENAI_API_KEY` 或 `OPENAI_API_KEY` 环境变量读取密钥。
+- 修复早期实验脚本导入时依赖 OpenAI SDK 和真实 client 的问题，避免污染正式包导入路径。
+- 新增 `tests/test_api_experiments.py`，扫描正式源码防止硬编码 key 回归。
+- 为 `Tool` 增加名称、描述、handler 和 arguments 校验。
+- 为 `ToolRegistry` 增加注册对象类型、工具名和 arguments 校验。
+- 为 `ToolCall`、`Message` 和 `ScriptedLLM` 增加结构校验。
+- 为 `AgentLoop` 增加 `llm`、`tools`、`max_turns` 和 `user_input` 校验。
+- 调整 `AgentLoop` 工具错误处理：工具失败时把错误写回 `message history`，让 LLM 有机会恢复。
+- 为文件工具补充 `workspace_root` 必须存在、读取目录错误稳定化、写入内容必须为字符串等边界。
+- 为 shell runtime 补充 `workspace_root` / `cwd` 必须存在、超时上限、空环境变量名拒绝和 `duration_ms` 返回字段。
+- 将源码占位模块和示例文件的说明文字改为中文。
+- 新增 ADR-0005：工业级加固必须先处理输入校验、错误回写和密钥边界。
+- 更新 `docs/05_LEARNING_NOTES.md`，补充本次工业级代码审查学习笔记。
+- 按用户要求，在核心修改后的新源码中补充“修改前旧代码”注释片段，用于和当前实现就地对比；涉及敏感 API key 的旧代码片段已脱敏。
 - 更新长期教学要求：把“不能直接给代码 / 必须先让用户自己写”调整为“先讲清代码逻辑并确认理解，再给出完整、安全、全面、工程级代码”。
 - 同步更新 `AGENTS.md`、`docs/CODEX_PROJECT_BRIEF.md`、`docs/02_DAILY_TASKS.md` 和 `docs/09_NEXT_ACTIONS.md`。
 - 评审用户重新修改的文件工具和 shell runtime 代码。
@@ -23,12 +40,19 @@
 
 ### 架构决策
 
+- 新增 ADR-0005：工业级加固必须先处理输入校验、错误回写和密钥边界。
 - 新增 ADR-0004：第 1 周 Day 4 shell runtime 先实现受工作区限制的同步命令执行。
 - 更新 ADR-0003：`write_file` 写入嵌套路径时会自动创建缺失的父目录。
 - 补充 ADR-0004：shell 执行逻辑属于 runtime 层，tool 层只负责包装和转发。
 
 ### 验证
 
+- 先运行新增目标测试观察 RED：`python -m pytest tests\test_tools.py tests\test_agent_loop.py tests\test_file_tools.py tests\test_shell_runtime.py tests\test_api_experiments.py -q`，结果为 `17 failed, 44 passed, 1 skipped`。
+- 修复后运行同一目标测试：`61 passed, 1 skipped`。
+- 运行最新全量测试：`python -m pytest -q`，结果为 `62 passed, 1 skipped`。
+- 运行 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 运行 `python -m compileall src examples -q`：通过。
+- 扫描 `src/` 和修改前快照中的 `sk-` 字面量：未发现匹配。
 - 先运行 `python -m pytest tests\test_shell_runtime.py -q` 观察 RED：失败原因为 `pca.runtime.shell_runtime` 中尚无 `run_command`。
 - 拆分实现后运行 `python -m pytest tests\test_shell_runtime.py -q`：`17 passed`。
 - 运行 `python -m pytest tests\test_file_tools.py tests\test_shell_runtime.py -q`：`37 passed, 1 skipped`。

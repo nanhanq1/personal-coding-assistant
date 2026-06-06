@@ -1,2 +1,1 @@
-"""Memory base abstractions will be implemented in Week 9."""
-
+"""Memory 基础抽象占位模块，计划在第 9 周实现。"""

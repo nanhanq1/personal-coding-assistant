@@ -15,7 +15,7 @@
 
 ## 当前进度
 
-- 当前阶段：第 1 周 Day 4 shell runtime 已完成工程化拆分，准备进入 Day 4 复盘与面试题回答。
+- 当前阶段：第 1 周 Day 4 shell runtime 已完成工程化拆分和工业级代码审查，准备进入 Day 4 复盘与面试题回答。
 - 已完成：项目文档初始化、最小 Python 包结构、message schema、mock LLM、最小 Agent Loop、Agent Loop 测试、示例脚本回归测试。
 - 已完成 Day 1 学习验收：用户已经读懂代码，并能解释 Agent Loop、Message history、ToolCall、mock LLM 和 max_turns。
 - 已修复 Day 1 遗留导入问题：核心模块和测试统一使用标准 `pca...` 导入。
@@ -43,6 +43,14 @@
 - 已补充 `tests/test_shell_runtime.py`，覆盖成功命令、失败命令、工作目录、超时、环境变量、输出捕获、runtime 层直接执行、`timeout_seconds` 规范化和 `ToolRegistry` 集成。
 - 最新测试结果：`python -m pytest tests\test_file_tools.py tests\test_shell_runtime.py -q` 为 `37 passed, 1 skipped`；`python -m pytest -q` 为 `45 passed, 1 skipped`。
 - 已新增并补充 ADR-0004：shell runtime 先实现受工作区限制的同步命令执行，且执行逻辑属于 runtime 层。
+- 已完成 2026-06-06 工业级代码审查：移除正式源码硬编码 API key，Responses API 实验脚本改为环境变量和惰性 client，工具系统、消息结构、AgentLoop、文件工具和 shell runtime 均补充边界校验。
+- 已创建修改前代码快照：`docs/code_reviews/2026-06-06-before-industrial-refactor/`；旧版 API key 已脱敏。
+- 已在核心修改后的新源码中补充“修改前旧代码”注释片段，便于就地对比学习。
+- 已新增 `tests/test_api_experiments.py`，防止正式源码再次出现硬编码 key。
+- 已新增 ADR-0005：工业级加固必须先处理输入校验、错误回写和密钥边界。
+- 最新测试结果：`python -m pytest -q` 为 `62 passed, 1 skipped`。
+- 最新示例验证：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 最新编译验证：`python -m compileall src examples -q` 通过。
 - 当前阻塞：无。
 
 ## 下一次应该继续做什么

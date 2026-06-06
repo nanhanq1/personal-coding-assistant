@@ -1,2 +1,1 @@
-"""Placeholder for Week 5."""
-
+"""第 5 周代码库感知 Agent 示例占位文件。"""

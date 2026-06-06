@@ -1,2 +1,1 @@
-"""Workspace abstraction will be implemented in Week 7."""
-
+"""工作区抽象占位模块，计划在第 7 周实现。"""

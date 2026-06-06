@@ -26,6 +26,15 @@ class TestReadFileTool:
         with pytest.raises(FileNotFoundError):
             tool.run({"path": "missing.txt", "workspace_root": str(tmp_path)})
 
+    def test_rejects_directory_path(self, tmp_path):
+        """测试读取目录时抛出清晰错误，而不是依赖系统 PermissionError。"""
+        tool = ReadFileTool()
+        directory = tmp_path / "folder"
+        directory.mkdir()
+
+        with pytest.raises(IsADirectoryError, match="path is a directory"):
+            tool.run({"path": "folder", "workspace_root": str(tmp_path)})
+
     def test_rejects_blank_path(self, tmp_path):
         """测试空路径会被拒绝"""
         tool = ReadFileTool()
@@ -33,6 +42,19 @@ class TestReadFileTool:
         for invalid_path in ("", " ", None):
             with pytest.raises(ValueError, match="path"):
                 tool.run({"path": invalid_path, "workspace_root": str(tmp_path)})
+
+    def test_rejects_invalid_workspace_root(self, tmp_path):
+        """测试 workspace_root 必须是已存在的目录。"""
+        tool = ReadFileTool()
+        missing_root = tmp_path / "missing"
+        file_root = tmp_path / "file.txt"
+        file_root.write_text("not a directory", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="workspace_root"):
+            tool.run({"path": "test.txt", "workspace_root": str(missing_root)})
+
+        with pytest.raises(ValueError, match="workspace_root"):
+            tool.run({"path": "test.txt", "workspace_root": str(file_root)})
 
     def test_rejects_path_outside_workspace(self, tmp_path):
         """测试拒绝工作区外的路径"""
@@ -106,6 +128,19 @@ class TestWriteFileTool:
 
         with pytest.raises(ValueError, match="content"):
             tool.run({"path": "test.txt", "content": None, "workspace_root": str(tmp_path)})
+
+    def test_rejects_non_string_content(self, tmp_path):
+        """测试写入内容必须是字符串，避免把 dict/list 静默转成伪文件内容。"""
+        tool = WriteFileTool()
+
+        with pytest.raises(TypeError, match="content"):
+            tool.run({
+                "path": "test.txt",
+                "content": {"not": "text"},
+                "workspace_root": str(tmp_path),
+            })
+
+        assert not (tmp_path / "test.txt").exists()
 
     def test_rejects_path_outside_workspace(self, tmp_path):
         """测试拒绝工作区外的路径"""

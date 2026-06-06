@@ -1,2 +1,1 @@
-"""CLI entrypoint placeholder for the final integrated agent."""
-
+"""最终集成 Agent 的命令行入口占位模块。"""

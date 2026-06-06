@@ -1,2 +1,1 @@
-"""Permission policy will be implemented in Week 3."""
-
+"""权限策略占位模块，计划在第 3 周实现。"""

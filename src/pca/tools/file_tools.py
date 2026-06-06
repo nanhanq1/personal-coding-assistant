@@ -17,6 +17,12 @@ class ReadFileTool(Tool):
     def _run(self, arguments: dict[str, Any]) -> str:
         """读取工作区内的文件内容。"""
         path = _resolve_workspace_path(arguments)
+        # 修改前旧代码：
+        # return path.read_text(encoding="utf-8")
+        #
+        # 问题：读取目录时依赖操作系统抛 PermissionError，错误语义不稳定。
+        if path.is_dir():
+            raise IsADirectoryError(f"path is a directory: {path}")
         return path.read_text(encoding="utf-8")
 
 
@@ -35,11 +41,19 @@ class WriteFileTool(Tool):
         path = _resolve_workspace_path(arguments)
         content = arguments.get("content")
 
+        # 修改前旧代码：
+        # if content is None:
+        #     raise ValueError("content must be a string")
+        # path.write_text(str(content), encoding="utf-8")
+        #
+        # 问题：dict/list 会被静默 str(...) 成伪文件内容，掩盖 LLM 参数错误。
         if content is None:
             raise ValueError("content must be a string")
+        if not isinstance(content, str):
+            raise TypeError("content must be a string")
 
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(str(content), encoding="utf-8")
+        path.write_text(content, encoding="utf-8")
         return "ok"
 
 
@@ -49,7 +63,11 @@ def _resolve_workspace_path(arguments: dict[str, Any]) -> Path:
     if raw_path is None or str(raw_path).strip() == "":
         raise ValueError("path must be a non-empty string")
 
-    workspace_root = Path(arguments.get("workspace_root", Path.cwd())).resolve()
+    # 修改前旧代码：
+    # workspace_root = Path(arguments.get("workspace_root", Path.cwd())).resolve()
+    #
+    # 问题：workspace_root 不存在或是文件时也会继续拼路径，错误会延迟到读写阶段。
+    workspace_root = _resolve_workspace_root(arguments)
     requested_path = Path(str(raw_path))
 
     if requested_path.is_absolute():
@@ -61,6 +79,18 @@ def _resolve_workspace_path(arguments: dict[str, Any]) -> Path:
         raise ValueError(f"path is outside workspace: {raw_path}")
 
     return resolved_path
+
+
+def _resolve_workspace_root(arguments: dict[str, Any]) -> Path:
+    """解析并校验允许文件工具操作的工作区根目录。"""
+    raw_workspace_root = arguments.get("workspace_root", Path.cwd())
+    if raw_workspace_root is None or str(raw_workspace_root).strip() == "":
+        raise ValueError("workspace_root must be a non-empty directory")
+
+    workspace_root = Path(str(raw_workspace_root)).resolve()
+    if not workspace_root.exists() or not workspace_root.is_dir():
+        raise ValueError(f"workspace_root must be an existing directory: {raw_workspace_root}")
+    return workspace_root
 
 
 # 向后兼容的函数形式

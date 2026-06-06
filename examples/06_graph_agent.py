@@ -1,2 +1,1 @@
-"""Placeholder for Week 10."""
-
+"""第 10 周图记忆 Agent 示例占位文件。"""

@@ -115,3 +115,38 @@ def test_clear_tools():
 
     # 清空后应该没有工具
     assert len(registry.list_tools()) == 0
+
+
+def test_tool_rejects_invalid_metadata():
+    """测试工具元数据必须可被 Agent 安全展示和路由。"""
+
+    def handler(arguments: dict[str, Any]) -> str:
+        return "ok"
+
+    for invalid_name in ("", " ", 123):
+        with pytest.raises(ValueError, match="name"):
+            Tool(name=invalid_name, description="描述", handler=handler)
+
+    for invalid_description in ("", " ", None):
+        with pytest.raises(ValueError, match="description"):
+            Tool(name="valid_name", description=invalid_description, handler=handler)
+
+    with pytest.raises(TypeError, match="handler"):
+        Tool(name="valid_name", description="描述", handler="not-callable")
+
+
+def test_tool_run_rejects_non_dict_arguments():
+    """测试工具入口只接受结构化字典参数。"""
+
+    tool = Tool(name="echo", description="回显工具", handler=lambda arguments: arguments)
+
+    with pytest.raises(TypeError, match="arguments"):
+        tool.run("not-a-dict")
+
+
+def test_tool_registry_rejects_invalid_tool_instances():
+    """测试注册表拒绝非 Tool 对象，避免运行期路由崩溃。"""
+    registry = ToolRegistry()
+
+    with pytest.raises(TypeError, match="Tool"):
+        registry.register("not-a-tool")

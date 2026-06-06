@@ -1,2 +1,1 @@
-"""Search tools will be implemented during context engineering."""
-
+"""搜索工具占位模块，计划在上下文工程阶段实现。"""

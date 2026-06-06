@@ -89,19 +89,52 @@ class TestShellRuntime:
         assert result["stdout"] == ""
         assert result["returncode"] == -1  # 超时返回码
 
-    def test_workspace_boundary_violation(self):
+    def test_workspace_boundary_violation(self, tmp_path):
         """测试工作区边界：cwd 指向 workspace_root 外部时，抛 ValueError"""
         tool = ShellCommandTool()
+        outside_dir = tmp_path.parent
 
         arguments = {
             "command": "echo test",
-            "cwd": "/tmp/outside/path",
-            "workspace_root": "/workspace/root",
+            "cwd": str(outside_dir),
+            "workspace_root": str(tmp_path),
             "timeout_seconds": 5
         }
 
         with pytest.raises(ValueError, match="outside workspace"):
             tool.run(arguments)
+
+    def test_workspace_root_must_exist_and_be_directory(self, tmp_path):
+        """测试 workspace_root 必须是已存在的目录。"""
+        tool = ShellCommandTool()
+        missing_root = tmp_path / "missing"
+        file_root = tmp_path / "file.txt"
+        file_root.write_text("not a directory", encoding="utf-8")
+
+        for invalid_root in (missing_root, file_root):
+            with pytest.raises(ValueError, match="workspace_root"):
+                tool.run({
+                    "command": "echo test",
+                    "cwd": ".",
+                    "workspace_root": str(invalid_root),
+                    "timeout_seconds": 5,
+                })
+
+    def test_cwd_must_exist_and_be_directory(self, tmp_path):
+        """测试 cwd 必须是工作区内已存在的目录。"""
+        tool = ShellCommandTool()
+        missing_cwd = tmp_path / "missing"
+        file_cwd = tmp_path / "file.txt"
+        file_cwd.write_text("not a directory", encoding="utf-8")
+
+        for invalid_cwd in (missing_cwd, file_cwd):
+            with pytest.raises(ValueError, match="cwd"):
+                tool.run({
+                    "command": "echo test",
+                    "cwd": str(invalid_cwd),
+                    "workspace_root": str(tmp_path),
+                    "timeout_seconds": 5,
+                })
 
     def test_tool_registry_integration(self):
         """测试 ToolRegistry 集成：把 run_command 注册成 Tool，通过 registry.run(...) 执行"""
@@ -215,6 +248,31 @@ class TestShellRuntime:
                     "cwd": ".",
                     "workspace_root": str(tmp_path),
                     "timeout_seconds": "not-a-number",
+                }
+            )
+
+    def test_timeout_seconds_has_upper_bound(self, tmp_path):
+        """测试超时时间必须有上限，避免 Agent 请求无限长执行。"""
+        with pytest.raises(ValueError, match="timeout_seconds"):
+            runtime_run_command(
+                {
+                    "command": "echo too-long",
+                    "cwd": ".",
+                    "workspace_root": str(tmp_path),
+                    "timeout_seconds": 999999,
+                }
+            )
+
+    def test_env_rejects_blank_keys(self, tmp_path):
+        """测试环境变量 key 不能为空。"""
+        with pytest.raises(ValueError, match="env"):
+            runtime_run_command(
+                {
+                    "command": "echo env",
+                    "cwd": ".",
+                    "workspace_root": str(tmp_path),
+                    "timeout_seconds": 5,
+                    "env": {"": "VALUE"},
                 }
             )
 

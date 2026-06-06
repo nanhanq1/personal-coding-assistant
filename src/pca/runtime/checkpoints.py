@@ -1,2 +1,1 @@
-"""Checkpoint and rollback support will be implemented in Week 7."""
-
+"""检查点与回滚占位模块，计划在第 7 周实现。"""

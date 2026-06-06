@@ -1,2 +1,1 @@
-"""Task memory will be implemented in Week 9."""
-
+"""任务记忆占位模块，计划在第 9 周实现。"""

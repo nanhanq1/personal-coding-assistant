@@ -1,2 +1,1 @@
-"""Repo map will be implemented in Week 5."""
-
+"""代码库地图占位模块，计划在第 5 周实现。"""

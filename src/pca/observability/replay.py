@@ -1,2 +1,1 @@
-"""Replay support will be implemented in Week 11."""
-
+"""轨迹回放占位模块，计划在第 11 周实现。"""

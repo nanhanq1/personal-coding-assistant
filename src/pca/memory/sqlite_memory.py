@@ -1,2 +1,1 @@
-"""SQLite memory will be implemented in Week 9."""
-
+"""SQLite 记忆占位模块，计划在第 9 周实现。"""

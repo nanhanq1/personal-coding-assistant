@@ -1,2 +1,1 @@
-"""Graph memory will be implemented after temporal memory study."""
-
+"""图记忆占位模块，计划在时间记忆学习后实现。"""

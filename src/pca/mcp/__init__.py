@@ -1,2 +1,1 @@
-"""MCP integration package."""
-
+"""MCP 集成相关模块包。"""

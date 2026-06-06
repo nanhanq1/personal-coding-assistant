@@ -1,2 +1,1 @@
-"""Vector memory will be implemented after retrieval basics."""
-
+"""向量记忆占位模块，计划在检索基础学习后实现。"""

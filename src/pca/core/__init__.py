@@ -1,2 +1,1 @@
-"""Core agent loop and message abstractions."""
-
+"""核心 Agent Loop 和消息抽象模块包。"""

@@ -1,2 +1,1 @@
-"""Structured logger will be implemented in Week 11."""
-
+"""结构化日志占位模块，计划在第 11 周实现。"""
