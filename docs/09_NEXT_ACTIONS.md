@@ -15,6 +15,7 @@
 
 ## 当前进度
 
+- 已完成 GitHub 发布准备：补充公开版 `README.md`，补强 `.gitignore`，并准备配置远程仓库 `https://github.com/nanhanq1/personal-coding-assistant.git`。
 - 当前阶段：第 1 周 Day 4 shell runtime 已完成复盘与面试题归档，准备进入 Day 5：整合 Loop + Tools。
 - 已完成：项目文档初始化、最小 Python 包结构、message schema、mock LLM、最小 Agent Loop、Agent Loop 测试、示例脚本回归测试。
 - 已完成 Day 1 学习验收：用户已经读懂代码，并能解释 Agent Loop、Message history、ToolCall、mock LLM 和 max_turns。

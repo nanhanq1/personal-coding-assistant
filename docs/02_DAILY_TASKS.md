@@ -3,6 +3,31 @@
 ## 2026-06-07
 
 日期：2026-06-07
+当前阶段：项目公开发布准备
+当前模块：README / .gitignore / GitHub remote
+预计用时：20 分钟
+
+### 1. 今日目标
+
+- 让 GitHub 首页能清晰说明项目目标、当前进度、运行方式和学习路线。
+- 补强 Git 忽略规则，避免缓存、虚拟环境、环境变量、IDE 状态和本地临时文件被发布。
+- 配置远程仓库并发布到 `https://github.com/nanhanq1/personal-coding-assistant.git`。
+
+### 2. 今日输出物
+
+- 更新 `README.md`。
+- 更新 `.gitignore`。
+- 更新 `docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
+
+### 3. 完成情况
+
+- 已完成 README 和 `.gitignore` 的发布前补充。
+- 发布前继续执行测试、Git 索引清理、提交和 push。
+- 本次不改变学习主线；下一次继续项目仍进入第 1 周 Day 5：整合 Loop + Tools。
+
+## 2026-06-07
+
+日期：2026-06-07
 当前阶段：第 1 周 Day 4 收尾
 当前模块：shell runtime 复盘与面试题归档
 预计用时：15 分钟

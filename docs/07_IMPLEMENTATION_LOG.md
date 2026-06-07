@@ -4,6 +4,19 @@
 
 ### 本次完成
 
+- 补充公开发布用 `README.md`，说明项目目标、当前能力、目录结构、运行方式、测试方式、设计原则和学习路线。
+- 补强 `.gitignore`，覆盖 Python 缓存、测试缓存、虚拟环境、构建产物、环境变量、IDE 配置、本地临时目录、日志、数据库文件和系统文件。
+- 准备将仓库发布到 GitHub：`https://github.com/nanhanq1/personal-coding-assistant.git`。
+
+### 验证
+
+- 运行 `python -m pytest -q`：`65 passed, 1 skipped`。
+- 已确认 `.idea/`、`.tmp/`、`.pytest_cache/` 和 `__pycache__/` 仅作为 ignored 本地文件存在，不进入 Git 索引。
+
+## 2026-06-07
+
+### 本次完成
+
 - 增强 shell runtime 的 `command` 参数，支持官方推荐的 `list[str]` 形式。
 - 字符串命令继续走 `shell=True`，保持早期用法兼容。
 - 列表命令走 `shell=False`，避免手写 shell 引号和转义，减少参数解析歧义和 shell 注入风险。
