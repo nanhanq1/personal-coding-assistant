@@ -1,5 +1,23 @@
 # Implementation Log
 
+## 2026-06-07
+
+### 本次完成
+
+- 增强 shell runtime 的 `command` 参数，支持官方推荐的 `list[str]` 形式。
+- 字符串命令继续走 `shell=True`，保持早期用法兼容。
+- 列表命令走 `shell=False`，避免手写 shell 引号和转义，减少参数解析歧义和 shell 注入风险。
+- 新增测试覆盖列表命令执行、带空格参数传递和非法列表拒绝。
+- 完成第 1 周 Day 4 shell runtime 复盘与面试题回答评审。
+- 评审用户对 shell runtime 风险、`cwd` / `workspace_root`、输出字段、tool/runtime 分层和安全缺口的理解。
+- 将第 4 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
+- 更新 `docs/02_DAILY_TASKS.md` 和 `docs/09_NEXT_ACTIONS.md`，把下一步推进到第 1 周 Day 5：整合 Loop + Tools。
+
+### 验证
+
+- 先运行 `python -m pytest tests\test_shell_runtime.py -q` 观察 RED：列表命令测试失败，原因是 `_require_command` 只允许字符串。
+- 实现列表命令后运行 `python -m pytest tests\test_shell_runtime.py -q`：`24 passed`。
+
 ## 2026-06-06
 
 ### 本次完成

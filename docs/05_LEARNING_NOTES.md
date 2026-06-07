@@ -83,7 +83,11 @@ flowchart TD
 
 ### 5. 技术原理
 
-- `command` 必须是非空字符串。
+- `command` 可以是非空字符串，也可以是非空字符串列表。
+- 字符串命令为了兼容早期用法仍通过 `shell=True` 执行。
+- 列表命令通过 `shell=False` 执行，是更推荐的形式。
+- 列表命令把可执行程序和每个参数拆成独立元素，例如 `[sys.executable, "-c", "print('hello')"]`。
+- 列表形式避免手写 shell 引号和转义，能稳定传递包含空格的参数，并减少 shell 注入风险。
 - 相对 `cwd` 必须以 `workspace_root` 为基准解析。
 - 解析后的 `cwd` 必须位于 `workspace_root` 内。
 - `timeout_seconds` 要先规范化成正浮点数，再传给 `subprocess.run(...)`。

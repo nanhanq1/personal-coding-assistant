@@ -196,6 +196,61 @@ class TestShellRuntime:
         assert "stdout message" in result["stdout"]
         assert "stderr message" in result["stderr"]
 
+    def test_command_accepts_argument_list(self, tmp_path):
+        """测试 command 支持官方推荐的参数列表形式。"""
+        result = runtime_run_command(
+            {
+                "command": [sys.executable, "-c", "print('list command')"],
+                "cwd": ".",
+                "workspace_root": str(tmp_path),
+                "timeout_seconds": 5,
+            }
+        )
+
+        assert result["returncode"] == 0
+        assert result["stdout"].strip() == "list command"
+        assert result["timed_out"] is False
+
+    def test_command_list_preserves_arguments_with_spaces(self, tmp_path):
+        """测试列表命令不用 shell 引号也能保留带空格的参数。"""
+        result = runtime_run_command(
+            {
+                "command": [
+                    sys.executable,
+                    "-c",
+                    "import sys; print(sys.argv[1])",
+                    "value with spaces",
+                ],
+                "cwd": ".",
+                "workspace_root": str(tmp_path),
+                "timeout_seconds": 5,
+            }
+        )
+
+        assert result["returncode"] == 0
+        assert result["stdout"].strip() == "value with spaces"
+
+    def test_command_list_rejects_invalid_items(self, tmp_path):
+        """测试列表命令必须是非空字符串列表。"""
+        invalid_commands = [
+            [],
+            [""],
+            [" "],
+            [sys.executable, None],
+            [sys.executable, 123],
+        ]
+
+        for command in invalid_commands:
+            with pytest.raises(ValueError, match="command"):
+                runtime_run_command(
+                    {
+                        "command": command,
+                        "cwd": ".",
+                        "workspace_root": str(tmp_path),
+                        "timeout_seconds": 5,
+                    }
+                )
+
     def test_backward_compatibility_function(self):
         """测试向后兼容的函数形式"""
         arguments = {

@@ -1,5 +1,36 @@
 # Daily Tasks
 
+## 2026-06-07
+
+日期：2026-06-07
+当前阶段：第 1 周 Day 4 收尾
+当前模块：shell runtime 复盘与面试题归档
+预计用时：15 分钟
+
+### 1. 今日学习目标
+
+- 检查用户是否理解 shell runtime 的风险、工作区边界、输出字段和 tool/runtime 分层。
+- 将 Day 4 面试题、用户回答和标准回答沉淀到每日面试题归档。
+- 明确下一步进入 Day 5：整合 Loop + Tools。
+
+### 2. 今日输出物
+
+- 已评审 Day 4 五个面试题回答。
+- 已更新 `docs/Compilation-of-Interview-Questions.md`，追加第 4 天记录。
+- 已更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
+
+### 3. 完成情况
+
+- 已增强 shell runtime 的 `command` 参数，支持 `list[str]` 命令。
+- 已保留字符串命令兼容路径：字符串使用 `shell=True`，列表使用 `shell=False`。
+- 已补充测试：列表命令执行、带空格参数保留、非法列表拒绝。
+- 用户已能说明 shell runtime 比文件工具危险，因为它可以影响本机程序和文件。
+- 用户已能说明 `workspace_root` 是命令运行边界。
+- 用户已能区分 `stdout`、`stderr`、`returncode`、`timed_out` 和 `duration_ms`。
+- 用户已能说明 `ShellCommandTool` 负责工具包装，`ShellRuntime` 负责真实执行。
+- 已补充说明：越界 `cwd` 不能直接放行，应进入权限审批或扩大授权工作区；`command` 列表形式和 `shell=False` 是后续安全增强方向。
+- 下一步进入第 1 周 Day 5：整合 Loop + Tools。
+
 ## 2026-06-06
 
 日期：2026-06-06
@@ -79,7 +110,9 @@
 - 已运行 `python examples\01_minimal_agent.py`，示例输出完整 `user -> assistant -> tool -> assistant` 链路。
 - 已运行 `python -m compileall src examples -q`，源码和示例均可编译。
 - 已扫描 `src/` 和修改前快照，未再发现 `sk-` 字面量。
-- 下一步需要复盘 Day 4 shell runtime，并让用户回答 Day 4 面试题。
+- 已完成 Day 4 shell runtime 复盘与面试题回答评审。
+- 已将第 4 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
+- 下一步进入第 1 周 Day 5：整合 Loop + Tools，重点是多工具调用和工具路由链路。
 
 ## 2026-06-05
 

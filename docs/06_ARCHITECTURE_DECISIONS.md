@@ -52,6 +52,9 @@ Day 4 开始实现 shell runtime。相比文件工具，shell 命令可以执行
 - `cwd` 可选，默认相对于 `workspace_root` 的当前目录。
 - 相对 `cwd` 以 `workspace_root` 为基准解析。
 - 解析后的 `cwd` 必须位于 `workspace_root` 内，否则抛 `ValueError`。
+- `command` 支持字符串和 `list[str]` 两种形式。
+- 字符串命令继续使用 `shell=True`，用于兼容早期测试和简单 shell 内置命令。
+- 列表命令使用 `shell=False`，作为推荐形式，用于避免手写 shell 引号、减少参数解析歧义和 shell 注入风险。
 - 命令执行逻辑位于 `src/pca/runtime/shell_runtime.py`，通过 `subprocess.run(...)` 同步执行。
 - `ShellCommandTool` 位于 `src/pca/tools/shell_tools.py`，只负责把工具调用转发给 runtime。
 - `timeout_seconds` 会被规范化为正浮点数后再传给 `subprocess.run(...)`。
@@ -65,6 +68,7 @@ Day 4 开始实现 shell runtime。相比文件工具，shell 命令可以执行
 - 保留命令输出、错误输出、退出码和超时状态，方便后续 Agent 判断下一步。
 - 将工作目录边界前置，避免 shell 命令默认在未授权目录中执行。
 - 保持 runtime 层和 tool 层分离，后续可以把本地 runtime 替换为 sandbox、docker 或远程 runtime。
+- 与 Python `subprocess` 官方建议保持一致：优先传入参数序列，让 subprocess 负责必要的转义和引用。
 - 为后续权限系统、危险命令检测、审计日志和 sandbox runtime 留出扩展点。
 
 ### 暂不采用

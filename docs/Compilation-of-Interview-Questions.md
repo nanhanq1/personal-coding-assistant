@@ -80,3 +80,30 @@
 
 - 用户回答：`ToolCall` 只是 LLM 根据上下文信息做出工具的封装，`read_file` 才是真正执行文件操作的工具函数。
 - 标准回答：`ToolCall` 是 LLM 输出的结构化调用意图，表达“我想调用哪个工具、传入哪些参数”，它本身不会产生任何副作用。真正执行发生在程序侧：`AgentLoop` 读取 `ToolCall`，把 `tool_call.name` 和 `tool_call.arguments` 交给 `ToolRegistry.run(...)`，registry 找到对应 `Tool`，再由 `Tool.run(...)` 调用 `read_file(arguments)`。因此调用链上有清晰分层：LLM 负责提出意图，Agent runtime 负责路由和执行，工具函数负责接触真实环境并返回结果。
+
+## 第 4 天：2026-06-07
+
+### 面试题 1：为什么 shell runtime 比 `read_file` / `write_file` 更危险？
+
+- 用户回答：因为 shell runtime 几乎可以操纵本机的所有文件和程序，如果没有管控，容易执行危险命令。
+- 标准回答：文件工具主要读写指定文件，而 shell runtime 可以启动任意程序、访问环境变量、读写大量文件、安装依赖、删除文件、启动后台进程或长时间占用资源。它的影响范围不只是一两个文件，而是整个运行环境。因此 shell runtime 必须比文件工具更早接入工作目录边界、超时、权限审批、危险命令检测、审计日志和 sandbox 隔离。
+
+### 面试题 2：为什么相对 `cwd` 必须以 `workspace_root` 为基准解析？
+
+- 用户回答：因为 workspace 规定了程序或者命令运行的空间范围。
+- 标准回答：`workspace_root` 是当前授权给 Agent 操作的项目边界。相对 `cwd` 如果按当前进程目录解析，就会受启动位置影响，可能在错误目录执行命令；如果按 `workspace_root` 解析，就能让 `cwd="."`、`cwd="src"` 等参数始终落在授权工作区内。解析后还必须检查最终路径是否仍在 `workspace_root` 内，防止 `..` 或绝对路径绕过边界。
+
+### 面试题 3：`stdout`、`stderr`、`returncode`、`timed_out`、`duration_ms` 分别有什么作用？
+
+- 用户回答：`stdout` 捕获子进程的输出；`stderr` 捕获子进程的错误；`returncode` 表示子进程命令是否执行成功；`timed_out` 表示子进程是否超时；`duration_ms` 表示子进程运行命令的时间。
+- 标准回答：`stdout` 保存命令的正常输出，例如测试结果、打印内容或查询结果；`stderr` 保存错误输出，例如语法错误、依赖缺失或命令报错；`returncode` 是进程退出码，通常 `0` 表示成功，非 `0` 表示命令失败；`timed_out` 明确区分“命令自己失败”和“命令被 runtime 超时终止”；`duration_ms` 是可观测性字段，帮助判断命令耗时、定位慢命令，并为后续审计日志和性能分析提供依据。Agent 应该把这些字段写回 message history，让 LLM 能基于真实执行结果继续决策。
+
+### 面试题 4：为什么 `ShellCommandTool` 不应该直接写一堆 `subprocess.run(...)` 逻辑，而要转发给 `ShellRuntime`？
+
+- 用户回答：`ShellCommandTool` 类的职责是将命令工具封装成 `Tool` 类，而真正的实现逻辑应该放在 `ShellRuntime` 类中，面向对象编程。
+- 标准回答：更准确地说，这是职责分离，不只是“面向对象”。`ShellCommandTool` 属于工具层，负责工具名称、描述、handler 和 `ToolRegistry` 集成；`ShellRuntime` 属于运行环境层，负责命令执行、工作目录解析、超时、环境变量、输出捕获和耗时统计。这样做的价值是：`AgentLoop` 和 `ToolRegistry` 不需要知道命令如何执行；未来如果把本地 subprocess 替换成 Docker、sandbox、远程执行器或带审批的 runtime，只需要替换 runtime 层，而不用重写工具路由和 Agent Loop。
+
+### 面试题 5：现在这个 shell runtime 还不能算真正安全，至少还缺哪些工业级能力？
+
+- 用户回答：我认为是一些适配能力，比如：如果我操作的 `cwd` 不在 workspace 范围内，但是又是完成任务所必须的；`command` 参数没做规范化处理，官方文档中说明了 `command` 最好是命令列表，比如 `["python", "-c", "import time; time.sleep(100)"]`，而不是字符串。至于其他方面还没有想到，因为已经有了参数校验。
+- 标准回答：你指出的 `command` 列表形式是重要增强点，因为列表参数配合 `shell=False` 可以减少 shell 字符串解析和注入风险。`cwd` 超出 workspace 但任务必须完成时，不能直接绕过边界，而应该进入权限审批、扩大授权 workspace，或由用户显式确认新的工作目录。除此之外，工业级 shell runtime 还缺少危险命令分类、人工审批、命令 allowlist / denylist、审计日志、trace id、进程树清理、输出大小限制、环境变量脱敏、资源限制、sandbox / Docker 隔离、checkpoint / rollback、并发控制和更细粒度的权限策略。参数校验只是第一层安全边界，不等于完整安全。

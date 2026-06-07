@@ -15,7 +15,7 @@
 
 ## 当前进度
 
-- 当前阶段：第 1 周 Day 4 shell runtime 已完成工程化拆分和工业级代码审查，准备进入 Day 4 复盘与面试题回答。
+- 当前阶段：第 1 周 Day 4 shell runtime 已完成复盘与面试题归档，准备进入 Day 5：整合 Loop + Tools。
 - 已完成：项目文档初始化、最小 Python 包结构、message schema、mock LLM、最小 Agent Loop、Agent Loop 测试、示例脚本回归测试。
 - 已完成 Day 1 学习验收：用户已经读懂代码，并能解释 Agent Loop、Message history、ToolCall、mock LLM 和 max_turns。
 - 已修复 Day 1 遗留导入问题：核心模块和测试统一使用标准 `pca...` 导入。
@@ -51,25 +51,28 @@
 - 最新测试结果：`python -m pytest -q` 为 `62 passed, 1 skipped`。
 - 最新示例验证：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
 - 最新编译验证：`python -m compileall src examples -q` 通过。
+- 已完成 Day 4 shell runtime 复盘与面试题回答评审。
+- 已将第 4 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
+- 已增强 shell runtime：`command` 现在支持 `list[str]`，列表命令使用 `shell=False`；字符串命令继续兼容 `shell=True`。
 - 当前阻塞：无。
 
 ## 下一次应该继续做什么
 
-继续第 1 周 Day 4：shell runtime 复盘与面试题回答。
+继续第 1 周 Day 5：整合 Loop + Tools。
 
-教学执行方式：先复盘 `Tool` 包装器和工具类继承的区别，再讲 shell runtime 的 `cwd`、`workspace_root`、`timeout_seconds`、`stdout`、`stderr`、`returncode` 和 `timed_out`。讲清代码逻辑并确认理解后，可以给出完整、安全、全面、工程级代码；如果用户先提交代码，则先评审、补中文注释，再给工程级参考实现。然后让用户回答 Day 4 面试题；完成回答后，把 Day 4 面试题、用户回答和标准回答保存到 `docs/Compilation-of-Interview-Questions.md`。
+教学执行方式：先讲清 Day 5 的直觉、调用链、目标文件、输入输出和验收测试，再进入代码。重点让用户理解多个工具如何统一注册、如何从 `AgentLoop` 通过 `ToolRegistry` 路由到不同工具，以及多工具调用结果如何写回 message history。
 
 建议任务：
 
-1. 复盘为什么 `Tool` 是包装器，不是普通抽象基类。
-2. 解释为什么 shell runtime 的相对 `cwd` 必须以 `workspace_root` 为基准。
-3. 解释 `stdout`、`stderr`、`returncode` 和 `timed_out` 分别用于什么决策。
-4. 解释为什么 shell runtime 必须先接权限系统，再扩大能力。
-5. 让用户回答 Day 4 面试题。
-6. 将 Day 4 面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
+1. 复盘当前已有工具：`read_file`、`write_file`、`run_command`。
+2. 讲解 Day 5 为什么要整合 Loop + Tools，而不是继续单独实现工具。
+3. 设计一个多工具调用场景，例如先 `write_file`，再 `read_file`，或先 `run_command`，再根据结果继续回答。
+4. 补充或调整测试，覆盖 AgentLoop 通过 `ToolRegistry` 调用多个不同工具。
+5. 明确工具路由链路：`ToolCall -> ToolRegistry -> Tool -> handler/runtime -> tool message`。
+6. 更新学习笔记、实现日志、next actions；如果完成当天任务，继续归档 Day 5 面试题。
 
 ## 用户下次应发送的指令
 
 ```text
-继续项目，完成第 1 周 Day 4：shell runtime 复盘和面试题归档。
+继续项目，开始第 1 周 Day 5：整合 Loop + Tools。请先讲直觉、调用链、目标文件、输入输出和验收测试。
 ```
