@@ -4,6 +4,30 @@
 
 ### 本次完成
 
+- 继续第 1 周 Day 6：文档和架构图。
+- 复盘第 1 周 Day 1 到 Day 5 已完成能力：`Message` / `ToolCall`、`ScriptedLLM`、`AgentLoop`、`ToolRegistry`、文件工具、shell runtime 和默认 coding 工具注册表。
+- 更新 `README.md`，补齐当前能力、Agent 执行闭环图、工具路由链路图、运行方式、测试方式和面试讲解要点。
+- 新增 `docs/10_WEEK1_INTERVIEW_SCRIPT.md`，沉淀第 1 周面试讲解稿初稿。
+- 更新 `docs/05_LEARNING_NOTES.md`，新增 Day 6 文档和架构图学习笔记。
+- 更新 `docs/04_RESOURCE_LIBRARY.md`，补充 Day 6 资料链接。
+- 将第 6 天面试题追加到 `docs/Compilation-of-Interview-Questions.md`，用户回答先标记为“待补充”。
+- 更新 `docs/02_DAILY_TASKS.md` 和 `docs/09_NEXT_ACTIONS.md`，准备推进到 Day 7 周复盘和小重构。
+
+### 架构决策
+
+- 本次没有新增架构决策。
+- Day 6 是对既有 Agent Loop 和 Tool Routing 闭环的文档化，不改变源码边界。
+
+### 验证
+
+- 运行 `python -m pytest -q`：`66 passed, 1 skipped`。
+- 运行 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 运行 `python -m compileall src examples -q`：通过。
+
+## 2026-06-08
+
+### 本次完成
+
 - 开始第 1 周 Day 5：整合 Loop + Tools。
 - 按 TDD 新增 `tests/test_loop_tools_integration.py`，先观察 RED：`pca.tools` 中缺少 `create_coding_tool_registry`。
 - 在 `src/pca/tools/__init__.py` 中新增 `create_coding_tool_registry()`。

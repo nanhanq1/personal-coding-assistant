@@ -3,6 +3,71 @@
 ## 2026-06-08
 
 日期：2026-06-08
+当前阶段：第 1 周 Day 6
+当前模块：文档和架构图
+预计用时：45 分钟
+
+### 1. 今日学习目标
+
+- 复盘第 1 周 Day 1 到 Day 5 已经完成的最小 Coding Agent 闭环。
+- 能用作品集和面试语言解释 `user -> LLM -> tool_call -> tool_result -> LLM -> final_answer`。
+- 能区分 Agent 执行闭环和工具路由链路。
+- 把 README、架构图、学习笔记和面试讲解稿整理成可继续维护的项目文档。
+
+### 2. 所需前置知识
+
+- Day 1：`Message`、`ToolCall`、`AgentLoop`、`ScriptedLLM`。
+- Day 2：`Tool`、`ToolRegistry`、工具注册和执行。
+- Day 3：文件工具和 `workspace_root` 边界。
+- Day 4：shell runtime、`cwd`、timeout 和命令结果结构。
+- Day 5：默认 coding 工具注册表和多工具路由集成。
+
+### 3. 今日必须理解的知识点
+
+- README 是项目入口，不只是运行说明；它要表达项目目标、当前能力、架构图、运行方式和安全边界。
+- 架构图要画真实调用链，不画和代码不一致的未来设想。
+- `ToolCall` 是 LLM 的调用意图，真正执行发生在程序侧的 `ToolRegistry -> Tool -> handler/runtime`。
+- 工具结果必须写回 `message history`，否则 LLM 下一轮无法基于真实环境反馈继续决策。
+- Day 6 是作品集表达和面试表达，不新增架构边界，因此不需要新增 ADR。
+
+### 4. 今日代码 / 文档任务
+
+- 更新 `README.md`，补齐当前能力、运行方式、核心架构图和面试讲解要点。
+- 新增 `docs/10_WEEK1_INTERVIEW_SCRIPT.md`，沉淀第 1 周面试讲解稿初稿。
+- 更新 `docs/05_LEARNING_NOTES.md`，新增 Day 6 文档和架构图学习笔记。
+- 更新 `docs/04_RESOURCE_LIBRARY.md`，补充 Day 6 资料链接。
+- 收尾时更新 `docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
+
+### 5. 今日资料推荐
+
+- ReAct 论文 arXiv 页面：https://arxiv.org/abs/2210.03629
+- Google Research ReAct 介绍：https://research.google/blog/react-synergizing-reasoning-and-acting-in-language-models/
+- Mermaid 官方语法参考：https://mermaid.js.org/intro/syntax-reference.html
+- GitHub Docs：README 和个人资料 README 说明：https://docs.github.com/en/account-and-profile/how-tos/profile-customization/managing-your-profile-readme
+- OpenAI Function calling / tool calling guide：https://platform.openai.com/docs/guides/function-calling
+
+### 6. 今日输出物
+
+- 更新后的 `README.md`。
+- `docs/10_WEEK1_INTERVIEW_SCRIPT.md`。
+- Day 6 文档和架构图学习笔记。
+- Day 6 面试题归档。
+
+### 7. 完成情况
+
+- 已复盘第 1 周 Day 1 到 Day 5 的核心闭环。
+- 已更新 README，使其反映 Day 6 当前能力、架构图、运行方式、测试方式和面试讲解要点。
+- 已新增第 1 周面试讲解稿初稿：`docs/10_WEEK1_INTERVIEW_SCRIPT.md`。
+- 已在学习笔记中新增 Day 6 文档和架构图记录。
+- 已补充 Day 6 资料链接。
+- 已运行 `python -m pytest -q`，结果为 `66 passed, 1 skipped`。
+- 已运行 `python examples\01_minimal_agent.py`，示例输出完整 `user -> assistant -> tool:echo -> assistant` 链路。
+- 已运行 `python -m compileall src examples -q`，源码和示例均可编译。
+- Day 6 学习任务完成，下一步进入第 1 周 Day 7：周复盘和小重构。
+
+## 2026-06-08
+
+日期：2026-06-08
 当前阶段：第 1 周 Day 5
 当前模块：整合 Loop + Tools
 预计用时：45 分钟

@@ -134,3 +134,30 @@
 
 - 用户回答：planner、危险工具和命令的分类和预防、上下文工程以及记忆系统。
 - 标准回答：这些方向是正确的。当前 Day 5 仍处在第 1 周 Agent Loop 阶段，主要证明多工具可以通过统一注册表进入同一条循环链路。距离工业级 Coding Agent 至少还缺：第一，planner / todo 状态机，用于拆解任务、记录步骤和控制多轮执行；第二，权限系统和危险命令分类，用于在写文件、运行 shell、删除文件、安装依赖等高风险操作前进行风险评估和人工审批；第三，上下文工程和记忆系统，用于选择相关代码文件、压缩历史、检索长期偏好和任务经验。除此之外还需要结构化 tool result、schema 校验、可观测 trace、checkpoint / rollback、sandbox 和 MCP tool bridge。
+
+## 第 6 天：2026-06-08
+
+### 面试题 1：请用 30 秒解释当前 Personal Coding Assistant 已经实现了什么。
+
+- 用户回答：待补充
+- 标准回答：当前项目实现了一个最小 Coding Agent harness，包含 `Message` / `ToolCall`、mock LLM、`AgentLoop`、`ToolRegistry`、文件工具和 shell runtime。它能完成 `user -> LLM -> tool_call -> tool_result -> LLM -> final_answer` 的最小闭环，并通过测试验证工具调用结果会写回 message history。
+
+### 面试题 2：`user -> LLM -> tool_call -> tool_result -> LLM -> final_answer` 和 `AgentLoop -> ToolRegistry -> Tool -> handler/runtime` 有什么区别？
+
+- 用户回答：待补充
+- 标准回答：前一条是 Agent 从用户请求到最终回答的业务执行闭环，强调 LLM、工具调用和工具结果如何交替推进；后一条是程序内部执行工具调用的工程路由链路，强调 `AgentLoop` 不直接依赖具体工具，而是通过 `ToolRegistry` 找到 `Tool`，再由 handler 或 runtime 执行真实副作用。
+
+### 面试题 3：为什么 README 和架构图必须和真实代码保持一致？
+
+- 用户回答：待补充
+- 标准回答：README 和架构图是外部读者理解项目的入口，也是面试时解释项目的依据。如果文档画的是未来设想、代码却没有实现，会误导读者，也会暴露工程表达不严谨。好的架构图应该反映当前真实调用链，并明确哪些能力已经实现、哪些只是后续计划。
+
+### 面试题 4：当前项目的安全边界主要在哪里？还缺什么？
+
+- 用户回答：待补充
+- 标准回答：当前主要安全边界是 `workspace_root`：文件工具和 shell runtime 都会把路径限制在授权工作区内；shell runtime 还会限制超时时间并结构化返回执行结果。但它还缺权限审批、危险命令分类、审计日志、输出大小限制、环境变量脱敏、sandbox、checkpoint / rollback 和进程树清理。
+
+### 面试题 5：如果面试官问“为什么现在还不用真实 LLM”，应该怎么回答？
+
+- 用户回答：待补充
+- 标准回答：第 1 周重点是验证 Agent Loop 和工具路由控制流。真实 LLM 会带来 API key、网络、费用、随机性和输出不可控问题，容易干扰核心架构验证。先用 `ScriptedLLM` 固定响应，可以让测试稳定复现 `tool_call -> tool_result -> final answer`，等控制流和安全边界打牢后再接真实模型 adapter。

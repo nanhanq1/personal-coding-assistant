@@ -1,5 +1,97 @@
 # Learning Notes
 
+## 文档和架构图：第 6 天
+
+### 1. 直觉
+
+Day 6 不继续新增工具，而是把第 1 周已经实现的能力讲清楚。一个 Coding Agent 项目要能放进作品集，不能只说“我写了几个类”，而要能解释完整闭环、核心调用链、设计取舍、安全边界和当前不足。
+
+本日重点是把代码变成可展示的工程叙事：
+
+- README 让外部读者快速知道项目是什么、现在能做什么、怎么运行。
+- 架构图让读者一眼看懂 `user -> LLM -> tool_call -> tool_result -> final_answer`。
+- 面试讲解稿让自己能用 30 秒、2 分钟和追问回答三种粒度讲清项目。
+
+### 2. 一句话解释
+
+Day 6 是把第 1 周的 Agent Loop 和 Tool Routing 闭环沉淀成项目文档、架构图和面试讲解材料。
+
+### 3. 核心调用链复盘
+
+```text
+user input
+  -> AgentLoop.run(...)
+  -> append user Message
+  -> llm.complete(messages)
+  -> assistant Message(tool_calls=[...])
+  -> ToolRegistry.run(tool_call.name, tool_call.arguments)
+  -> Tool.run(arguments)
+  -> concrete handler or ShellRuntime
+  -> append role="tool" Message
+  -> llm.complete(messages)
+  -> final assistant Message
+```
+
+这条链路里有两个必须分清的层次：
+
+1. Agent 执行闭环：`user -> LLM -> tool_call -> tool_result -> LLM -> final_answer`。
+2. 工具路由闭环：`AgentLoop -> ToolRegistry -> Tool -> handler/runtime`。
+
+### 4. 架构图
+
+```mermaid
+flowchart TD
+    A["User request"] --> B["AgentLoop"]
+    B --> C["LLM.complete(messages)"]
+    C --> D{"Assistant returned tool_calls?"}
+    D -- "No" --> E["Final answer"]
+    D -- "Yes" --> F["ToolRegistry.run"]
+    F --> G["Tool.run"]
+    G --> H{"Concrete tool"}
+    H --> I["ReadFileTool / WriteFileTool"]
+    H --> J["ShellCommandTool -> ShellRuntime"]
+    I --> K["Tool result"]
+    J --> K
+    K --> L["Append role=tool Message"]
+    L --> C
+```
+
+### 5. 当前代码位置
+
+- README 总览：`README.md`
+- 面试讲解稿：`docs/10_WEEK1_INTERVIEW_SCRIPT.md`
+- Agent 主循环：`src/pca/core/agent_loop.py`
+- Message / ToolCall：`src/pca/core/messages.py`
+- Mock LLM：`src/pca/core/mock_llm.py`
+- 默认工具注册表：`src/pca/tools/__init__.py`
+- 工具抽象：`src/pca/tools/base.py`
+- 工具注册表：`src/pca/tools/registry.py`
+- 文件工具：`src/pca/tools/file_tools.py`
+- shell runtime：`src/pca/runtime/shell_runtime.py`
+
+### 6. 当前项目阶段定位
+
+当前代码处在 12 周路线的第 1 周末尾：已经完成最小 Agent Loop 和基础工具路由雏形。
+
+它在整体架构里的位置是“Agent harness 骨架层”，不是完整 Coding Agent 产品。后续所有复杂能力，例如权限系统、planner、上下文工程、RAG、MCP、Memory、状态机和可观测性，都会接在这条骨架链路之上。
+
+### 7. 当前仍不是完整工业级的地方
+
+- 真实 LLM adapter 尚未接入，当前仍依赖 `ScriptedLLM`。
+- 工具参数还没有 JSON Schema / Pydantic schema。
+- shell runtime 尚未接入危险命令分类、人工审批、sandbox 和进程树清理。
+- 文件工具还没有 `edit_file`、diff、写入审批、文件大小限制和二进制检测。
+- message history 仍是内存列表，还没有压缩、检索、持久化 trace 和长期记忆。
+- 复杂任务还没有 planner / todo 状态机。
+
+### 8. 检查问题
+
+1. 为什么 Day 6 不是继续写新工具，而是整理 README 和架构图？
+2. `user -> LLM -> tool_call -> tool_result -> LLM -> final_answer` 这条链路每一步分别是谁负责？
+3. `AgentLoop -> ToolRegistry -> Tool -> handler/runtime` 和上一条链路有什么区别？
+4. 面试时如何解释 `ToolCall` 只是调用意图，而不是工具执行本身？
+5. 当前项目如果要进入工业级，下一步最应该补哪些安全和工程能力？
+
 ## Loop + Tools 整合：第 5 天
 
 ### 1. 直觉

@@ -47,6 +47,14 @@
 - mini-SWE-agent GitHub：https://github.com/SWE-agent/mini-swe-agent
 - mini-SWE-agent CLI docs：https://mini-swe-agent.com/latest/usage/mini/
 
+### Day 6 文档和架构图资料
+
+- ReAct 论文 arXiv 页面：https://arxiv.org/abs/2210.03629
+- Google Research ReAct 介绍：https://research.google/blog/react-synergizing-reasoning-and-acting-in-language-models/
+- Mermaid 官方语法参考：https://mermaid.js.org/intro/syntax-reference.html
+- GitHub Docs：README 和个人资料 README 说明：https://docs.github.com/en/account-and-profile/how-tos/profile-customization/managing-your-profile-readme
+- OpenAI Function calling / tool calling guide：https://platform.openai.com/docs/guides/function-calling
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |
