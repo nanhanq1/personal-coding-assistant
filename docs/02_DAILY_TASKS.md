@@ -3,6 +3,73 @@
 ## 2026-06-08
 
 日期：2026-06-08
+当前阶段：第 1 周 Day 7
+当前模块：周复盘和小重构
+预计用时：45 分钟
+
+### 1. 今日学习目标
+
+- 复盘第 1 周从 Agent Loop 到 Tool Routing 的完整闭环。
+- 能从源码角度讲清 `AgentLoop -> ToolRegistry -> Tool -> handler/runtime`。
+- 学会在周复盘中区分“小而必要的重构”和“提前引入未来架构”。
+- 用 TDD 补一个真实边界缺口：文件工具不能把非字符串 `path` 静默转成文件名。
+- 更新第 1 周收口文档，为第 2 周 Tool System 深化做准备。
+
+### 2. 所需前置知识
+
+- Day 1：`Message`、`ToolCall`、`ScriptedLLM` 和最小 `AgentLoop`。
+- Day 2：`Tool`、`ToolRegistry` 和工具路由。
+- Day 3：文件工具、路径解析和 `workspace_root`。
+- Day 4：`ShellRuntime`、`cwd`、timeout、输出结构和 runtime 分层。
+- Day 5：默认 coding 工具注册表和多工具调用链路。
+- Day 6：README、架构图和面试表达。
+
+### 3. 今日必须理解的知识点
+
+- 周复盘不是大重构；它的目标是确认当前闭环是否清楚、稳定、可测试、可解释。
+- 工具参数来自 LLM 的结构化输出，不能把坏参数静默转成看似可执行的输入。
+- `path=123` 这类坏参数如果被转成 `"123"`，`read_file` 会变成错误的文件读取，`write_file` 甚至会写出意外文件。
+- TDD 的 RED 价值在于先证明测试真的能抓住缺口，再做最小修复。
+- 第 1 周代码仍是 Agent harness 骨架，不应该在 Day 7 提前引入 planner、权限系统或真实 LLM。
+
+### 4. 今日代码 / 文档任务
+
+- 跑 Day 7 基线验证：`python -m pytest -q`、`python examples\01_minimal_agent.py`、`python -m compileall src examples -q`。
+- 复盘 `src/pca/core/`、`src/pca/tools/`、`src/pca/runtime/` 和 `tests/`。
+- 在 `tests/test_file_tools.py` 中补充非字符串 `path` 的 RED 测试。
+- 在 `src/pca/tools/file_tools.py` 中让 `_resolve_workspace_path(...)` 明确拒绝非字符串路径。
+- 更新 `README.md`、学习笔记、资料库、实现日志、下一步行动和每日面试题归档。
+
+### 5. 今日资料推荐
+
+- pytest assertion 官方文档：https://docs.pytest.org/en/stable/how-to/assert.html
+- Python `pathlib` 官方文档：https://docs.python.org/3.11/library/pathlib.html
+- Mermaid 语法官方参考：https://mermaid.js.org/intro/syntax-reference.html
+- OpenAI Function calling / tool calling guide：https://platform.openai.com/docs/guides/function-calling
+
+### 6. 今日输出物
+
+- `tests/test_file_tools.py` 新增非字符串路径边界测试。
+- `src/pca/tools/file_tools.py` 新增路径参数类型校验。
+- Day 7 周复盘学习笔记。
+- Day 7 面试题归档。
+- 更新后的 `README.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
+
+### 7. 完成情况
+
+- 已完成第 1 周代码复盘：当前主链路保持在 `AgentLoop -> ToolRegistry -> Tool -> handler/runtime`。
+- 已确认不做大架构调整，不提前引入 planner、权限系统或真实 LLM。
+- 已跑 Day 7 初始基线：`python -m pytest -q` 为 `66 passed, 1 skipped`；示例脚本和编译验证通过。
+- 已按 TDD 新增 RED 测试，证明 `path=123` 会被错误地当作文件名处理。
+- 已修复 `_resolve_workspace_path(...)`，让文件工具明确拒绝非字符串 `path`。
+- 已验证 `python -m pytest tests\test_file_tools.py -q` 为 `25 passed, 1 skipped`。
+- 已验证 `python -m pytest -q` 为 `68 passed, 1 skipped`。
+- 已更新第 1 周收口文档。
+- Day 6 和 Day 7 的用户面试题回答仍待补充。
+
+## 2026-06-08
+
+日期：2026-06-08
 当前阶段：第 1 周 Day 6
 当前模块：文档和架构图
 预计用时：45 分钟

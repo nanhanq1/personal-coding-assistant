@@ -1,5 +1,78 @@
 # Learning Notes
 
+## 周复盘和小重构：第 7 天
+
+### 1. 直觉
+
+Day 7 的核心不是“再堆功能”，而是把第 1 周已经做出来的 Agent harness 收口。一个可继续扩展的 Coding Agent，首先要保证最小闭环稳定、边界清楚、测试能抓住真实风险，文档和代码讲的是同一件事。
+
+本日小重构选择了文件工具的 `path` 参数边界，因为它刚好体现 Agent 工程里的一个常见问题：LLM 给出的结构化参数不能默认可信。`path=123` 看起来只是类型不对，但如果程序把它静默转成 `"123"`，读文件会报错到错误层级，写文件甚至会创建意外文件。
+
+### 2. 一句话解释
+
+Day 7 是用周复盘确认第 1 周 Agent Loop 和工具路由闭环已经稳定，并用 TDD 修掉一个工具参数边界缺口。
+
+### 3. 第 1 周完整调用链
+
+```text
+user input
+  -> AgentLoop.run(...)
+  -> append user Message
+  -> llm.complete(messages)
+  -> assistant Message(tool_calls=[...])
+  -> ToolRegistry.run(tool_call.name, tool_call.arguments)
+  -> Tool.run(arguments)
+  -> ReadFileTool / WriteFileTool / ShellCommandTool
+  -> handler or ShellRuntime
+  -> append role="tool" Message
+  -> llm.complete(messages)
+  -> final assistant Message
+```
+
+### 4. Day 7 小重构流程
+
+```mermaid
+flowchart TD
+    A["发现边界缺口: path=123"] --> B["写 RED 测试"]
+    B --> C["测试失败: read_file 读 123 / write_file 写 123"]
+    C --> D["最小修复 _resolve_workspace_path"]
+    D --> E["拒绝非字符串 path"]
+    E --> F["文件工具测试通过"]
+    F --> G["全量测试通过"]
+```
+
+### 5. 当前代码位置
+
+- 主循环：`src/pca/core/agent_loop.py`
+- 工具调用结构：`src/pca/core/messages.py`
+- 工具注册表：`src/pca/tools/registry.py`
+- 文件工具边界：`src/pca/tools/file_tools.py`
+- shell runtime：`src/pca/runtime/shell_runtime.py`
+- Day 7 新增测试：`tests/test_file_tools.py`
+
+### 6. 当前项目阶段定位
+
+当前代码处在第 1 周结束位置：最小 Agent Loop、工具抽象、文件工具、shell runtime、默认 coding 工具注册表、README、架构图和面试讲解稿都已经有了。
+
+它仍然不是完整 Coding Agent 产品，而是后续 11 周能力的骨架层。第 2 周可以继续深化 Tool System，优先处理工具参数 schema、`edit_file`、结构化 tool result 和更清晰的工具元数据。
+
+### 7. 当前仍存在的问题
+
+- 工具参数还没有 JSON Schema 或 Pydantic schema。
+- 文件工具还没有 `edit_file`、diff、二进制检测、文件大小限制和写入审批。
+- shell runtime 还缺危险命令分类、权限审批、sandbox、输出大小限制和进程树清理。
+- message history 还没有持久化 trace、压缩、检索和长期记忆。
+- 复杂任务还没有 planner / todo 状态机。
+- Day 6 和 Day 7 面试题的用户回答仍待补充。
+
+### 8. 检查问题
+
+1. 为什么 Day 7 不应该做大重构？
+2. 为什么 `path=123` 不能被文件工具静默转成 `"123"`？
+3. RED 测试在这次小重构里证明了什么？
+4. 第 1 周的 Agent 执行闭环和工具路由链路分别是什么？
+5. 第 2 周继续深化 Tool System 时，最应该优先补哪些能力？
+
 ## 文档和架构图：第 6 天
 
 ### 1. 直觉

@@ -55,6 +55,13 @@
 - GitHub Docs：README 和个人资料 README 说明：https://docs.github.com/en/account-and-profile/how-tos/profile-customization/managing-your-profile-readme
 - OpenAI Function calling / tool calling guide：https://platform.openai.com/docs/guides/function-calling
 
+### Day 7 周复盘和小重构资料
+
+- pytest assertion 官方文档：https://docs.pytest.org/en/stable/how-to/assert.html
+- Python `pathlib` 官方文档：https://docs.python.org/3.11/library/pathlib.html
+- Mermaid 官方语法参考：https://mermaid.js.org/intro/syntax-reference.html
+- OpenAI Function calling / tool calling guide：https://platform.openai.com/docs/guides/function-calling
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |

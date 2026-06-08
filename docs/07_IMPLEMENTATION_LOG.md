@@ -4,6 +4,32 @@
 
 ### 本次完成
 
+- 进行第 1 周 Day 7：周复盘和小重构。
+- 复盘当前核心链路：`AgentLoop -> ToolRegistry.run(...) -> Tool.run(...) -> handler/runtime`。
+- 确认 Day 7 不做大架构调整，不提前引入 planner、权限系统或真实 LLM。
+- 运行 Day 7 初始基线验证，确认第 1 周代码在重构前稳定。
+- 按 TDD 新增文件工具边界测试：`path` 必须是字符串，不能把数字等坏参数静默转成文件名。
+- 修复 `src/pca/tools/file_tools.py` 的 `_resolve_workspace_path(...)`，明确拒绝非字符串 `path`。
+- 更新 `README.md`、`docs/02_DAILY_TASKS.md`、`docs/04_RESOURCE_LIBRARY.md`、`docs/05_LEARNING_NOTES.md`、`docs/Compilation-of-Interview-Questions.md` 和 `docs/09_NEXT_ACTIONS.md`。
+
+### 架构决策
+
+- 本次没有新增 ADR。
+- Day 7 只是第 1 周收口型小重构，继续沿用已有工具路由和 workspace 边界设计。
+
+### 验证
+
+- 初始基线运行 `python -m pytest -q`：`66 passed, 1 skipped`。
+- 初始基线运行 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 初始基线运行 `python -m compileall src examples -q`：通过。
+- RED：运行 `python -m pytest tests\test_file_tools.py -q`，新增两个非字符串路径测试失败，证明 `path=123` 会被错误处理。
+- GREEN：修复后运行 `python -m pytest tests\test_file_tools.py -q`：`25 passed, 1 skipped`。
+- 全量验证运行 `python -m pytest -q`：`68 passed, 1 skipped`。
+
+## 2026-06-08
+
+### 本次完成
+
 - 继续第 1 周 Day 6：文档和架构图。
 - 复盘第 1 周 Day 1 到 Day 5 已完成能力：`Message` / `ToolCall`、`ScriptedLLM`、`AgentLoop`、`ToolRegistry`、文件工具、shell runtime 和默认 coding 工具注册表。
 - 更新 `README.md`，补齐当前能力、Agent 执行闭环图、工具路由链路图、运行方式、测试方式和面试讲解要点。

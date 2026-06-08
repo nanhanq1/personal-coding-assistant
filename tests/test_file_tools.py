@@ -43,6 +43,13 @@ class TestReadFileTool:
             with pytest.raises(ValueError, match="path"):
                 tool.run({"path": invalid_path, "workspace_root": str(tmp_path)})
 
+    def test_rejects_non_string_path(self, tmp_path):
+        """测试 path 必须是字符串，避免把 LLM 坏参数静默转成文件名。"""
+        tool = ReadFileTool()
+
+        with pytest.raises(TypeError, match="path"):
+            tool.run({"path": 123, "workspace_root": str(tmp_path)})
+
     def test_rejects_invalid_workspace_root(self, tmp_path):
         """测试 workspace_root 必须是已存在的目录。"""
         tool = ReadFileTool()
@@ -141,6 +148,19 @@ class TestWriteFileTool:
             })
 
         assert not (tmp_path / "test.txt").exists()
+
+    def test_rejects_non_string_path(self, tmp_path):
+        """测试写入路径必须是字符串，避免把数字等坏参数静默转成文件名。"""
+        tool = WriteFileTool()
+
+        with pytest.raises(TypeError, match="path"):
+            tool.run({
+                "path": 123,
+                "content": "should not be written",
+                "workspace_root": str(tmp_path),
+            })
+
+        assert not (tmp_path / "123").exists()
 
     def test_rejects_path_outside_workspace(self, tmp_path):
         """测试拒绝工作区外的路径"""

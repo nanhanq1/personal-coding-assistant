@@ -60,7 +60,11 @@ class WriteFileTool(Tool):
 def _resolve_workspace_path(arguments: dict[str, Any]) -> Path:
     """把工具参数中的路径解析为工作区内的绝对路径。"""
     raw_path = arguments.get("path")
-    if raw_path is None or str(raw_path).strip() == "":
+    if raw_path is None:
+        raise ValueError("path must be a non-empty string")
+    if not isinstance(raw_path, str):
+        raise TypeError("path must be a string")
+    if raw_path.strip() == "":
         raise ValueError("path must be a non-empty string")
 
     # 修改前旧代码：
@@ -68,7 +72,7 @@ def _resolve_workspace_path(arguments: dict[str, Any]) -> Path:
     #
     # 问题：workspace_root 不存在或是文件时也会继续拼路径，错误会延迟到读写阶段。
     workspace_root = _resolve_workspace_root(arguments)
-    requested_path = Path(str(raw_path))
+    requested_path = Path(raw_path)
 
     if requested_path.is_absolute():
         resolved_path = requested_path.resolve()

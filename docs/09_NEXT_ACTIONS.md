@@ -15,8 +15,12 @@
 
 ## 当前进度
 
+- 已完成第 1 周 Day 7：周复盘和小重构。
+- Day 7 小重构内容：文件工具现在明确拒绝非字符串 `path`，避免把 LLM 坏参数静默转成文件名。
+- 最新测试结果：`python -m pytest -q` 为 `68 passed, 1 skipped`。
+- 最新文件工具测试结果：`python -m pytest tests\test_file_tools.py -q` 为 `25 passed, 1 skipped`。
 - 已完成 GitHub 发布准备：补充公开版 `README.md`，补强 `.gitignore`，并准备配置远程仓库 `https://github.com/nanhanq1/personal-coding-assistant.git`。
-- 当前阶段：第 1 周 Day 6 文档和架构图已完成，准备进入 Day 7：周复盘和小重构。
+- 当前阶段：第 1 周已收口，准备进入第 2 周 Tool System 深化。
 - 已完成：项目文档初始化、最小 Python 包结构、message schema、mock LLM、最小 Agent Loop、Agent Loop 测试、示例脚本回归测试。
 - 已完成 Day 1 学习验收：用户已经读懂代码，并能解释 Agent Loop、Message history、ToolCall、mock LLM 和 max_turns。
 - 已修复 Day 1 遗留导入问题：核心模块和测试统一使用标准 `pca...` 导入。
@@ -72,21 +76,21 @@
 
 ## 下一次应该继续做什么
 
-继续第 1 周 Day 7：周复盘和小重构。
+继续第 2 周 Tool System 深化。
 
-教学执行方式：先带用户复盘第 1 周完整闭环，再检查现有代码是否有小而必要的重构点。重点不是大改架构，而是从测试覆盖、命名、边界校验、文档一致性和面试表达角度完成第 1 周收口。
+教学执行方式：先带用户复盘第 1 周完整闭环，再基于 `docs/01_LEARNING_ROADMAP.md` 把第 2 周拆成可执行 Sprint。当前不要直接跳到真实 LLM、planner、RAG 或 MCP；第 2 周优先继续深化工具系统。
 
 建议任务：
 
-1. 让用户回答 Day 6 面试题，并评审回答质量。
-2. 对第 1 周代码做一次小范围复盘：`src/pca/core/`、`src/pca/tools/`、`src/pca/runtime/` 和 `tests/`。
-3. 检查是否存在命名不一致、重复逻辑、测试缺口或文档与代码不一致。
-4. 只做必要的小重构，避免提前引入 planner、权限系统或真实 LLM。
-5. 运行 `python -m pytest -q`、`python examples\01_minimal_agent.py` 和 `python -m compileall src examples -q` 做 Day 7 验证。
+1. 先让用户补充 Day 6 和 Day 7 面试题回答，并评审回答质量。
+2. 读取 `docs/01_LEARNING_ROADMAP.md` 和 `docs/03_WEEKLY_SPRINTS.md`，把第 2 周 Tool System 深化拆成日任务。
+3. 优先考虑工具参数 schema、`edit_file`、结构化 tool result、工具元数据和更清晰的错误语义。
+4. 继续使用 mock LLM 和 TDD，不要一开始依赖真实 API。
+5. 每个新工具或行为必须有单元测试和集成测试。
 6. 结束时更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
 
 ## 用户下次应发送的指令
 
 ```text
-继续项目，开始第 1 周 Day 7：周复盘和小重构。请先评审我对 Day 6 面试题的回答。
+继续项目，开始第 2 周 Tool System 深化。请先评审我对 Day 6 和 Day 7 面试题的回答。
 ```

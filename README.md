@@ -6,9 +6,9 @@
 
 ## 当前进度
 
-- 路线阶段：12 周学习路线，第 1 周 Day 6。
+- 路线阶段：12 周学习路线，第 1 周 Day 7。
 - 当前主题：Agent Loop 与 Tool Routing 闭环。
-- 当前状态：已完成 `user -> LLM -> tool_call -> tool_result -> LLM -> final_answer` 的最小可运行链路。
+- 当前状态：已完成 `user -> LLM -> tool_call -> tool_result -> LLM -> final_answer` 的最小可运行链路，并完成第 1 周周复盘和小范围边界重构。
 - 已实现能力：
   - 标准 message schema：`Message`、`ToolCall`。
   - 可脚本化 mock LLM：`ScriptedLLM`。
@@ -20,7 +20,7 @@
   - 工作区路径边界校验、基础参数校验和工具错误回写。
   - pytest 单元测试、集成测试和示例脚本。
 
-下一步将进入 Day 7：第 1 周复盘和小重构，重点检查第 1 周代码边界、文档一致性、测试覆盖和面试讲解材料。
+下一步将进入第 2 周：继续深化 Tool System，优先从工具参数 schema、`edit_file` 和更清晰的工具结果结构开始规划。
 
 ## 核心架构
 
@@ -95,7 +95,7 @@ python -m pytest -q
 当前最近一次全量验证基线：
 
 ```text
-66 passed, 1 skipped
+68 passed, 1 skipped
 ```
 
 ## 运行示例
