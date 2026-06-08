@@ -1,5 +1,64 @@
 # Daily Tasks
 
+## 2026-06-08
+
+日期：2026-06-08
+当前阶段：第 1 周 Day 5
+当前模块：整合 Loop + Tools
+预计用时：45 分钟
+
+### 1. 今日学习目标
+
+- 理解 Day 5 为什么不是继续新增单个工具，而是验证 `AgentLoop` 和多个工具的统一路由。
+- 理解默认 coding 工具注册表的作用：把 `read_file`、`write_file`、`run_command` 组合成一个 `ToolRegistry`。
+- 理解多工具调用结果如何按顺序写回 `message history`，让 LLM 可以继续基于工具结果回答。
+
+### 2. 所需前置知识
+
+- Day 1：`AgentLoop`、`Message`、`ToolCall` 和 `message history`。
+- Day 2：`Tool` 和 `ToolRegistry` 的注册、查找和执行。
+- Day 3：`read_file` / `write_file` 的 `workspace_root` 边界。
+- Day 4：`run_command`、`ShellRuntime`、`cwd`、`timeout_seconds` 和结构化命令结果。
+
+### 3. 今日必须理解的知识点
+
+- `AgentLoop` 不应该直接依赖具体工具类，只应该依赖 `ToolRegistry.run(...)`。
+- 多个工具统一注册后，路由链路仍然是 `ToolCall -> ToolRegistry -> Tool -> handler/runtime -> tool message`。
+- `write_file` 的工具结果是 `"ok"`，`read_file` 的工具结果是文件文本，二者都必须进入 `message history`。
+- 默认工具注册表只是组合入口，不替代权限系统、planner 或真实 LLM。
+
+### 4. 今日代码任务
+
+- 新增 `create_coding_tool_registry()`，统一注册内置 coding 工具。
+- 新增 `tests/test_loop_tools_integration.py`，覆盖 `AgentLoop` 连续调用 `write_file` 和 `read_file` 的集成链路。
+- 保持 `AgentLoop` 主循环不重构，先用集成测试证明现有路由能力成立。
+
+### 5. 今日资料推荐
+
+- OpenAI Function calling / tool calling guide：https://platform.openai.com/docs/guides/function-calling
+- Claude tool use overview：https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
+- mini-SWE-agent GitHub：https://github.com/SWE-agent/mini-swe-agent
+- mini-SWE-agent CLI docs：https://mini-swe-agent.com/latest/usage/mini/
+
+### 6. 今日输出物
+
+- `src/pca/tools/__init__.py` 中的 `create_coding_tool_registry()`。
+- `tests/test_loop_tools_integration.py`。
+- Day 5 Loop + Tools 学习笔记。
+
+### 7. 完成情况
+
+- 已按 TDD 写 RED 测试，失败原因是 `pca.tools` 尚无 `create_coding_tool_registry`。
+- 已实现默认 coding 工具注册表，注册 `ReadFileTool`、`WriteFileTool` 和 `ShellCommandTool`。
+- 已验证 `AgentLoop` 可以通过默认工具注册表完成 `write_file -> read_file -> final answer`。
+- 已运行 `python -m pytest tests\test_loop_tools_integration.py -q`，结果为 `1 passed`。
+- 已运行 `python -m pytest -q`，结果为 `66 passed, 1 skipped`。
+- 已运行 `python examples\01_minimal_agent.py`，示例输出完整 `user -> assistant -> tool:echo -> assistant` 链路。
+- 已运行 `python -m compileall src examples -q`，源码和示例均可编译。
+- 已完成 Day 5 面试题回答评审。
+- 已将第 5 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
+- Day 5 学习验收通过，下一步进入第 1 周 Day 6：文档和架构图。
+
 ## 2026-06-07
 
 日期：2026-06-07

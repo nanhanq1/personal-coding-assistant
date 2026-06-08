@@ -1,5 +1,32 @@
 # Implementation Log
 
+## 2026-06-08
+
+### 本次完成
+
+- 开始第 1 周 Day 5：整合 Loop + Tools。
+- 按 TDD 新增 `tests/test_loop_tools_integration.py`，先观察 RED：`pca.tools` 中缺少 `create_coding_tool_registry`。
+- 在 `src/pca/tools/__init__.py` 中新增 `create_coding_tool_registry()`。
+- 默认注册表统一注册 `ReadFileTool`、`WriteFileTool` 和 `ShellCommandTool`。
+- 通过集成测试验证 `AgentLoop` 可以连续路由 `write_file` 和 `read_file`，并把每次工具结果写回 `message history`。
+- 评审用户对 Day 5 Loop + Tools 整合面试题的回答。
+- 将第 5 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
+- 更新 `docs/02_DAILY_TASKS.md`、`docs/04_RESOURCE_LIBRARY.md`、`docs/05_LEARNING_NOTES.md` 和 `docs/09_NEXT_ACTIONS.md`。
+
+### 架构决策
+
+- 本次没有新增架构决策。
+- 继续沿用已有链路：`AgentLoop -> ToolRegistry.run(...) -> Tool.run(...) -> handler/runtime`。
+- `create_coding_tool_registry()` 只是内置工具组合入口，不改变 AgentLoop、权限系统或 runtime 边界。
+
+### 验证
+
+- 先运行 `python -m pytest tests\test_loop_tools_integration.py -q` 观察 RED：失败原因为 `cannot import name 'create_coding_tool_registry' from 'pca.tools'`。
+- 实现默认工具注册表后运行 `python -m pytest tests\test_loop_tools_integration.py -q`：`1 passed`。
+- 运行 `python -m pytest -q`：`66 passed, 1 skipped`。
+- 运行 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 运行 `python -m compileall src examples -q`：通过。
+
 ## 2026-06-07
 
 ### 本次完成

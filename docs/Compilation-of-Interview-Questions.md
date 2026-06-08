@@ -107,3 +107,30 @@
 
 - 用户回答：我认为是一些适配能力，比如：如果我操作的 `cwd` 不在 workspace 范围内，但是又是完成任务所必须的；`command` 参数没做规范化处理，官方文档中说明了 `command` 最好是命令列表，比如 `["python", "-c", "import time; time.sleep(100)"]`，而不是字符串。至于其他方面还没有想到，因为已经有了参数校验。
 - 标准回答：你指出的 `command` 列表形式是重要增强点，因为列表参数配合 `shell=False` 可以减少 shell 字符串解析和注入风险。`cwd` 超出 workspace 但任务必须完成时，不能直接绕过边界，而应该进入权限审批、扩大授权 workspace，或由用户显式确认新的工作目录。除此之外，工业级 shell runtime 还缺少危险命令分类、人工审批、命令 allowlist / denylist、审计日志、trace id、进程树清理、输出大小限制、环境变量脱敏、资源限制、sandbox / Docker 隔离、checkpoint / rollback、并发控制和更细粒度的权限策略。参数校验只是第一层安全边界，不等于完整安全。
+
+## 第 5 天：2026-06-08
+
+### 面试题 1：为什么 Day 5 要新增 `create_coding_tool_registry()`，而不是让 `AgentLoop` 直接 import `ReadFileTool`、`WriteFileTool` 和 `ShellCommandTool`？
+
+- 用户回答：因为需要一个工具的统一的注册接口，有助于统一管理和分发以及区分。
+- 标准回答：`create_coding_tool_registry()` 是内置 coding 工具的组合入口。它把 `ReadFileTool`、`WriteFileTool` 和 `ShellCommandTool` 注册到同一个 `ToolRegistry`，让 `AgentLoop` 只依赖统一的工具路由接口，而不是直接依赖具体工具类。这样可以保持职责分离：`AgentLoop` 负责循环和消息轨迹，`ToolRegistry` 负责查找和分发，具体工具负责真实执行和安全边界。后续新增、替换或禁用工具时，优先改注册入口，而不是改 Agent 主循环。
+
+### 面试题 2：在 `write_file -> read_file -> final answer` 这个测试里，为什么 `write_file` 返回的 `"ok"` 必须写回 `message history`？
+
+- 用户回答：因为根本原因是工具的调用结果是 context，有助于帮助 LLM 做出当前情形下的决策。
+- 标准回答：工具结果就是 Agent 从外部环境获得的新上下文。`write_file` 返回 `"ok"` 表示写入动作已经成功完成；把它写回 `message history` 后，LLM 下一轮才能知道“文件已经写好”，从而安全地继续发起 `read_file`。如果不写回 history，LLM 只能猜测工具是否成功，可能重复写入、跳过验证，或者基于错误状态继续回答。message history 同时也是可回放轨迹，能解释 Agent 为什么进入下一步。
+
+### 面试题 3：`ToolCall` 和真正执行工具有什么区别？请用 `ToolCall(name="read_file", arguments={...})` 举例说明。
+
+- 用户回答：`ToolCall` 只是将 LLM 的返回结果进行了封装，就是告诉你工具的名称是什么以及工具所需的参数，然后通过统一的工具注册入口进行分发。
+- 标准回答：`ToolCall(name="read_file", arguments={...})` 是 LLM 发出的结构化调用意图，表示“我想读取某个文件，并且这些是参数”。它本身不会读取磁盘，也不会产生副作用。真正执行发生在程序侧：`AgentLoop` 读取 `tool_call.name` 和 `tool_call.arguments`，交给 `ToolRegistry.run(...)`；registry 找到名为 `read_file` 的 `Tool`；`Tool.run(arguments)` 再调用 `ReadFileTool` 的 handler；最后文件工具解析路径、检查 `workspace_root` 并读取文件内容。LLM 提出意图，runtime 负责执行，这是工具调用体系的核心分层。
+
+### 面试题 4：如果 `read_file` 读取失败，为什么更好的做法是把错误作为 tool message 写回 history，而不是直接让整个 AgentLoop 崩掉？
+
+- 用户回答：因为工具调用失败的原因有很多种，比如环境问题、网络问题、以及本身工具的问题，你不能保证哪种问题，所以要求将工具调用失败的结果进行返还到 history，让 LLM 根据上下文进行判断和决策，比如换个工具或者继续这个工具以及跳过这个决策路径换个路径。
+- 标准回答：工具失败也是一种环境反馈。失败原因可能是路径不存在、参数错误、权限不足、工作区越界、文件被占用或工具自身 bug。如果 AgentLoop 直接崩掉，轨迹会中断，LLM 没有机会理解失败原因，也不能改用其他策略。把错误作为 `role="tool"` 的消息写回 history 后，LLM 可以根据错误决定重试、换路径、请求用户确认、调用别的工具或停止执行并解释问题。工业级 Agent 需要可恢复和可复盘，而不是遇到一次工具错误就丢失上下文。
+
+### 面试题 5：当前 Day 5 代码离工业级 Coding Agent 还缺哪三个关键能力？
+
+- 用户回答：planner、危险工具和命令的分类和预防、上下文工程以及记忆系统。
+- 标准回答：这些方向是正确的。当前 Day 5 仍处在第 1 周 Agent Loop 阶段，主要证明多工具可以通过统一注册表进入同一条循环链路。距离工业级 Coding Agent 至少还缺：第一，planner / todo 状态机，用于拆解任务、记录步骤和控制多轮执行；第二，权限系统和危险命令分类，用于在写文件、运行 shell、删除文件、安装依赖等高风险操作前进行风险评估和人工审批；第三，上下文工程和记忆系统，用于选择相关代码文件、压缩历史、检索长期偏好和任务经验。除此之外还需要结构化 tool result、schema 校验、可观测 trace、checkpoint / rollback、sandbox 和 MCP tool bridge。

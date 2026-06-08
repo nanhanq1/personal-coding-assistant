@@ -1,5 +1,80 @@
 # Learning Notes
 
+## Loop + Tools 整合：第 5 天
+
+### 1. 直觉
+
+前几天分别完成了 Agent 循环、工具注册表、文件工具和 shell runtime。Day 5 的重点不是继续新增工具，而是确认这些能力能被同一个 `AgentLoop` 串起来。
+
+也就是说，Agent 不应该只会调用一个示例 `echo`，而应该能通过同一个路由入口调用不同工具，例如先写文件，再读文件，最后根据工具结果继续回答。
+
+### 2. 一句话解释
+
+`create_coding_tool_registry()` 是内置 coding 工具的组合入口，负责把 `read_file`、`write_file` 和 `run_command` 注册到同一个 `ToolRegistry`。
+
+### 3. 核心调用链
+
+```text
+user input
+  -> AgentLoop.run(...)
+  -> llm.complete(messages)
+  -> assistant Message(tool_calls=[ToolCall(...)])
+  -> ToolRegistry.run(tool_call.name, tool_call.arguments)
+  -> Tool.run(arguments)
+  -> ReadFileTool / WriteFileTool / ShellCommandTool
+  -> 返回工具结果
+  -> AgentLoop 追加 role="tool" 的 Message
+  -> llm.complete(messages)
+  -> final assistant answer
+```
+
+### 4. 流程图
+
+```mermaid
+flowchart TD
+    A["User asks coding task"] --> B["AgentLoop"]
+    B --> C["LLM returns write_file ToolCall"]
+    C --> D["ToolRegistry.run write_file"]
+    D --> E["WriteFileTool writes file"]
+    E --> F["Append tool message: ok"]
+    F --> G["LLM returns read_file ToolCall"]
+    G --> H["ToolRegistry.run read_file"]
+    H --> I["ReadFileTool reads file"]
+    I --> J["Append tool message: file content"]
+    J --> K["LLM returns final answer"]
+```
+
+### 5. 当前代码位置
+
+- 默认工具注册入口：`src/pca/tools/__init__.py`
+- Agent 主循环：`src/pca/core/agent_loop.py`
+- 文件工具：`src/pca/tools/file_tools.py`
+- shell 工具：`src/pca/tools/shell_tools.py`
+- 集成测试：`tests/test_loop_tools_integration.py`
+
+### 6. 当前测试覆盖
+
+- `create_coding_tool_registry()` 可以创建包含内置 coding 工具的 `ToolRegistry`。
+- `AgentLoop` 可以通过默认工具注册表连续调用 `write_file` 和 `read_file`。
+- `write_file` 的 `"ok"` 结果会写回 `message history`。
+- `read_file` 的文件内容会写回 `message history`。
+- 最终 assistant 可以基于工具结果结束循环。
+
+### 7. 当前仍不是完整工业级的地方
+
+- 当前 LLM 仍是脚本化 mock，还不会根据自然语言自主选择工具。
+- 工具参数仍由测试脚本直接构造，还没有 JSON Schema / Pydantic 参数层。
+- `run_command` 已注册进默认工具表，但本轮集成测试重点先放在文件工具链路。
+- 还没有权限审批、风险分类、planner、长期记忆和可观测 trace。
+
+### 8. 检查问题
+
+1. 为什么 Day 5 不直接重写 `AgentLoop`？
+2. `create_coding_tool_registry()` 解决了什么问题？
+3. 为什么 `AgentLoop` 不应该直接 import 并调用 `ReadFileTool`？
+4. `write_file` 和 `read_file` 的工具结果为什么都要写回 `message history`？
+5. 如果 `read_file` 失败，为什么应该把错误写回工具消息，而不是直接丢掉轨迹？
+
 ## 工业级代码审查：2026-06-06
 
 ### 1. 直觉

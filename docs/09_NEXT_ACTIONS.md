@@ -16,7 +16,7 @@
 ## 当前进度
 
 - 已完成 GitHub 发布准备：补充公开版 `README.md`，补强 `.gitignore`，并准备配置远程仓库 `https://github.com/nanhanq1/personal-coding-assistant.git`。
-- 当前阶段：第 1 周 Day 4 shell runtime 已完成复盘与面试题归档，准备进入 Day 5：整合 Loop + Tools。
+- 当前阶段：第 1 周 Day 5 Loop + Tools 整合已完成，准备进入 Day 6：文档和架构图。
 - 已完成：项目文档初始化、最小 Python 包结构、message schema、mock LLM、最小 Agent Loop、Agent Loop 测试、示例脚本回归测试。
 - 已完成 Day 1 学习验收：用户已经读懂代码，并能解释 Agent Loop、Message history、ToolCall、mock LLM 和 max_turns。
 - 已修复 Day 1 遗留导入问题：核心模块和测试统一使用标准 `pca...` 导入。
@@ -55,25 +55,33 @@
 - 已完成 Day 4 shell runtime 复盘与面试题回答评审。
 - 已将第 4 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
 - 已增强 shell runtime：`command` 现在支持 `list[str]`，列表命令使用 `shell=False`；字符串命令继续兼容 `shell=True`。
+- 已开始 Day 5 Loop + Tools 整合：新增 `create_coding_tool_registry()`，统一注册 `ReadFileTool`、`WriteFileTool` 和 `ShellCommandTool`。
+- 已新增 `tests/test_loop_tools_integration.py`，验证 `AgentLoop` 可以通过默认工具注册表连续执行 `write_file -> read_file -> final answer`。
+- 最新测试结果：`python -m pytest tests\test_loop_tools_integration.py -q` 为 `1 passed`。
+- 最新全量测试结果：`python -m pytest -q` 为 `66 passed, 1 skipped`。
+- 最新示例验证：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 最新编译验证：`python -m compileall src examples -q` 通过。
+- 已完成 Day 5 面试题回答评审。
+- 已将第 5 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
 - 当前阻塞：无。
 
 ## 下一次应该继续做什么
 
-继续第 1 周 Day 5：整合 Loop + Tools。
+继续第 1 周 Day 6：文档和架构图。
 
-教学执行方式：先讲清 Day 5 的直觉、调用链、目标文件、输入输出和验收测试，再进入代码。重点让用户理解多个工具如何统一注册、如何从 `AgentLoop` 通过 `ToolRegistry` 路由到不同工具，以及多工具调用结果如何写回 message history。
+教学执行方式：先复盘第 1 周当前完整闭环，再整理 README、架构图和面试讲解稿初稿。重点让用户能从作品集和面试角度讲清 `user -> LLM -> tool_call -> tool_result -> LLM -> final_answer`，以及 `AgentLoop -> ToolRegistry -> Tool -> handler/runtime` 两条核心链路。
 
 建议任务：
 
-1. 复盘当前已有工具：`read_file`、`write_file`、`run_command`。
-2. 讲解 Day 5 为什么要整合 Loop + Tools，而不是继续单独实现工具。
-3. 设计一个多工具调用场景，例如先 `write_file`，再 `read_file`，或先 `run_command`，再根据结果继续回答。
-4. 补充或调整测试，覆盖 AgentLoop 通过 `ToolRegistry` 调用多个不同工具。
-5. 明确工具路由链路：`ToolCall -> ToolRegistry -> Tool -> handler/runtime -> tool message`。
-6. 更新学习笔记、实现日志、next actions；如果完成当天任务，继续归档 Day 5 面试题。
+1. 复盘第 1 周 Day 1 到 Day 5 已完成能力：AgentLoop、ToolRegistry、文件工具、shell runtime、默认 coding 工具注册表。
+2. 补充或整理 README 中的当前能力、运行方式、测试方式和学习路线。
+3. 在学习笔记或文档中整理 Agent Loop + Tool Routing 架构图。
+4. 准备第 1 周面试讲解稿初稿，覆盖核心调用链、设计取舍、安全边界和当前不足。
+5. 运行 `python -m pytest -q`、`python examples\01_minimal_agent.py` 和 `python -m compileall src examples -q` 做 Day 6 验证。
+6. 结束时更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
 
 ## 用户下次应发送的指令
 
 ```text
-继续项目，开始第 1 周 Day 5：整合 Loop + Tools。请先讲直觉、调用链、目标文件、输入输出和验收测试。
+继续项目，开始第 1 周 Day 6：文档和架构图。请先复盘第 1 周当前完整闭环。
 ```

@@ -40,6 +40,13 @@
 - PowerShell `pwsh` 命令行说明：https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_pwsh
 - Python `locale` 官方文档：https://docs.python.org/3/library/locale.html
 
+### Day 5 Loop + Tools 整合资料
+
+- OpenAI Function calling / tool calling guide：https://platform.openai.com/docs/guides/function-calling
+- Claude tool use overview：https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
+- mini-SWE-agent GitHub：https://github.com/SWE-agent/mini-swe-agent
+- mini-SWE-agent CLI docs：https://mini-swe-agent.com/latest/usage/mini/
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |
