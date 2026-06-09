@@ -139,52 +139,52 @@
 
 ### 面试题 1：请用 30 秒解释当前 Personal Coding Assistant 已经实现了什么。
 
-- 用户回答：待补充
+- 用户回答：实现了 `user -> LLM -> tool call -> tool registry -> tool run -> tool result -> LLM -> final answer` 的闭环，其中当前验证使用的是 mock LLM，并不是真实 LLM 环境。
 - 标准回答：当前项目实现了一个最小 Coding Agent harness，包含 `Message` / `ToolCall`、mock LLM、`AgentLoop`、`ToolRegistry`、文件工具和 shell runtime。它能完成 `user -> LLM -> tool_call -> tool_result -> LLM -> final_answer` 的最小闭环，并通过测试验证工具调用结果会写回 message history。
 
 ### 面试题 2：`user -> LLM -> tool_call -> tool_result -> LLM -> final_answer` 和 `AgentLoop -> ToolRegistry -> Tool -> handler/runtime` 有什么区别？
 
-- 用户回答：待补充
+- 用户回答：前面是 Agent Loop 的整体逻辑流程，后者是 Agent Loop 的实现和封装细节。
 - 标准回答：前一条是 Agent 从用户请求到最终回答的业务执行闭环，强调 LLM、工具调用和工具结果如何交替推进；后一条是程序内部执行工具调用的工程路由链路，强调 `AgentLoop` 不直接依赖具体工具，而是通过 `ToolRegistry` 找到 `Tool`，再由 handler 或 runtime 执行真实副作用。
 
 ### 面试题 3：为什么 README 和架构图必须和真实代码保持一致？
 
-- 用户回答：待补充
+- 用户回答：README 和架构图是外部读者理解项目的入口，也是面试时解释项目的依据。
 - 标准回答：README 和架构图是外部读者理解项目的入口，也是面试时解释项目的依据。如果文档画的是未来设想、代码却没有实现，会误导读者，也会暴露工程表达不严谨。好的架构图应该反映当前真实调用链，并明确哪些能力已经实现、哪些只是后续计划。
 
 ### 面试题 4：当前项目的安全边界主要在哪里？还缺什么？
 
-- 用户回答：待补充
+- 用户回答：当前主要安全边界是 `workspace_root`：文件工具和 shell runtime 都会把路径限制在授权工作区内，还缺权限审批、危险命令分类。
 - 标准回答：当前主要安全边界是 `workspace_root`：文件工具和 shell runtime 都会把路径限制在授权工作区内；shell runtime 还会限制超时时间并结构化返回执行结果。但它还缺权限审批、危险命令分类、审计日志、输出大小限制、环境变量脱敏、sandbox、checkpoint / rollback 和进程树清理。
 
 ### 面试题 5：如果面试官问“为什么现在还不用真实 LLM”，应该怎么回答？
 
-- 用户回答：待补充
+- 用户回答：重点是验证 Agent Loop 和工具路由控制流。真实 LLM 会带来 API key、网络、费用、随机性和输出不可控问题，容易干扰核心架构验证。
 - 标准回答：第 1 周重点是验证 Agent Loop 和工具路由控制流。真实 LLM 会带来 API key、网络、费用、随机性和输出不可控问题，容易干扰核心架构验证。先用 `ScriptedLLM` 固定响应，可以让测试稳定复现 `tool_call -> tool_result -> final answer`，等控制流和安全边界打牢后再接真实模型 adapter。
 
 ## 第 7 天：2026-06-08
 
 ### 面试题 1：为什么 Day 7 不应该继续大规模新增功能？
 
-- 用户回答：待补充
+- 用户回答：Day 7 是第 1 周收口日，目标是确认最小 Agent Loop、工具路由、测试和文档是否稳定。
 - 标准回答：Day 7 是第 1 周收口日，目标是确认最小 Agent Loop、工具路由、测试和文档是否稳定，而不是提前进入 planner、权限系统、真实 LLM 或 RAG。大规模新增功能会模糊第 1 周的学习重点，也容易在基础边界还没完全讲清时引入复杂耦合。
 
 ### 面试题 2：为什么文件工具不能把 `path=123` 静默转成 `"123"`？
 
-- 用户回答：待补充
+- 用户回答：工具参数来自 LLM 输出，不能默认可信。
 - 标准回答：工具参数来自 LLM 输出，不能默认可信。如果把非字符串路径静默转成字符串，`read_file` 会把类型错误伪装成文件不存在，`write_file` 甚至可能创建意外文件。这会掩盖参数生成错误，也会让审计和错误恢复更困难。更好的做法是在工具边界明确拒绝非字符串 `path`。
 
 ### 面试题 3：这次 Day 7 的 RED 测试证明了什么？
 
-- 用户回答：待补充
+- 用户回答：RED 测试证明当前代码确实存在目标缺口。
 - 标准回答：RED 测试证明当前代码确实存在目标缺口：非字符串 `path` 没有在参数边界被拒绝。`read_file` 会继续尝试读取名为 `123` 的路径，`write_file` 会写出名为 `123` 的文件。看到测试按预期失败后，再做最小修复，才能确认测试不是装饰性覆盖，而是真的能抓住回归。
 
 ### 面试题 4：请分别解释 Agent 执行闭环和工具路由链路。
 
-- 用户回答：待补充
+- 用户回答：Agent 执行闭环是 `user -> LLM -> tool_call -> tool_result -> LLM -> final_answer`，强调模型如何根据工具结果继续决策。工具路由链路是 `AgentLoop -> ToolRegistry.run(...) -> Tool.run(...) -> handler/runtime`。
 - 标准回答：Agent 执行闭环是 `user -> LLM -> tool_call -> tool_result -> LLM -> final_answer`，强调模型如何根据工具结果继续决策。工具路由链路是 `AgentLoop -> ToolRegistry.run(...) -> Tool.run(...) -> handler/runtime`，强调程序内部如何把 LLM 的调用意图转成真实工具执行。前者是业务执行流程，后者是工程实现路径。
 
 ### 面试题 5：第 2 周深化 Tool System 时，最应该优先补哪些能力？
 
-- 用户回答：待补充
+- 用户回答：工具参数 schema、结构化 tool result 和可观测字段，让工具成功、失败、耗时和错误原因可被 Agent 与测试稳定消费。
 - 标准回答：优先补三类能力：第一，工具参数 schema，例如 JSON Schema 或 Pydantic，用来系统化约束工具输入；第二，`edit_file` 或 diff/patch 能力，避免长期依赖整文件覆盖；第三，结构化 tool result 和可观测字段，让工具成功、失败、耗时和错误原因可被 Agent 与测试稳定消费。权限审批和危险命令分类也很重要，但应在工具边界更清楚后继续推进。
