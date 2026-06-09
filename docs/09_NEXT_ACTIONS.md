@@ -15,6 +15,15 @@
 
 ## 当前进度
 
+- 已开始第 2 周 Tool System 深化。
+- 已完成第 2 周 Day 1：工具参数 schema。
+- Day 1 新增 `ToolParameter`，`Tool` 现在可以声明 `parameters` 并导出 `to_schema()`。
+- `Tool.run(...)` 现在会在 handler 执行前校验必填参数和基础类型。
+- `ToolRegistry` 新增 `list_tool_schemas()`，可统一导出已注册工具 schema。
+- 内置 `read_file`、`write_file` 和 `run_command` 已声明参数 schema。
+- 已新增 ADR-0006：第 2 周 Day 1 使用 `ToolParameter` 声明工具参数 schema。
+- 最新工具系统测试结果：`python -m pytest tests\test_tools.py -q` 为 `15 passed`。
+- 最新相关工具链测试结果：`python -m pytest tests\test_tools.py tests\test_file_tools.py tests\test_shell_runtime.py tests\test_loop_tools_integration.py -q` 为 `65 passed, 1 skipped`。
 - 已完成第 1 周 Day 7：周复盘和小重构。
 - Day 7 小重构内容：文件工具现在明确拒绝非字符串 `path`，避免把 LLM 坏参数静默转成文件名。
 - 最新测试结果：`python -m pytest -q` 为 `68 passed, 1 skipped`。
@@ -78,20 +87,22 @@
 
 ## 下一次应该继续做什么
 
-继续第 2 周 Tool System 深化。
+继续第 2 周 Tool System 深化，进入 Day 2。
 
-教学执行方式：先快速复盘第 1 周完整闭环；之后基于 `docs/01_LEARNING_ROADMAP.md` 把第 2 周拆成可执行 Sprint。当前不要直接跳到真实 LLM、planner、RAG 或 MCP；第 2 周优先继续深化工具系统。
+教学执行方式：先复盘 Day 1 的 schema 契约，再讲 schema 如何服务未来真实 LLM adapter。当前不要直接跳到 planner、RAG 或 MCP；第 2 周优先继续深化工具系统。
 
 建议任务：
 
-1. 读取 `docs/01_LEARNING_ROADMAP.md` 和 `docs/03_WEEKLY_SPRINTS.md`，把第 2 周 Tool System 深化拆成日任务。
-2. 优先考虑工具参数 schema、`edit_file`、结构化 tool result、工具元数据和更清晰的错误语义。
-3. 继续使用 mock LLM 和 TDD，不要一开始依赖真实 API。
-4. 每个新工具或行为必须有单元测试和集成测试。
-5. 结束时更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
+1. 让用户回答第 2 周 Day 1 的面试题，并将用户回答补全到 `docs/Compilation-of-Interview-Questions.md`。
+2. 进入第 2 周 Day 2：理解工具参数 schema 如何服务真实 LLM adapter。
+3. 为默认 coding 工具注册表补充 schema 展示示例或测试，说明 `create_coding_tool_registry().list_tool_schemas()` 如何被 adapter 消费。
+4. 优先考虑内置工具 schema 展示、工具描述质量、模型选工具所需信息和错误语义。
+5. 继续使用 mock LLM 和 TDD，不要一开始依赖真实 API。
+6. 每个新工具或行为必须有单元测试和集成测试。
+7. 结束时更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
 
 ## 用户下次应发送的指令
 
 ```text
-继续项目，开始第 2 周 Tool System 深化。请先读取路线和周计划，再拆第 2 周的可执行 Sprint。
+继续项目，进入第 2 周 Day 2。请先评审我对 Day 1 工具 schema 面试题的回答。
 ```

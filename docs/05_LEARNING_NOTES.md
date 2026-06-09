@@ -492,3 +492,90 @@ flowchart TD
 - 增加权限审批，写文件前让用户确认高风险操作。
 - 增加 audit log，记录工具名、参数、结果、错误、耗时和 trace id。
 - 增加 checkpoint 或 git diff，用于真正回滚文件状态。
+
+## 工具 schema：第 2 周 Day 1
+
+### 1. 直觉
+
+第 1 周的工具已经能执行，但 LLM 还没有一个稳定的“工具说明书”。如果没有 schema，模型只能从自然语言描述里猜参数名、参数类型和必填字段；程序也只能等参数进入具体工具后才发现错误。
+
+工具 schema 的作用是把工具调用契约结构化：
+
+- 这个工具叫什么。
+- 这个工具做什么。
+- 这个工具需要哪些参数。
+- 每个参数大致是什么 JSON 类型。
+- 哪些参数必须提供。
+
+### 2. 一句话解释
+
+工具 schema 是 LLM 和程序之间的工具调用合同；它能做基础参数约束，但不能替代具体工具的安全逻辑。
+
+### 3. 核心调用链
+
+```text
+ToolParameter
+  -> Tool(parameters=...)
+  -> Tool.to_schema()
+  -> ToolRegistry.list_tool_schemas()
+  -> 未来 LLM adapter 把 schema 提供给模型
+  -> LLM 生成 tool_call.arguments
+  -> Tool.run(...) 先做基础参数校验
+  -> handler(arguments) 执行业务逻辑和安全校验
+```
+
+### 4. 流程图
+
+```mermaid
+flowchart TD
+    A["ToolParameter declares name/type/required"] --> B["Tool stores parameter schema"]
+    B --> C["Tool.to_schema() exports JSON-like schema"]
+    C --> D["ToolRegistry.list_tool_schemas()"]
+    D --> E["Future LLM adapter receives tool list"]
+    E --> F["LLM emits ToolCall arguments"]
+    F --> G["Tool.run validates required fields and basic types"]
+    G --> H["Concrete tool checks business safety"]
+    H --> I["handler/runtime executes"]
+```
+
+### 5. 技术原理
+
+- `ToolParameter` 是单个参数的元数据对象。
+- `Tool.parameters` 是工具的参数声明集合。
+- `Tool.to_schema()` 把 Python 内部结构转换为接近 JSON Schema 的字典。
+- `Tool.run(...)` 先统一检查参数是否是 dict，再根据 `ToolParameter` 检查必填字段和基础类型。
+- `ToolRegistry.list_tool_schemas()` 让未来真实 LLM adapter 可以一次性获得所有工具说明。
+
+### 6. 当前代码位置
+
+- 实现：`src/pca/tools/base.py`
+- 注册表导出：`src/pca/tools/registry.py`
+- 内置工具 schema：`src/pca/tools/file_tools.py`、`src/pca/tools/shell_tools.py`
+- 测试：`tests/test_tools.py`
+- 架构决策：`docs/06_ARCHITECTURE_DECISIONS.md` 中的 ADR-0006
+
+### 7. 当前测试覆盖
+
+- 工具能导出包含 `name`、`description`、`parameters` 的 schema。
+- 必填参数缺失时，`Tool.run(...)` 在进入 handler 前失败。
+- 参数基础类型错误时，`Tool.run(...)` 在进入 handler 前失败。
+- `bool` 不会被误当作 JSON number / integer。
+- `ToolRegistry` 能导出已注册工具的 schema 列表。
+- 内置 `read_file`、`write_file`、`run_command` 都有参数 schema。
+
+### 8. 和安全校验的边界
+
+schema 只能解决第一层问题：参数结构是否像工具期望的样子。它不能判断路径是否越界、命令是否危险、是否允许覆盖文件、是否需要用户审批。
+
+因此当前设计是双层校验：
+
+- `Tool.run(...)`：统一做基础参数校验。
+- 具体工具 / runtime：继续做业务语义和安全边界校验。
+
+### 9. 检查问题
+
+1. `Tool schema` 和 `Tool handler` 的职责分别是什么？
+2. 为什么 schema 不能替代 `workspace_root` 检查？
+3. 为什么必填参数缺失要在 handler 执行前失败？
+4. 为什么 Python 里的 `bool` 不能直接当作 JSON number / integer？
+5. 未来真实 LLM adapter 会怎么使用 `ToolRegistry.list_tool_schemas()`？

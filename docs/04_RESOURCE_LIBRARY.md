@@ -62,6 +62,13 @@
 - Mermaid 官方语法参考：https://mermaid.js.org/intro/syntax-reference.html
 - OpenAI Function calling / tool calling guide：https://platform.openai.com/docs/guides/function-calling
 
+### Week 2 Day 1 工具 schema 资料
+
+- JSON Schema object 参考：https://json-schema.org/understanding-json-schema/reference/object
+- OpenAI Function calling / tool calling guide：https://platform.openai.com/docs/guides/function-calling
+- Python `dataclasses` 官方文档：https://docs.python.org/3/library/dataclasses.html
+- 建议阅读顺序：先看 JSON Schema 的 `properties`、`required` 和 `additionalProperties`，再看 OpenAI tool calling 如何把函数名、描述和参数 schema 提供给模型，最后复习 `dataclass` 如何表达轻量数据结构。
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |

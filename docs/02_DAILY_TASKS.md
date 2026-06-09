@@ -3,6 +3,68 @@
 ## 2026-06-09
 
 日期：2026-06-09
+当前阶段：第 2 周 Day 1
+当前模块：Tool System 深化：工具参数 schema
+预计用时：60 分钟
+
+### 1. 今日学习目标
+
+- 理解工具 schema 为什么是 LLM 和程序之间的调用契约。
+- 区分 schema 的基础参数校验和具体工具的业务安全校验。
+- 实现 `ToolParameter`，让工具能声明参数名、JSON 类型、描述和是否必填。
+- 实现 `Tool.to_schema()` 和 `ToolRegistry.list_tool_schemas()`。
+- 给内置 `read_file`、`write_file` 和 `run_command` 声明参数 schema。
+
+### 2. 所需前置知识
+
+- 第 1 周主链路：`AgentLoop -> ToolRegistry.run(...) -> Tool.run(...) -> handler/runtime`。
+- Python `dataclass`、tuple、dict 和类型判断。
+- JSON Schema 中的 `type`、`properties`、`required` 和 `additionalProperties`。
+- 工具参数来自 LLM 输出，不能默认可信。
+
+### 3. 今日必须理解的知识点
+
+- `Tool schema` 是给 LLM adapter 和工具系统看的调用契约，不是真正执行工具的代码。
+- schema 可以声明“需要哪些参数”和“参数大致是什么类型”。
+- schema 不能替代业务安全校验，例如 `workspace_root` 越界检查、危险命令审批和文件覆盖策略。
+- `Tool.run(...)` 是统一入口，适合放通用参数校验。
+- 具体工具仍必须保留自己的语义校验和安全边界。
+
+### 4. 今日代码 / 文档任务
+
+- 在 `tests/test_tools.py` 中按 TDD 新增工具 schema、必填参数、类型校验和内置工具 schema 测试。
+- 在 `src/pca/tools/base.py` 中新增 `ToolParameter`、`Tool.parameters` 和 `Tool.to_schema()`。
+- 在 `src/pca/tools/registry.py` 中新增 `list_tool_schemas()`。
+- 在文件工具和 shell 工具中声明参数 schema。
+- 更新第 2 周 Sprint、学习笔记、资源库、实现日志、下一步行动和每日面试题归档。
+
+### 5. 今日资料推荐
+
+- JSON Schema object 参考：https://json-schema.org/understanding-json-schema/reference/object
+- OpenAI Function calling / tool calling guide：https://platform.openai.com/docs/guides/function-calling
+- Python `dataclasses` 官方文档：https://docs.python.org/3/library/dataclasses.html
+
+### 6. 今日输出物
+
+- `ToolParameter`
+- `Tool.to_schema()`
+- `ToolRegistry.list_tool_schemas()`
+- 内置工具参数 schema
+- 第 2 周 Sprint
+- Day 1 工具 schema 学习笔记
+
+### 7. 完成情况
+
+- 已评审今日检查问题：用户已能说明 schema 主要负责参数说明、必填字段和基础类型约束，不能替代路径边界、命令安全等逻辑校验。
+- 已按 TDD 新增 schema 相关 RED 测试，初始失败原因为 `ToolParameter` 尚不存在。
+- 已实现 `ToolParameter`、`Tool.to_schema()` 和 `ToolRegistry.list_tool_schemas()`。
+- 已给 `read_file`、`write_file` 和 `run_command` 声明参数 schema。
+- 已验证 `python -m pytest tests\test_tools.py -q` 为 `15 passed`。
+- 已验证 `python -m pytest tests\test_tools.py tests\test_file_tools.py tests\test_shell_runtime.py tests\test_loop_tools_integration.py -q` 为 `65 passed, 1 skipped`。
+
+## 2026-06-09
+
+日期：2026-06-09
 当前阶段：第 1 周 Day 6 收尾
 当前模块：文档和架构图面试题验收
 预计用时：15 分钟

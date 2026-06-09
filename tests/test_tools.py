@@ -2,7 +2,8 @@
 from typing import Any
 
 import pytest
-from pca.tools.base import Tool
+from pca.tools import create_coding_tool_registry
+from pca.tools.base import Tool, ToolParameter
 from pca.tools.registry import ToolRegistry
 
 
@@ -150,3 +151,137 @@ def test_tool_registry_rejects_invalid_tool_instances():
 
     with pytest.raises(TypeError, match="Tool"):
         registry.register("not-a-tool")
+
+
+def test_tool_parameter_schema_is_exported_for_llm_tool_descriptions():
+    """测试 Tool 能把参数 schema 导出为接近 JSON Schema 的结构。"""
+    tool = Tool(
+        name="read_file",
+        description="读取文件",
+        handler=lambda arguments: "ok",
+        parameters=(
+            ToolParameter(name="path", type="string", description="文件路径"),
+            ToolParameter(
+                name="workspace_root",
+                type="string",
+                description="工作区根目录",
+                required=False,
+            ),
+        ),
+    )
+
+    schema = tool.to_schema()
+
+    assert schema == {
+        "name": "read_file",
+        "description": "读取文件",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "文件路径"},
+                "workspace_root": {"type": "string", "description": "工作区根目录"},
+            },
+            "required": ["path"],
+            "additionalProperties": True,
+        },
+    }
+
+
+def test_tool_run_validates_required_parameters_before_handler_runs():
+    """测试缺少必填参数会在 Tool 层失败，不进入具体工具 handler。"""
+    called = False
+
+    def handler(arguments: dict[str, Any]) -> str:
+        nonlocal called
+        called = True
+        return "ok"
+
+    tool = Tool(
+        name="write_file",
+        description="写入文件",
+        handler=handler,
+        parameters=(ToolParameter(name="path", type="string", description="文件路径"),),
+    )
+
+    with pytest.raises(ValueError, match="Missing required argument: path"):
+        tool.run({})
+
+    assert called is False
+
+
+def test_tool_run_validates_parameter_types_before_handler_runs():
+    """测试参数类型错误会在 Tool 层失败，避免坏参数下沉到具体工具。"""
+    called = False
+
+    def handler(arguments: dict[str, Any]) -> str:
+        nonlocal called
+        called = True
+        return "ok"
+
+    tool = Tool(
+        name="write_file",
+        description="写入文件",
+        handler=handler,
+        parameters=(ToolParameter(name="path", type="string", description="文件路径"),),
+    )
+
+    with pytest.raises(TypeError, match="path"):
+        tool.run({"path": 123})
+
+    assert called is False
+
+
+def test_tool_parameter_rejects_bool_for_number_types():
+    """测试 bool 不能被当作 JSON number / integer 参数。"""
+    for json_type in ("number", "integer"):
+        parameter = ToolParameter(name="count", type=json_type, description="数量")
+
+        with pytest.raises(TypeError, match="count"):
+            parameter.validate({"count": True})
+
+
+def test_tool_registry_exports_registered_tool_schemas():
+    """测试注册表能统一导出所有工具 schema，供后续真实 LLM adapter 使用。"""
+    registry = ToolRegistry()
+    registry.register(
+        Tool(
+            name="echo",
+            description="回显",
+            handler=lambda arguments: arguments["text"],
+            parameters=(ToolParameter(name="text", type="string", description="文本"),),
+        )
+    )
+
+    schemas = registry.list_tool_schemas()
+
+    assert schemas == [
+        {
+            "name": "echo",
+            "description": "回显",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "文本"},
+                },
+                "required": ["text"],
+                "additionalProperties": True,
+            },
+        }
+    ]
+
+
+def test_builtin_coding_tools_export_parameter_schemas():
+    """测试内置 coding 工具都能导出参数 schema。"""
+    registry = create_coding_tool_registry()
+
+    schemas = {
+        schema["name"]: schema
+        for schema in registry.list_tool_schemas()
+    }
+
+    assert "path" in schemas["read_file"]["parameters"]["required"]
+    assert "path" in schemas["write_file"]["parameters"]["required"]
+    assert "content" in schemas["write_file"]["parameters"]["required"]
+    assert "command" in schemas["run_command"]["parameters"]["required"]
+    assert "workspace_root" in schemas["run_command"]["parameters"]["required"]
+    assert "timeout_seconds" in schemas["run_command"]["parameters"]["required"]

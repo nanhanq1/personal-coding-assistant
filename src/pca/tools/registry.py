@@ -57,6 +57,13 @@ class ToolRegistry:
     def list_tools(self) -> list[str]:
         return list(self._tools.keys())
 
+    def list_tool_schemas(self) -> list[dict[str, Any]]:
+        """导出所有已注册工具的 schema，供 LLM adapter 构造 tool 列表。"""
+        return [
+            tool.to_schema()
+            for tool in self._tools.values()
+        ]
+
     def unregister(self, name: str) -> None:
         if not isinstance(name, str) or name.strip() == "":
             raise ValueError("tool name must be a non-empty string")

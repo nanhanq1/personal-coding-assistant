@@ -1,5 +1,6 @@
 """工具抽象与内置 coding 工具模块包。"""
 
+from pca.tools.base import Tool, ToolParameter
 from pca.tools.file_tools import ReadFileTool, WriteFileTool
 from pca.tools.registry import ToolRegistry
 from pca.tools.shell_tools import ShellCommandTool
@@ -17,6 +18,8 @@ def create_coding_tool_registry() -> ToolRegistry:
 __all__ = [
     "ReadFileTool",
     "ShellCommandTool",
+    "Tool",
+    "ToolParameter",
     "ToolRegistry",
     "WriteFileTool",
     "create_coding_tool_registry",

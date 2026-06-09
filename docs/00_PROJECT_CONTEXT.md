@@ -18,9 +18,9 @@ Personal Coding Assistant Agent
 
 ## 当前阶段
 
-- 12 周路线：第 1 周
-- 当前主题：Agent Loop
-- 当前模块：最小 Agent 循环、message schema、mock LLM、tool_call -> tool_result -> continue
+- 12 周路线：第 2 周
+- 当前主题：Tool System 深化
+- 当前模块：工具参数 schema、工具元数据导出、统一参数入口校验
 
 ## 当前原则
 

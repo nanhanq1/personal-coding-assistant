@@ -4,6 +4,32 @@
 
 ### 本次完成
 
+- 开始第 2 周 Day 1：Tool System 深化之工具参数 schema。
+- 评审用户对 schema 与安全校验边界的理解：schema 负责参数说明、必填字段和基础类型约束，不能替代路径边界、命令风险和权限审批等逻辑校验。
+- 按 TDD 新增 `tests/test_tools.py` 中的 schema 行为测试，初始失败原因为 `ToolParameter` 尚不存在。
+- 在 `src/pca/tools/base.py` 中新增 `ToolParameter`。
+- 为 `Tool` 增加 `parameters` 和 `to_schema()`。
+- 将 `Tool.run(...)` 扩展为在 handler 执行前校验必填参数和基础类型。
+- 在 `src/pca/tools/registry.py` 中新增 `list_tool_schemas()`。
+- 为 `ReadFileTool`、`WriteFileTool` 和 `ShellCommandTool` 声明参数 schema。
+- 在 `src/pca/tools/__init__.py` 中导出 `Tool` 和 `ToolParameter`。
+- 更新第 2 周 Sprint、今日任务、资源库、学习笔记、架构决策和下一步行动。
+
+### 架构决策
+
+- 新增 ADR-0006：第 2 周 Day 1 使用 `ToolParameter` 声明工具参数 schema。
+- 本次不引入 Pydantic，不实现完整 JSON Schema 校验器，不把 schema 当作权限系统。
+
+### 验证
+
+- RED：运行 `python -m pytest tests\test_tools.py -q`，失败原因为 `ImportError: cannot import name 'ToolParameter'`。
+- GREEN：实现后运行 `python -m pytest tests\test_tools.py -q`：`15 passed`。
+- 相关工具链验证运行 `python -m pytest tests\test_tools.py tests\test_file_tools.py tests\test_shell_runtime.py tests\test_loop_tools_integration.py -q`：`65 passed, 1 skipped`。
+
+## 2026-06-09
+
+### 本次完成
+
 - 完成第 1 周 Day 7 面试题验收收尾。
 - 逐题评审用户对 Day 7 五个问题的回答：
   - 为什么 Day 7 不应该继续大规模新增功能。

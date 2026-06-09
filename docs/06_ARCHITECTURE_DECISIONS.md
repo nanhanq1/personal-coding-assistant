@@ -1,5 +1,40 @@
 # Architecture Decisions
 
+## ADR-0006：第 2 周 Day 1 使用 ToolParameter 声明工具参数 schema
+
+日期：2026-06-09
+
+### 背景
+
+第 1 周的 `Tool` 已经包含 `name`、`description` 和 `handler`，`ToolRegistry` 也能统一注册和执行工具。但真实 LLM adapter 需要更结构化的工具说明，才能知道每个工具需要哪些参数、参数类型是什么、哪些字段必须提供。
+
+如果只依赖自然语言描述，模型容易生成错误参数；如果只在具体工具里做校验，错误会下沉到工具实现内部，调用边界不够清晰。
+
+### 决策
+
+新增 `ToolParameter` 并扩展 `Tool`：
+
+- `ToolParameter` 描述单个参数的名称、JSON 类型、说明和是否必填。
+- `Tool.parameters` 保存工具参数声明。
+- `Tool.to_schema()` 导出接近 JSON Schema 的工具描述。
+- `Tool.run(...)` 在调用 handler 前统一校验必填字段和基础类型。
+- `ToolRegistry.list_tool_schemas()` 统一导出所有已注册工具 schema。
+- 内置 `read_file`、`write_file` 和 `run_command` 都声明参数 schema。
+
+### 理由
+
+- 让工具系统更接近真实 tool calling 接口。
+- 让未来 LLM adapter 可以从注册表直接获得工具列表。
+- 将基础参数校验前移到 `Tool.run(...)`，避免坏参数进入具体工具。
+- 保持具体工具继续负责业务语义和安全边界，例如路径越界、命令工作区、超时和危险操作。
+
+### 暂不采用
+
+- 暂不引入 Pydantic，避免第 2 周 Day 1 过早增加依赖和抽象。
+- 暂不实现完整 JSON Schema 校验器，只实现当前项目需要的基础类型和必填校验。
+- 暂不关闭 `additionalProperties`，避免过早限制未来工具扩展字段和 trace 字段。
+- 暂不把 schema 当成权限系统；危险命令审批留到第 3 周 Permission System。
+
 ## ADR-0005：工业级加固必须先处理输入校验、错误回写和密钥边界
 
 日期：2026-06-06

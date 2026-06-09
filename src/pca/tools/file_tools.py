@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any
 
-from pca.tools.base import Tool
+from pca.tools.base import Tool, ToolParameter
 
 
 class ReadFileTool(Tool):
@@ -12,6 +12,15 @@ class ReadFileTool(Tool):
             name="read_file",
             description="读取工作区内的文件内容。参数：path (文件路径), workspace_root (工作区根目录)",
             handler=self._run,
+            parameters=(
+                ToolParameter(name="path", type="string", description="要读取的文件路径"),
+                ToolParameter(
+                    name="workspace_root",
+                    type="string",
+                    description="允许读取的工作区根目录",
+                    required=False,
+                ),
+            ),
         )
 
     def _run(self, arguments: dict[str, Any]) -> str:
@@ -34,6 +43,16 @@ class WriteFileTool(Tool):
             name="write_file",
             description="写入工作区内的文件内容。参数：path (文件路径), content (内容), workspace_root (工作区根目录)",
             handler=self._run,
+            parameters=(
+                ToolParameter(name="path", type="string", description="要写入的文件路径"),
+                ToolParameter(name="content", type="string", description="要写入的文本内容"),
+                ToolParameter(
+                    name="workspace_root",
+                    type="string",
+                    description="允许写入的工作区根目录",
+                    required=False,
+                ),
+            ),
         )
 
     def _run(self, arguments: dict[str, Any]) -> str:
