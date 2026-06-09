@@ -1,5 +1,51 @@
 # Implementation Log
 
+## 2026-06-09
+
+### 本次完成
+
+- 完成第 1 周 Day 7 面试题验收收尾。
+- 逐题评审用户对 Day 7 五个问题的回答：
+  - 为什么 Day 7 不应该继续大规模新增功能。
+  - 为什么文件工具不能把 `path=123` 静默转成 `"123"`。
+  - RED 测试证明了什么。
+  - Agent 执行闭环和工具路由链路的区别。
+  - 第 2 周深化 Tool System 时最应该优先补哪些能力。
+- 确认 `docs/Compilation-of-Interview-Questions.md` 中第 7 天用户回答已补全。
+- 更新 `docs/02_DAILY_TASKS.md` 和 `docs/09_NEXT_ACTIONS.md`，把下一步明确为进入第 2 周 Tool System 深化。
+
+### 架构决策
+
+- 本次没有新增架构决策。
+- 本次只补齐 Day 7 面试验收和收尾文档，不改变代码架构。
+
+### 验证
+
+- 本次只更新文档，未修改业务代码，未运行测试。
+
+## 2026-06-09
+
+### 本次完成
+
+- 完成第 1 周 Day 6 面试题验收收尾。
+- 逐题评审用户对 Day 6 五个问题的回答：
+  - 当前项目实现了什么。
+  - Agent 业务执行闭环和程序内部工具路由链路的区别。
+  - README / 架构图为什么必须和真实代码保持一致。
+  - 当前安全边界和缺失的工业级安全能力。
+  - 为什么当前阶段先用 mock LLM 而不是直接接真实 LLM。
+- 将第 6 天 5 道面试题的用户回答写入 `docs/Compilation-of-Interview-Questions.md`。
+- 更新 `docs/02_DAILY_TASKS.md` 和 `docs/09_NEXT_ACTIONS.md`，把下一步明确为先补 Day 7 面试题，再进入第 2 周 Tool System 深化。
+
+### 架构决策
+
+- 本次没有新增架构决策。
+- 本次只补齐 Day 6 面试验收和收尾文档，不改变代码架构。
+
+### 验证
+
+- 运行 `python -m pytest -q`：`68 passed, 1 skipped`。
+
 ## 2026-06-08
 
 ### 本次完成

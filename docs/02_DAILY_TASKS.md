@@ -1,5 +1,34 @@
 # Daily Tasks
 
+## 2026-06-09
+
+日期：2026-06-09
+当前阶段：第 1 周 Day 6 收尾
+当前模块：文档和架构图面试题验收
+预计用时：15 分钟
+
+### 1. 今日目标
+
+- 补全第 1 周 Day 6 面试题的用户回答。
+- 对用户回答做逐题评审，指出答对的点和面试表达可增强的点。
+- 将第 6 天用户回答归档到 `docs/Compilation-of-Interview-Questions.md`。
+- 明确下一次继续项目时的入口。
+
+### 2. 今日输出物
+
+- 已补全 `docs/Compilation-of-Interview-Questions.md` 中第 6 天 5 道面试题的用户回答。
+- 已完成第 6 天面试题逐题评审。
+- 已更新本文件、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
+
+### 3. 完成情况
+
+- 用户已能说明当前项目实现了最小 Coding Agent harness 的闭环。
+- 用户已能区分 Agent 业务执行闭环和程序内部工具路由链路。
+- 用户已能说明 README / 架构图必须和真实代码保持一致。
+- 用户已能指出当前主要安全边界是 `workspace_root`，并能说出权限审批、危险命令分类等缺口。
+- 用户已能说明当前先用 mock LLM 是为了稳定验证 Agent Loop 和工具路由控制流。
+- 已运行 `python -m pytest -q`，结果为 `68 passed, 1 skipped`。
+
 ## 2026-06-08
 
 日期：2026-06-08
@@ -65,7 +94,7 @@
 - 已验证 `python -m pytest tests\test_file_tools.py -q` 为 `25 passed, 1 skipped`。
 - 已验证 `python -m pytest -q` 为 `68 passed, 1 skipped`。
 - 已更新第 1 周收口文档。
-- Day 6 和 Day 7 的用户面试题回答仍待补充。
+- Day 6 和 Day 7 面试题用户回答均已补全并归档。
 
 ## 2026-06-08
 

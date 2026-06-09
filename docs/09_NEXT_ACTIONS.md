@@ -62,14 +62,16 @@
 - 已开始 Day 5 Loop + Tools 整合：新增 `create_coding_tool_registry()`，统一注册 `ReadFileTool`、`WriteFileTool` 和 `ShellCommandTool`。
 - 已新增 `tests/test_loop_tools_integration.py`，验证 `AgentLoop` 可以通过默认工具注册表连续执行 `write_file -> read_file -> final answer`。
 - 最新测试结果：`python -m pytest tests\test_loop_tools_integration.py -q` 为 `1 passed`。
-- 最新全量测试结果：`python -m pytest -q` 为 `66 passed, 1 skipped`。
+- Day 5 全量测试结果：`python -m pytest -q` 为 `66 passed, 1 skipped`。
 - 最新示例验证：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
 - 最新编译验证：`python -m compileall src examples -q` 通过。
 - 已完成 Day 5 面试题回答评审。
 - 已将第 5 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
 - 已完成 Day 6 文档和架构图：更新 `README.md`，新增 `docs/10_WEEK1_INTERVIEW_SCRIPT.md`，补充 `docs/05_LEARNING_NOTES.md` 的 Day 6 学习笔记。
-- 已将第 6 天面试题追加到 `docs/Compilation-of-Interview-Questions.md`，用户回答先标记为“待补充”。
-- 最新全量测试结果：`python -m pytest -q` 为 `66 passed, 1 skipped`。
+- 已完成 Day 6 面试题回答评审，并将第 6 天 5 道面试题的用户回答补全到 `docs/Compilation-of-Interview-Questions.md`。
+- 已完成 Day 7 面试题回答评审，并确认第 7 天 5 道面试题的用户回答已补全到 `docs/Compilation-of-Interview-Questions.md`。
+- 最新收尾测试结果：`python -m pytest -q` 为 `68 passed, 1 skipped`。
+- Day 6 文档完成时全量测试结果：`python -m pytest -q` 为 `66 passed, 1 skipped`。
 - 最新示例验证：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
 - 最新编译验证：`python -m compileall src examples -q` 通过。
 - 当前阻塞：无。
@@ -78,19 +80,18 @@
 
 继续第 2 周 Tool System 深化。
 
-教学执行方式：先带用户复盘第 1 周完整闭环，再基于 `docs/01_LEARNING_ROADMAP.md` 把第 2 周拆成可执行 Sprint。当前不要直接跳到真实 LLM、planner、RAG 或 MCP；第 2 周优先继续深化工具系统。
+教学执行方式：先快速复盘第 1 周完整闭环；之后基于 `docs/01_LEARNING_ROADMAP.md` 把第 2 周拆成可执行 Sprint。当前不要直接跳到真实 LLM、planner、RAG 或 MCP；第 2 周优先继续深化工具系统。
 
 建议任务：
 
-1. 先让用户补充 Day 6 和 Day 7 面试题回答，并评审回答质量。
-2. 读取 `docs/01_LEARNING_ROADMAP.md` 和 `docs/03_WEEKLY_SPRINTS.md`，把第 2 周 Tool System 深化拆成日任务。
-3. 优先考虑工具参数 schema、`edit_file`、结构化 tool result、工具元数据和更清晰的错误语义。
-4. 继续使用 mock LLM 和 TDD，不要一开始依赖真实 API。
-5. 每个新工具或行为必须有单元测试和集成测试。
-6. 结束时更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
+1. 读取 `docs/01_LEARNING_ROADMAP.md` 和 `docs/03_WEEKLY_SPRINTS.md`，把第 2 周 Tool System 深化拆成日任务。
+2. 优先考虑工具参数 schema、`edit_file`、结构化 tool result、工具元数据和更清晰的错误语义。
+3. 继续使用 mock LLM 和 TDD，不要一开始依赖真实 API。
+4. 每个新工具或行为必须有单元测试和集成测试。
+5. 结束时更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
 
 ## 用户下次应发送的指令
 
 ```text
-继续项目，开始第 2 周 Tool System 深化。请先评审我对 Day 6 和 Day 7 面试题的回答。
+继续项目，开始第 2 周 Tool System 深化。请先读取路线和周计划，再拆第 2 周的可执行 Sprint。
 ```
