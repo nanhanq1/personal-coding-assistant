@@ -146,6 +146,6 @@ class Tool:
                 "type": "object",
                 "properties": properties,
                 "required": required,
-                "additionalProperties": True,
+                "additionalProperties": False,
             },
         }
