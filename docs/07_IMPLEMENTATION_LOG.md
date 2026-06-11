@@ -51,6 +51,7 @@
 - GitHub 同步前运行 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
 - GitHub 同步前运行 `python examples\02_tool_agent.py`：成功输出增强后的 schema JSON。
 - GitHub 同步前运行 `python -m compileall src examples -q`：通过。
+- 已提交并推送到 GitHub `origin/main`：`2aae93e docs: update README for tool schema progress`。
 
 ## 2026-06-10
 
