@@ -78,6 +78,8 @@
 - Day 2 验收通过，下一步进入第 2 周 Day 3：`edit_file` 局部编辑雏形。
 - Day 2 收尾复核已重新运行：`pytest -q` 为 `76 passed, 1 skipped`；`python examples\02_tool_agent.py`、`python examples\01_minimal_agent.py` 和 `python -m compileall src examples -q` 均通过。
 - 已补充项目级外部技能调用规则：普通解释、状态说明、面试题评审和文档答疑不主动调用额外 Superpowers skill；代码实现、调试、验收和复杂设计场景再按需调用。
+- 已更新 `README.md`，将 GitHub 项目说明同步到第 2 周 Day 2 已完成状态，补充工具 schema 能力、schema 示例和最新验证基线。
+- GitHub 同步前验证已重新运行：`pytest -q` 为 `76 passed, 1 skipped`；`python examples\01_minimal_agent.py`、`python examples\02_tool_agent.py` 和 `python -m compileall src examples -q` 均通过。
 
 ## 2026-06-10
 

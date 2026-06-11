@@ -6,21 +6,24 @@
 
 ## 当前进度
 
-- 路线阶段：12 周学习路线，第 1 周 Day 7。
-- 当前主题：Agent Loop 与 Tool Routing 闭环。
-- 当前状态：已完成 `user -> LLM -> tool_call -> tool_result -> LLM -> final_answer` 的最小可运行链路，并完成第 1 周周复盘和小范围边界重构。
+- 路线阶段：12 周学习路线，第 2 周 Day 2 已完成。
+- 当前主题：Tool System 深化。
+- 当前状态：已完成最小 Agent Loop、工具路由、文件工具、shell runtime、工具参数 schema、默认工具 schema 导出示例，以及内置工具描述质量优化。下一步进入第 2 周 Day 3：`edit_file` 局部编辑雏形。
 - 已实现能力：
   - 标准 message schema：`Message`、`ToolCall`。
   - 可脚本化 mock LLM：`ScriptedLLM`。
   - 最小 Agent Loop：调用 LLM、执行工具、写回工具结果、继续循环。
   - 工具抽象：`Tool` 与 `ToolRegistry`。
+  - 工具参数 schema：`ToolParameter`、`Tool.to_schema()`、`ToolRegistry.list_tool_schemas()`。
   - 文件工具：`read_file`、`write_file`。
   - shell runtime：`run_command`，返回 `stdout`、`stderr`、`returncode`、`timed_out`、`duration_ms`。
   - 默认 coding 工具注册表：`create_coding_tool_registry()`。
+  - 默认工具 schema 展示示例：`examples/02_tool_agent.py`。
   - 工作区路径边界校验、基础参数校验和工具错误回写。
+  - 内置工具描述边界：只读、写入或覆盖、命令执行、workspace、timeout 和返回字段。
   - pytest 单元测试、集成测试和示例脚本。
 
-下一步将进入第 2 周：继续深化 Tool System，优先从工具参数 schema、`edit_file` 和更清晰的工具结果结构开始规划。
+下一步将继续深化 Tool System，优先实现 `edit_file` 局部编辑能力，并继续保持 mock LLM、测试和示例驱动的开发节奏。
 
 ## 核心架构
 
@@ -57,6 +60,19 @@ flowchart LR
 ```
 
 这条链路回答的是：`AgentLoop` 为什么不直接 import 具体工具类。循环层只负责调度，注册表负责路由，工具层负责包装，runtime/handler 负责真实执行和安全边界。
+
+### 工具 schema 导出链路
+
+```mermaid
+flowchart LR
+    A["create_coding_tool_registry"] --> B["ToolRegistry"]
+    B --> C["list_tool_schemas"]
+    C --> D["Internal neutral schema"]
+    D --> E["Future OpenAI / Anthropic adapter"]
+    E --> F["Model-facing tools parameter"]
+```
+
+这条链路回答的是：真实 LLM adapter 后续应该从哪里拿工具列表。当前项目让 `ToolRegistry` 成为工具事实源，adapter 只负责把内部中立 schema 转成不同模型厂商需要的格式。
 
 ## 项目结构
 
@@ -95,7 +111,7 @@ python -m pytest -q
 当前最近一次全量验证基线：
 
 ```text
-68 passed, 1 skipped
+76 passed, 1 skipped
 ```
 
 ## 运行示例
@@ -110,11 +126,23 @@ python examples/01_minimal_agent.py
 user -> assistant -> tool:echo -> assistant
 ```
 
+查看默认 coding 工具 schema：
+
+```powershell
+python examples/02_tool_agent.py
+```
+
+该示例会输出 `read_file`、`write_file` 和 `run_command` 的 schema JSON，供后续真实 LLM adapter 转换使用。
+
 ## 面试讲解要点
 
 如果面试官问“你这个 Agent 当前实现了什么”，可以这样回答：
 
 > 当前版本实现了一个最小 Coding Agent harness。它有标准 message history、mock LLM、AgentLoop、ToolRegistry、文件工具和 shell runtime。一次任务会从用户消息进入 `AgentLoop`，LLM 如果返回 `ToolCall`，循环会通过 `ToolRegistry` 找到对应工具执行，并把工具结果作为 `role=tool` 的消息写回 history，随后再次调用 LLM，直到得到没有工具调用的最终回答。
+
+如果面试官问“工具 schema 在这个项目里解决什么问题”，可以这样回答：
+
+> 当前工具系统已经支持 `ToolParameter` 和 `ToolRegistry.list_tool_schemas()`。schema 让工具名、描述、参数类型、必填字段和参数说明结构化，未来真实 LLM adapter 可以把这些内部中立 schema 转成 OpenAI、Anthropic 或其他模型需要的工具格式。schema 只负责结构契约和第一层参数校验，不能替代 `workspace_root`、危险命令审批、权限系统和 runtime 安全逻辑。
 
 如果面试官问“你怎么考虑安全边界”，可以这样回答：
 

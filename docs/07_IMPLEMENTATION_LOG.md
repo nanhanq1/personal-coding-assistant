@@ -19,6 +19,7 @@
 - 将第 10 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
 - 完成第 2 周 Day 2 收尾，下一步交接到第 2 周 Day 3：`edit_file` 局部编辑雏形。
 - 补充外部技能调用规则到 `AGENTS.md` 和 `docs/CODEX_PROJECT_BRIEF.md`：普通解释、状态说明、面试题评审和文档答疑不主动调用额外 Superpowers skill；代码实现、调试、验收和复杂设计场景再按需调用。
+- 更新 `README.md`，将公开项目说明从第 1 周 Day 7 状态刷新到第 2 周 Day 2 已完成状态，补充工具 schema、默认 schema 示例和最新验证基线。
 
 ### 架构决策
 
@@ -46,6 +47,10 @@
 - Day 2 收尾复核运行 `python examples\02_tool_agent.py`：成功输出增强后的 schema JSON。
 - Day 2 收尾复核运行 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
 - Day 2 收尾复核运行 `python -m compileall src examples -q`：通过。
+- GitHub 同步前运行 `pytest -q`：`76 passed, 1 skipped`。
+- GitHub 同步前运行 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- GitHub 同步前运行 `python examples\02_tool_agent.py`：成功输出增强后的 schema JSON。
+- GitHub 同步前运行 `python -m compileall src examples -q`：通过。
 
 ## 2026-06-10
 
