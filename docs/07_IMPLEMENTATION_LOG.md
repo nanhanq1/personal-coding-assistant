@@ -2,6 +2,44 @@
 
 ## 2026-06-11
 
+### 第 2 周 Day 3：`edit_file` 局部编辑雏形
+
+### 本次完成
+
+- 开始第 2 周 Day 3：`edit_file` 局部编辑雏形。
+- 先讲清调用链：`AgentLoop -> ToolRegistry.run("edit_file", arguments) -> Tool.run(...) -> EditFileTool._run(...) -> 文件系统`。
+- 评审用户对 3 个检查问题的回答：确认用户理解多处替换风险、空 `old_text` 风险、`edit_file` 与 `write_file` 的边界。
+- 按 TDD 在 `tests/test_file_tools.py` 中新增 `EditFileTool` 行为测试，覆盖成功替换、未命中、多次命中、空 `old_text`、非字符串 `new_text`、路径越界、函数形式和默认注册表集成。
+- RED：运行 `pytest tests\test_file_tools.py -q`，8 个新增测试失败，原因是 `EditFileTool`、`edit_file` 函数和默认注册表中的 `edit_file` 尚不存在。
+- 在 `src/pca/tools/file_tools.py` 中新增 `EditFileTool` 和函数形式 `edit_file(...)`。
+- `EditFileTool` 复用 `_resolve_workspace_path(...)`，继续限制路径必须位于 `workspace_root` 内。
+- `EditFileTool` 要求 `old_text` 非空且在文件中唯一出现；`new_text` 必须是字符串，可以为空字符串。
+- 在 `src/pca/tools/__init__.py` 中导出并默认注册 `EditFileTool`。
+- 在 `tests/test_tools.py` 中补充默认 coding 工具 schema 断言，要求 `edit_file` 暴露 `path`、`old_text`、`new_text`，并用描述说明局部编辑边界。
+- 在 `tests/test_examples.py` 中同步 schema 示例断言，让 `examples/02_tool_agent.py` 的默认工具列表包含 `edit_file`。
+- 更新 `docs/02_DAILY_TASKS.md`、`docs/04_RESOURCE_LIBRARY.md`、`docs/05_LEARNING_NOTES.md` 和 `docs/Compilation-of-Interview-Questions.md`。
+
+### 架构决策
+
+- 本次不新增 ADR。
+- `edit_file` 仍属于文件工具能力扩展，继续沿用 ADR-0003 的 `workspace_root` 文件边界。
+- `edit_file` 的参数 schema 继续沿用 ADR-0006 的轻量 `ToolParameter` 设计；本次不引入完整 diff/patch parser。
+
+### 验证
+
+- 初次运行 `python -m pytest tests\test_file_tools.py -q` 失败，原因是当前 shell 的默认 Python 没有安装 `pytest`。
+- 改用系统可用 `pytest.exe` 后运行 `pytest tests\test_file_tools.py -q`，观察到 RED：`8 failed, 25 passed, 1 skipped`。
+- 实现 `EditFileTool` 后运行 `pytest tests\test_file_tools.py -q`：`33 passed, 1 skipped`。
+- 运行 `pytest tests\test_tools.py -q`：`16 passed`。
+- 运行 `pytest tests\test_examples.py -q` 时先观察到 1 个失败，原因是默认 schema 示例断言尚未包含 `edit_file`。
+- 同步示例测试后运行 `pytest tests\test_file_tools.py tests\test_tools.py tests\test_examples.py -q`：`51 passed, 1 skipped`。
+- 收尾运行 `pytest -q`：`84 passed, 1 skipped`。
+- 收尾运行 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 收尾运行 `python examples\02_tool_agent.py`：成功输出包含 `edit_file` 的默认工具 schema JSON。
+- 收尾运行 `python -m compileall src examples -q`：通过。
+
+## 2026-06-11
+
 ### 本次完成
 
 - 评审用户对第 2 周 Day 2 三个检查问题的回答。

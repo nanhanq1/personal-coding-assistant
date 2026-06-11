@@ -94,6 +94,72 @@ class WriteFileTool(Tool):
         return "ok"
 
 
+class EditFileTool(Tool):
+    """对工作区内已有文件执行一次精确局部替换。"""
+
+    def __init__(self) -> None:
+        super().__init__(
+            name="edit_file",
+            description=(
+                "对工作区内已有文本文件做局部编辑；只替换一次在文件中唯一出现的 old_text；"
+                "如果 old_text 不存在或出现多次会拒绝写入，避免误改多个语义位置；成功时返回 ok。"
+            ),
+            handler=self._run,
+            parameters=(
+                ToolParameter(
+                    name="path",
+                    type="string",
+                    description="要编辑的文件路径；相对路径会基于 workspace_root 解析",
+                ),
+                ToolParameter(
+                    name="old_text",
+                    type="string",
+                    description="原文件中必须唯一出现的待替换文本；不能为空",
+                ),
+                ToolParameter(
+                    name="new_text",
+                    type="string",
+                    description="替换后的文本；可以为空字符串，用于删除 old_text",
+                ),
+                ToolParameter(
+                    name="workspace_root",
+                    type="string",
+                    description="允许编辑的工作区根目录；未提供时使用当前进程目录",
+                    required=False,
+                ),
+            ),
+        )
+
+    def _run(self, arguments: dict[str, Any]) -> str:
+        """读取文件，确认 old_text 唯一出现，然后写回替换后的内容。"""
+        path = _resolve_workspace_path(arguments)
+        old_text = arguments.get("old_text")
+        new_text = arguments.get("new_text")
+
+        if path.is_dir():
+            raise IsADirectoryError(f"path is a directory: {path}")
+        if old_text is None:
+            raise ValueError("old_text must be a non-empty string")
+        if not isinstance(old_text, str):
+            raise TypeError("old_text must be a string")
+        if old_text == "":
+            raise ValueError("old_text must be a non-empty string")
+        if new_text is None:
+            raise ValueError("new_text must be a string")
+        if not isinstance(new_text, str):
+            raise TypeError("new_text must be a string")
+
+        content = path.read_text(encoding="utf-8")
+        occurrences = content.count(old_text)
+        if occurrences == 0:
+            raise ValueError("old_text was not found")
+        if occurrences > 1:
+            raise ValueError("old_text appears multiple times")
+
+        path.write_text(content.replace(old_text, new_text, 1), encoding="utf-8")
+        return "ok"
+
+
 def _resolve_workspace_path(arguments: dict[str, Any]) -> Path:
     """把工具参数中的路径解析为工作区内的绝对路径。"""
     raw_path = arguments.get("path")
@@ -144,4 +210,10 @@ def read_file(arguments: dict[str, Any]) -> str:
 def write_file(arguments: dict[str, Any]) -> str:
     """向后兼容的函数形式：写入工作区内的文件内容。"""
     tool = WriteFileTool()
+    return tool.run(arguments)
+
+
+def edit_file(arguments: dict[str, Any]) -> str:
+    """向后兼容的函数形式：对工作区内文件执行一次精确局部替换。"""
+    tool = EditFileTool()
     return tool.run(arguments)

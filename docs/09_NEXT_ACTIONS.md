@@ -45,7 +45,21 @@
 - Day 2 最新收尾验证：`pytest -q` 为 `76 passed, 1 skipped`；`python examples\02_tool_agent.py`、`python examples\01_minimal_agent.py` 和 `python -m compileall src examples -q` 均通过。
 - Day 2 工具描述质量 3 个检查题已评审并归档到 `docs/Compilation-of-Interview-Questions.md` 的第 10 天记录。
 - 已完成第 2 周 Day 2：默认工具 schema 展示示例与内置工具描述质量优化。
-- 下一阶段：第 2 周 Day 3，进入 `edit_file` 局部编辑雏形。
+- 已完成第 2 周 Day 3：`edit_file` 局部编辑雏形。
+- Day 3 已按 TDD 新增 `EditFileTool` 行为测试，覆盖成功替换、目标文本不存在、目标文本出现多次、空 `old_text`、非字符串 `new_text`、路径越界、函数形式和默认注册表集成。
+- Day 3 已实现 `EditFileTool` 和函数形式 `edit_file(...)`，复用 `_resolve_workspace_path(...)`，只允许在 `workspace_root` 内编辑已有文本文件。
+- `edit_file` 当前策略：`old_text` 必须是非空字符串，并且在文件中唯一出现；`new_text` 必须是字符串，可以为空字符串。
+- `create_coding_tool_registry()` 现在默认注册 `read_file`、`write_file`、`edit_file` 和 `run_command`。
+- `examples/02_tool_agent.py` 的默认 schema 示例现在包含 `edit_file`。
+- Day 3 最新文件工具测试结果：`pytest tests\test_file_tools.py -q` 为 `33 passed, 1 skipped`。
+- Day 3 最新工具测试结果：`pytest tests\test_tools.py -q` 为 `16 passed`。
+- Day 3 最新相关测试结果：`pytest tests\test_file_tools.py tests\test_tools.py tests\test_examples.py -q` 为 `51 passed, 1 skipped`。
+- Day 3 最新全量测试结果：`pytest -q` 为 `84 passed, 1 skipped`。
+- Day 3 最新最小 Agent 示例验证：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
+- Day 3 最新 schema 示例验证：`python examples\02_tool_agent.py` 成功输出包含 `edit_file` 的默认工具 schema JSON。
+- Day 3 最新编译验证：`python -m compileall src examples -q` 通过。
+- 第 11 天 `edit_file` 检查题已评审并归档到 `docs/Compilation-of-Interview-Questions.md`。
+- 下一阶段：第 2 周 Day 4，进入结构化 tool result。
 - 已补充外部技能调用规则：普通解释、状态说明、面试题评审和文档答疑不主动调用额外 Superpowers skill；代码实现、调试失败、完成验收和复杂设计时再按需调用对应流程。
 - 已更新 `README.md`，将 GitHub 项目说明同步到第 2 周 Day 2 已完成状态；已提交并推送到 GitHub `origin/main`：`2aae93e docs: update README for tool schema progress`。
 - 已完成第 1 周 Day 7：周复盘和小重构。
@@ -111,20 +125,20 @@
 
 ## 下一次应该继续做什么
 
-继续第 2 周 Tool System 深化，进入 Day 3：`edit_file` 局部编辑雏形。
+继续第 2 周 Tool System 深化，进入 Day 4：结构化 tool result。
 
-教学执行方式：先讲清为什么局部编辑比整文件覆盖更适合 Coding Agent，再讲调用链、目标文件、输入输出、验收测试和安全边界。当前不要直接跳到 planner、RAG、MCP 或真实 API；继续用 mock LLM、示例和测试证明工具系统边界。
+教学执行方式：先讲清为什么工具结果不能长期只靠字符串和异常，再讲调用链、目标文件、输入输出、验收测试和安全边界。当前不要直接跳到 planner、RAG、MCP 或真实 API；继续用 mock LLM、示例和测试证明工具系统边界。
 
 建议任务：
 
-1. 先讲 Day 3 调用链：`AgentLoop -> ToolRegistry.run("edit_file", arguments) -> Tool.run(...) -> edit_file handler -> 文件系统`。
-2. 讲清 `edit_file` 与 `write_file` 的边界：`write_file` 适合整文件写入或覆盖，`edit_file` 适合在已有文件中替换一段明确文本。
-3. 按 TDD 新增局部编辑测试：成功替换、目标文本不存在、目标文本出现多次、空 `old_text`、路径越界和 `ToolRegistry` 集成。
-4. 实现最小 `edit_file` 工具，并注册到 `create_coding_tool_registry()`。
+1. 先讲 Day 4 调用链：`ToolRegistry.run(...) -> Tool.run(...) -> handler/runtime -> ToolResult -> AgentLoop message history`。
+2. 讲清当前问题：字符串 `"ok"`、普通返回 dict 和异常混在一起，后续不利于 LLM adapter、可观测性和错误恢复。
+3. 按 TDD 设计最小 `ToolResult`：成功状态、结果内容、错误类型、错误消息、耗时字段。
+4. 先让 `Tool.run(...)` 或 `ToolRegistry.run(...)` 形成结构化结果的雏形，避免一次性大改 AgentLoop。
 5. 结束时运行 focused pytest、全量 pytest、示例和编译检查，并更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md`、`docs/09_NEXT_ACTIONS.md`。
 
 ## 用户下次应发送的指令
 
 ```text
-继续项目，进入第 2 周 Day 3：edit_file 局部编辑雏形。请先讲调用链、测试设计和安全边界。
+继续项目，进入第 2 周 Day 4：结构化 tool result。请先讲调用链、测试设计和安全边界。
 ```

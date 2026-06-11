@@ -3,6 +3,76 @@
 ## 2026-06-11
 
 日期：2026-06-11
+当前阶段：第 2 周 Day 3
+当前模块：`edit_file` 局部编辑雏形
+预计用时：60 分钟
+
+### 1. 今日学习目标
+
+- 理解局部编辑为什么比整文件覆盖更适合 Coding Agent 的小范围改动。
+- 区分 `write_file` 和 `edit_file` 的使用边界。
+- 按 TDD 新增 `edit_file` 行为测试，先观察 RED，再实现 GREEN。
+- 实现只替换一次、且 `old_text` 必须唯一出现的最小 `EditFileTool`。
+- 将 `edit_file` 注册到默认 coding 工具注册表，并让 schema 示例同步包含它。
+
+### 2. 所需前置知识
+
+- 第 1 周文件工具：`_resolve_workspace_path(...)` 如何限制 `workspace_root`。
+- 第 2 周 Day 1：`ToolParameter`、`Tool.run(...)` 和工具参数 schema。
+- 第 2 周 Day 2：`create_coding_tool_registry().list_tool_schemas()` 是未来 adapter 的工具清单来源。
+- Python 字符串的 `count(...)`、`replace(..., 1)` 和文件读写。
+
+### 3. 今日必须理解的知识点
+
+- `write_file` 适合新建文件或整文件覆盖；`edit_file` 适合对已有文件的一段明确文本做小范围替换。
+- `old_text` 必须非空，否则空字符串会匹配字符之间的所有位置，可能造成灾难性插入。
+- `old_text` 必须唯一出现；如果出现多次，工具无法知道 LLM 想改哪一个语义位置。
+- 工具参数 schema 只能说明参数形状，仍需要具体工具校验唯一匹配、路径边界和写入安全。
+- Day 3 只做最小精确替换，不提前实现 diff/patch、追加模式、模糊匹配或 planner。
+
+### 4. 今日代码 / 文档任务
+
+- 在 `tests/test_file_tools.py` 中新增 `EditFileTool` RED 测试：成功替换、目标文本不存在、目标文本出现多次、空 `old_text`、非字符串 `new_text`、路径越界、函数形式和默认注册表集成。
+- 在 `tests/test_tools.py` 中补充默认 coding 工具 schema 断言，要求 `edit_file` 暴露 `path`、`old_text`、`new_text`。
+- 在 `src/pca/tools/file_tools.py` 中实现 `EditFileTool` 和函数形式 `edit_file(...)`。
+- 在 `src/pca/tools/__init__.py` 中导出并注册 `EditFileTool`。
+- 在 `tests/test_examples.py` 中同步 schema 示例断言，让默认工具列表包含 `edit_file`。
+- 更新学习笔记、资料库、实现日志、下一步行动和每日面试题归档。
+
+### 5. 今日资料推荐
+
+- Python `difflib` 官方文档：https://docs.python.org/3/library/difflib.html
+- GNU diffutils `patch` 手册：https://www.gnu.org/software/diffutils/manual/html_node/Merging-with-patch.html
+- Real Python `pathlib` 教程：https://realpython.com/python-pathlib/
+
+### 6. 今日输出物
+
+- `EditFileTool`
+- `edit_file(arguments: dict[str, Any]) -> str`
+- 默认 coding 工具注册表中的 `edit_file`
+- `edit_file` 参数 schema
+- Day 3 局部编辑学习笔记
+- 第 11 天面试题归档
+
+### 7. 当前完成情况
+
+- 已评审用户 3 个检查问题：用户已理解多处替换会导致语义错误，`old_text` 为空必须拦截，`edit_file` 和 `write_file` 的边界基本正确。
+- 已按 TDD 写 RED 测试，初始运行 `pytest tests\test_file_tools.py -q` 时 8 个新增测试失败，原因是 `EditFileTool`、`edit_file` 函数和默认注册表中尚不存在 `edit_file`。
+- 已实现 `EditFileTool`：复用 `_resolve_workspace_path(...)`，读取文件，要求 `old_text` 非空且唯一出现，然后用 `replace(old_text, new_text, 1)` 写回。
+- 已将 `EditFileTool` 注册进 `create_coding_tool_registry()`。
+- 已同步 `tests/test_tools.py` 和 `tests/test_examples.py`，让 schema 测试和示例测试反映新增的 `edit_file`。
+- 已验证 `pytest tests\test_file_tools.py -q`：`33 passed, 1 skipped`。
+- 已验证 `pytest tests\test_tools.py -q`：`16 passed`。
+- 已验证 `pytest tests\test_file_tools.py tests\test_tools.py tests\test_examples.py -q`：`51 passed, 1 skipped`。
+- 已验证 `pytest -q`：`84 passed, 1 skipped`。
+- 已验证 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 已验证 `python examples\02_tool_agent.py`：成功输出包含 `read_file`、`write_file`、`edit_file`、`run_command` 的 schema JSON。
+- 已验证 `python -m compileall src examples -q`：通过。
+- Day 3 验收通过，下一步进入第 2 周 Day 4：结构化 tool result。
+
+## 2026-06-11
+
+日期：2026-06-11
 当前阶段：第 2 周 Day 2
 当前模块：默认工具 schema 展示示例与内置工具描述质量
 预计用时：45 分钟

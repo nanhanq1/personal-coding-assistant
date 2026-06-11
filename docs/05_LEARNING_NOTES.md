@@ -1,5 +1,90 @@
 # Learning Notes
 
+## `edit_file` 局部编辑雏形：第 2 周 Day 3
+
+### 1. 直觉
+
+Coding Agent 改代码时，不应该每次都把整个文件重写一遍。整文件覆盖的风险很高：模型可能漏掉原文件里的 import、注释、格式、边界逻辑或用户刚改过的内容。
+
+`edit_file` 的直觉是：让 Agent 明确指出“我要把这段旧文本替换成这段新文本”。这比整文件覆盖更窄，也更容易测试和审计。
+
+### 2. 一句话解释
+
+`edit_file` 是一个受 `workspace_root` 限制的局部编辑工具：它只在已有文件中替换一次唯一匹配的 `old_text`。
+
+### 3. 核心调用链
+
+```text
+AgentLoop
+  -> ToolRegistry.run("edit_file", arguments)
+  -> Tool.run(arguments)
+  -> EditFileTool._run(arguments)
+  -> _resolve_workspace_path(arguments)
+  -> path.read_text(...)
+  -> 校验 old_text 非空且唯一出现
+  -> path.write_text(...)
+```
+
+### 4. 流程图
+
+```mermaid
+flowchart TD
+    A["LLM outputs ToolCall(edit_file)"] --> B["ToolRegistry.run"]
+    B --> C["Tool.run validates schema"]
+    C --> D["EditFileTool._run"]
+    D --> E["Resolve path inside workspace_root"]
+    E --> F["Read file text"]
+    F --> G{"old_text count"}
+    G -->|0| H["Raise ValueError: not found"]
+    G -->|>1| I["Raise ValueError: multiple matches"]
+    G -->|1| J["Replace once"]
+    J --> K["Write file"]
+    K --> L["Return ok"]
+```
+
+### 5. 技术原理
+
+- `old_text` 为空必须拒绝，因为空字符串会匹配到每个字符之间的位置。
+- `old_text` 出现 0 次表示 LLM 的上下文已经过期，不能静默成功。
+- `old_text` 出现多次表示编辑意图不够精确，不能替模型猜要改哪一处。
+- `new_text` 可以为空字符串，这允许删除一段明确文本。
+- 路径解析继续复用 `_resolve_workspace_path(...)`，所以绝对路径和相对路径都必须落在 `workspace_root` 内。
+
+### 6. 当前代码位置
+
+- 实现：`src/pca/tools/file_tools.py`
+- 默认注册表：`src/pca/tools/__init__.py`
+- 行为测试：`tests/test_file_tools.py`
+- schema 测试：`tests/test_tools.py`
+- 示例 schema 测试：`tests/test_examples.py`
+
+### 7. 当前测试覆盖
+
+- 成功替换一个唯一文本片段。
+- 目标文本不存在时拒绝写入。
+- 目标文本出现多次时拒绝写入。
+- 空 `old_text` 被拒绝。
+- 非字符串 `new_text` 被拒绝。
+- 工作区外路径被拒绝。
+- 函数形式 `edit_file(...)` 可用。
+- 默认 coding 工具注册表可以运行 `edit_file`。
+- 默认工具 schema 和示例输出包含 `edit_file`。
+
+### 8. 当前限制
+
+- 还不支持 unified diff / patch。
+- 还不支持模糊匹配或基于行号的编辑。
+- 还没有结构化 tool result，失败仍然主要依赖异常。
+- 还没有权限审批、文件变更预览、自动 git diff 或 checkpoint / rollback。
+
+### 9. 检查问题
+
+1. 为什么 `edit_file` 要求 `old_text` 只能出现一次？
+2. 为什么 `new_text` 可以为空字符串，但 `old_text` 不能为空？
+3. 如果 `old_text` 不存在，应该让工具静默不写入、自动追加，还是明确失败？为什么？
+4. `edit_file` 和 `write_file` 的安全风险分别是什么？
+5. 后续要把 `edit_file` 升级到工业级 patch 工具，还缺哪些能力？
+
 ## 工具 schema 如何服务真实 LLM adapter：第 2 周 Day 2
 
 ### 1. 直觉

@@ -1,6 +1,8 @@
 from pathlib import Path
 
 import pytest
+from pca.tools import create_coding_tool_registry
+import pca.tools.file_tools as file_tools
 from pca.tools.file_tools import ReadFileTool, WriteFileTool, read_file, write_file
 from pca.tools.registry import ToolRegistry
 
@@ -365,6 +367,157 @@ class TestPathResolution:
         assert result == "ok"
         test_file = tmp_path / "file with spaces.txt"
         assert test_file.read_text(encoding="utf-8") == "Content with spaces"
+
+
+class TestEditFileTool:
+    """测试 EditFileTool 局部编辑工具"""
+
+    def test_replaces_one_exact_text_block(self, tmp_path):
+        """测试只替换一个明确文本片段。"""
+        tool = file_tools.EditFileTool()
+        test_file = tmp_path / "module.py"
+        test_file.write_text(
+            "def greet():\n"
+            "    return 'hello'\n",
+            encoding="utf-8",
+        )
+
+        result = tool.run({
+            "path": "module.py",
+            "old_text": "return 'hello'",
+            "new_text": "return 'hi'",
+            "workspace_root": str(tmp_path),
+        })
+
+        assert result == "ok"
+        assert test_file.read_text(encoding="utf-8") == (
+            "def greet():\n"
+            "    return 'hi'\n"
+        )
+
+    def test_rejects_missing_old_text(self, tmp_path):
+        """测试目标文本不存在时拒绝写入，避免静默无效编辑。"""
+        tool = file_tools.EditFileTool()
+        test_file = tmp_path / "module.py"
+        original = "def greet():\n    return 'hello'\n"
+        test_file.write_text(original, encoding="utf-8")
+
+        with pytest.raises(ValueError, match="old_text was not found"):
+            tool.run({
+                "path": "module.py",
+                "old_text": "return 'missing'",
+                "new_text": "return 'hi'",
+                "workspace_root": str(tmp_path),
+            })
+
+        assert test_file.read_text(encoding="utf-8") == original
+
+    def test_rejects_old_text_that_appears_multiple_times(self, tmp_path):
+        """测试目标文本出现多次时拒绝写入，避免误改多个语义位置。"""
+        tool = file_tools.EditFileTool()
+        test_file = tmp_path / "module.py"
+        original = (
+            "def first():\n"
+            "    return 'same'\n"
+            "\n"
+            "def second():\n"
+            "    return 'same'\n"
+        )
+        test_file.write_text(original, encoding="utf-8")
+
+        with pytest.raises(ValueError, match="old_text appears multiple times"):
+            tool.run({
+                "path": "module.py",
+                "old_text": "return 'same'",
+                "new_text": "return 'changed'",
+                "workspace_root": str(tmp_path),
+            })
+
+        assert test_file.read_text(encoding="utf-8") == original
+
+    def test_rejects_empty_old_text(self, tmp_path):
+        """测试空 old_text 会被拒绝，避免在所有字符间隙插入内容。"""
+        tool = file_tools.EditFileTool()
+        test_file = tmp_path / "module.py"
+        original = "print('hello')\n"
+        test_file.write_text(original, encoding="utf-8")
+
+        with pytest.raises(ValueError, match="old_text"):
+            tool.run({
+                "path": "module.py",
+                "old_text": "",
+                "new_text": "print('hi')",
+                "workspace_root": str(tmp_path),
+            })
+
+        assert test_file.read_text(encoding="utf-8") == original
+
+    def test_rejects_non_string_new_text(self, tmp_path):
+        """测试 new_text 必须是字符串，避免把坏参数写进文件。"""
+        tool = file_tools.EditFileTool()
+        test_file = tmp_path / "module.py"
+        original = "print('hello')\n"
+        test_file.write_text(original, encoding="utf-8")
+
+        with pytest.raises(TypeError, match="new_text"):
+            tool.run({
+                "path": "module.py",
+                "old_text": "hello",
+                "new_text": {"not": "text"},
+                "workspace_root": str(tmp_path),
+            })
+
+        assert test_file.read_text(encoding="utf-8") == original
+
+    def test_rejects_path_outside_workspace(self, tmp_path):
+        """测试继承文件工具 workspace_root 边界，不允许编辑工作区外文件。"""
+        tool = file_tools.EditFileTool()
+        outside_file = tmp_path.parent / "outside_edit.txt"
+        outside_file.write_text("secret", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="outside workspace"):
+            tool.run({
+                "path": str(outside_file),
+                "old_text": "secret",
+                "new_text": "changed",
+                "workspace_root": str(tmp_path),
+            })
+
+        assert outside_file.read_text(encoding="utf-8") == "secret"
+
+    def test_edit_file_function_keeps_backward_compatible_function_style(self, tmp_path):
+        """测试 edit_file 也提供函数形式，便于早期示例和测试直接调用。"""
+        test_file = tmp_path / "notes.txt"
+        test_file.write_text("old value\n", encoding="utf-8")
+
+        result = file_tools.edit_file({
+            "path": "notes.txt",
+            "old_text": "old value",
+            "new_text": "new value",
+            "workspace_root": str(tmp_path),
+        })
+
+        assert result == "ok"
+        assert test_file.read_text(encoding="utf-8") == "new value\n"
+
+    def test_default_coding_registry_can_run_edit_file(self, tmp_path):
+        """测试 edit_file 已进入默认 coding 工具注册表。"""
+        registry = create_coding_tool_registry()
+        test_file = tmp_path / "module.py"
+        test_file.write_text("x = 1\n", encoding="utf-8")
+
+        result = registry.run(
+            "edit_file",
+            {
+                "path": "module.py",
+                "old_text": "x = 1",
+                "new_text": "x = 2",
+                "workspace_root": str(tmp_path),
+            },
+        )
+
+        assert result == "ok"
+        assert test_file.read_text(encoding="utf-8") == "x = 2\n"
 
 
 # 运行所有测试

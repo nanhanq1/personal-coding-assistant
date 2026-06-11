@@ -78,6 +78,13 @@
 - JSON Schema object 参考：https://json-schema.org/understanding-json-schema/reference/object
 - 建议阅读顺序：先看 OpenAI function calling 中工具 schema 与 strict mode 的要求，再看 Anthropic define tools 中 `name`、`description`、`input_schema` 和工具描述质量要求，最后回到本项目理解为什么当前先保持内部中立 schema。
 
+### Week 2 Day 3 `edit_file` 局部编辑资料
+
+- Python `difflib` 官方文档：https://docs.python.org/3/library/difflib.html
+- GNU diffutils `patch` 手册：https://www.gnu.org/software/diffutils/manual/html_node/Merging-with-patch.html
+- Real Python `pathlib` 教程：https://realpython.com/python-pathlib/
+- 建议阅读顺序：先复习 `pathlib` 的路径读写和边界意识，再看 `difflib.unified_diff(...)` 如何表达文本差异，最后了解 `patch` 为什么需要上下文来把 diff 应用到文件。当前项目 Day 3 只实现精确文本替换，diff/patch 属于后续升级方向。
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |
@@ -89,6 +96,8 @@
 | `mini SWE agent architecture bash trajectory` | 学习 shell runtime 和 trajectory |
 | `Python pathlib tutorial` | 学习路径解析和文件读写 |
 | `pytest tmp_path tutorial` | 学习隔离文件系统测试 |
+| `Python difflib unified diff tutorial` | 学习如何表达局部文本差异 |
+| `apply patch algorithm context lines` | 理解 patch 工具为什么需要上下文 |
 | `Python subprocess timeout cwd stdout stderr tutorial` | 学习命令执行输入输出和超时 |
 | `shell command sandbox workspace root safety` | 学习 shell runtime 安全边界 |
 

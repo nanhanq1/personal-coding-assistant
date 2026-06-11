@@ -37,12 +37,17 @@ def test_tool_schema_example_exports_default_coding_tool_schemas():
         for schema in schemas
     }
 
-    assert list(schemas_by_name) == ["read_file", "write_file", "run_command"]
+    assert list(schemas_by_name) == ["read_file", "write_file", "edit_file", "run_command"]
     assert schemas_by_name["read_file"]["parameters"]["properties"]["path"] == {
         "type": "string",
         "description": "要读取的文件路径；相对路径会基于 workspace_root 解析",
     }
     assert "content" in schemas_by_name["write_file"]["parameters"]["required"]
+    assert schemas_by_name["edit_file"]["parameters"]["properties"]["old_text"] == {
+        "type": "string",
+        "description": "原文件中必须唯一出现的待替换文本；不能为空",
+    }
+    assert "new_text" in schemas_by_name["edit_file"]["parameters"]["required"]
     assert schemas_by_name["run_command"]["parameters"]["properties"]["command"]["type"] == [
         "string",
         "array",
