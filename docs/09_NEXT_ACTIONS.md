@@ -16,14 +16,37 @@
 ## 当前进度
 
 - 已开始第 2 周 Tool System 深化。
-- 已完成第 2 周 Day 1：工具参数 schema。
+- 已完成第 2 周 Day 1：工具参数 schema；2026-06-10 已重新审查并修复一次 schema 契约漂移。
 - Day 1 新增 `ToolParameter`，`Tool` 现在可以声明 `parameters` 并导出 `to_schema()`。
 - `Tool.run(...)` 现在会在 handler 执行前校验必填参数和基础类型。
 - `ToolRegistry` 新增 `list_tool_schemas()`，可统一导出已注册工具 schema。
 - 内置 `read_file`、`write_file` 和 `run_command` 已声明参数 schema。
 - 已新增 ADR-0006：第 2 周 Day 1 使用 `ToolParameter` 声明工具参数 schema。
-- 最新工具系统测试结果：`python -m pytest tests\test_tools.py -q` 为 `15 passed`。
-- 最新相关工具链测试结果：`python -m pytest tests\test_tools.py tests\test_file_tools.py tests\test_shell_runtime.py tests\test_loop_tools_integration.py -q` 为 `65 passed, 1 skipped`。
+- Day 1 审查发现：`Tool.to_schema()` 曾错误导出 `additionalProperties: False`，与 ADR-0006 的“暂不关闭 additionalProperties”和测试契约不一致；已修复为 `True`。
+- 最新工具系统测试结果：`pytest tests\test_tools.py -q` 为 `15 passed`。
+- 最新相关工具链测试结果：`pytest tests\test_tools.py tests\test_file_tools.py tests\test_shell_runtime.py tests\test_loop_tools_integration.py -q` 为 `65 passed, 1 skipped`。
+- 最新全量测试结果：`pytest -q` 为 `74 passed, 1 skipped`。
+- 最新示例验证：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 最新编译验证：`python -m compileall src examples -q` 通过。
+- 已开始第 2 周 Day 2：工具参数 schema 如何服务真实 LLM adapter。
+- Day 2 已评审用户 3 个检查问题，并将用户回答归档到 `docs/Compilation-of-Interview-Questions.md` 的第 9 天记录。
+- Day 2 已按 TDD 补充默认工具 schema 展示示例：`examples/02_tool_agent.py` 现在输出 `create_coding_tool_registry().list_tool_schemas()` 的 JSON。
+- Day 2 已新增 `tests/test_examples.py` 回归测试，验证 schema 展示示例可从仓库根目录运行并输出 `read_file`、`write_file`、`run_command` 的关键 schema。
+- Day 2 最新示例测试结果：`pytest tests\test_examples.py -q` 为 `2 passed`。
+- Day 2 最新工具 + 示例测试结果：`pytest tests\test_tools.py tests\test_examples.py -q` 为 `17 passed`。
+- 最新全量测试结果：`pytest -q` 为 `76 passed, 1 skipped`。
+- 最新 schema 示例验证：`python examples\02_tool_agent.py` 成功输出 `read_file`、`write_file`、`run_command` 的 schema JSON。
+- 最新最小 Agent 示例验证：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 最新编译验证：`python -m compileall src examples -q` 通过。
+- Day 2 已按 TDD 优化内置工具描述质量：`read_file` 明确只读和返回文本，`write_file` 明确写入/覆盖和返回 ok，`run_command` 明确 workspace/timeout 和 stdout/stderr/returncode/timed_out。
+- Day 2 已修复 `examples/02_tool_agent.py` stdout UTF-8 编码设置，避免 Windows 子进程测试解码中文 schema 失败。
+- Day 2 最新工具测试结果：`pytest tests\test_tools.py -q` 为 `16 passed`。
+- Day 2 最新工具 + 示例测试结果：`pytest tests\test_tools.py tests\test_examples.py -q` 为 `18 passed`。
+- Day 2 最新收尾验证：`pytest -q` 为 `76 passed, 1 skipped`；`python examples\02_tool_agent.py`、`python examples\01_minimal_agent.py` 和 `python -m compileall src examples -q` 均通过。
+- Day 2 工具描述质量 3 个检查题已评审并归档到 `docs/Compilation-of-Interview-Questions.md` 的第 10 天记录。
+- 已完成第 2 周 Day 2：默认工具 schema 展示示例与内置工具描述质量优化。
+- 下一阶段：第 2 周 Day 3，进入 `edit_file` 局部编辑雏形。
+- 已补充外部技能调用规则：普通解释、状态说明、面试题评审和文档答疑不主动调用额外 Superpowers skill；代码实现、调试失败、完成验收和复杂设计时再按需调用对应流程。
 - 已完成第 1 周 Day 7：周复盘和小重构。
 - Day 7 小重构内容：文件工具现在明确拒绝非字符串 `path`，避免把 LLM 坏参数静默转成文件名。
 - 最新测试结果：`python -m pytest -q` 为 `68 passed, 1 skipped`。
@@ -87,22 +110,20 @@
 
 ## 下一次应该继续做什么
 
-继续第 2 周 Tool System 深化，进入 Day 2。
+继续第 2 周 Tool System 深化，进入 Day 3：`edit_file` 局部编辑雏形。
 
-教学执行方式：先复盘 Day 1 的 schema 契约，再讲 schema 如何服务未来真实 LLM adapter。当前不要直接跳到 planner、RAG 或 MCP；第 2 周优先继续深化工具系统。
+教学执行方式：先讲清为什么局部编辑比整文件覆盖更适合 Coding Agent，再讲调用链、目标文件、输入输出、验收测试和安全边界。当前不要直接跳到 planner、RAG、MCP 或真实 API；继续用 mock LLM、示例和测试证明工具系统边界。
 
 建议任务：
 
-1. 让用户回答第 2 周 Day 1 的面试题，并将用户回答补全到 `docs/Compilation-of-Interview-Questions.md`。
-2. 进入第 2 周 Day 2：理解工具参数 schema 如何服务真实 LLM adapter。
-3. 为默认 coding 工具注册表补充 schema 展示示例或测试，说明 `create_coding_tool_registry().list_tool_schemas()` 如何被 adapter 消费。
-4. 优先考虑内置工具 schema 展示、工具描述质量、模型选工具所需信息和错误语义。
-5. 继续使用 mock LLM 和 TDD，不要一开始依赖真实 API。
-6. 每个新工具或行为必须有单元测试和集成测试。
-7. 结束时更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
+1. 先讲 Day 3 调用链：`AgentLoop -> ToolRegistry.run("edit_file", arguments) -> Tool.run(...) -> edit_file handler -> 文件系统`。
+2. 讲清 `edit_file` 与 `write_file` 的边界：`write_file` 适合整文件写入或覆盖，`edit_file` 适合在已有文件中替换一段明确文本。
+3. 按 TDD 新增局部编辑测试：成功替换、目标文本不存在、目标文本出现多次、空 `old_text`、路径越界和 `ToolRegistry` 集成。
+4. 实现最小 `edit_file` 工具，并注册到 `create_coding_tool_registry()`。
+5. 结束时运行 focused pytest、全量 pytest、示例和编译检查，并更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md`、`docs/09_NEXT_ACTIONS.md`。
 
 ## 用户下次应发送的指令
 
 ```text
-继续项目，进入第 2 周 Day 2。请先评审我对 Day 1 工具 schema 面试题的回答。
+继续项目，进入第 2 周 Day 3：edit_file 局部编辑雏形。请先讲调用链、测试设计和安全边界。
 ```

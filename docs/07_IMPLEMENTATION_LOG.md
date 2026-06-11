@@ -1,5 +1,79 @@
 # Implementation Log
 
+## 2026-06-11
+
+### 本次完成
+
+- 评审用户对第 2 周 Day 2 三个检查问题的回答。
+- 确认用户已经理解：`ToolRegistry` 保存真实工具，adapter 负责把内部 schema 转成模型厂商格式。
+- 按 TDD 新增 `tests/test_examples.py` 中的 schema 展示示例测试。
+- RED：现有 `examples/02_tool_agent.py` 只是占位文件，没有输出 JSON，测试在 `json.loads(completed.stdout)` 处失败。
+- GREEN：将 `examples/02_tool_agent.py` 改为创建默认 coding 工具注册表，并打印 `registry.list_tool_schemas()` 的 JSON。
+- 将第 9 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
+- 更新 `docs/02_DAILY_TASKS.md` 和 `docs/05_LEARNING_NOTES.md`。
+- 继续 Day 2 后半段：按 TDD 检查并优化内置工具 schema 描述质量。
+- 新增 `tests/test_tools.py::test_builtin_coding_tool_schemas_describe_selection_boundaries`，要求内置工具描述包含用途、副作用、工作区边界、返回语义和关键参数语义。
+- 优化 `ReadFileTool`、`WriteFileTool` 和 `ShellCommandTool` 的 description 与参数 description。
+- 修复 `examples/02_tool_agent.py` stdout 编码设置，让 Windows 子进程测试可以稳定按 UTF-8 解析 JSON。
+- 评审用户对 Day 2 工具描述质量 3 个检查题的回答：确认用户已理解工具描述影响模型选工具、读写工具的副作用边界；补强 `run_command` 返回字段也是 LLM 观察契约。
+- 将第 10 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
+- 完成第 2 周 Day 2 收尾，下一步交接到第 2 周 Day 3：`edit_file` 局部编辑雏形。
+- 补充外部技能调用规则到 `AGENTS.md` 和 `docs/CODEX_PROJECT_BRIEF.md`：普通解释、状态说明、面试题评审和文档答疑不主动调用额外 Superpowers skill；代码实现、调试、验收和复杂设计场景再按需调用。
+
+### 架构决策
+
+- 本次不新增 ADR。
+- 本次只补 schema 展示示例和测试，不新增真实 LLM adapter，不改变工具系统边界。
+- 继续保留内部中立 schema：adapter 后续只负责转换格式，不应该成为工具列表事实源。
+
+### 验证
+
+- RED：运行 `pytest tests\test_examples.py -q`，结果为 `1 failed, 1 passed`，失败原因为 `examples/02_tool_agent.py` 没有输出 JSON。
+- GREEN：实现后运行 `pytest tests\test_examples.py -q`，结果为 `2 passed`。
+- 运行 `pytest tests\test_tools.py tests\test_examples.py -q`：`17 passed`。
+- 运行 `pytest -q`：`75 passed, 1 skipped`。
+- 运行 `python examples\02_tool_agent.py`：成功输出 `read_file`、`write_file`、`run_command` 的 schema JSON。
+- 运行 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 运行 `python -m compileall src examples -q`：通过。
+- 描述质量 RED：运行 `pytest tests\test_tools.py -q`，结果为 `1 failed, 15 passed`，失败原因为 `read_file` 描述缺少“只读取”等模型选择边界。
+- 描述质量 GREEN：优化描述后运行 `pytest tests\test_tools.py -q`：`16 passed`。
+- 修复 Windows stdout 编码后运行 `pytest tests\test_tools.py tests\test_examples.py -q`：`18 passed`。
+- 全量验证运行 `pytest -q`：`76 passed, 1 skipped`。
+- 运行 `python examples\02_tool_agent.py`：成功输出增强后的 schema JSON。
+- 运行 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 运行 `python -m compileall src examples -q`：通过。
+- Day 2 收尾复核运行 `pytest -q`：`76 passed, 1 skipped`。
+- Day 2 收尾复核运行 `python examples\02_tool_agent.py`：成功输出增强后的 schema JSON。
+- Day 2 收尾复核运行 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- Day 2 收尾复核运行 `python -m compileall src examples -q`：通过。
+
+## 2026-06-10
+
+### 本次完成
+
+- 审查第 2 周 Day 1：工具参数 schema 是否真正完成。
+- 读取当前规则、交接文档、学习路线、每日任务、周 Sprint、学习笔记、实现日志和相关源码。
+- 复现 Day 1 当前 checkout 的测试失败：`Tool.to_schema()` 导出的 `additionalProperties` 与测试和 ADR-0006 不一致。
+- 按 ADR-0006 修复 `src/pca/tools/base.py`，让 `Tool.to_schema()` 暂不关闭 `additionalProperties`。
+- 开始第 2 周 Day 2 教学设计：解释工具 schema 如何服务未来真实 LLM adapter。
+- 更新 Day 2 每日任务、学习笔记、资源库和下一步行动。
+
+### 架构决策
+
+- 本次不新增 ADR。
+- 继续遵循 ADR-0006：第 2 周 Day 1 只实现基础参数 schema 和入口校验，不实现完整 JSON Schema 校验器，不关闭 `additionalProperties`，不把 schema 当成权限系统。
+- Day 2 先讲内部 schema 到 adapter 的边界，不直接接真实 LLM API。
+
+### 验证
+
+- 初始审查运行 `pytest tests\test_tools.py -q`：`2 failed, 13 passed`，失败点均为 `additionalProperties` 期望不一致。
+- 初始审查运行 `pytest tests\test_tools.py tests\test_file_tools.py tests\test_shell_runtime.py tests\test_loop_tools_integration.py -q`：`2 failed, 63 passed, 1 skipped`。
+- 修复后运行 `pytest tests\test_tools.py -q`：`15 passed`。
+- 修复后运行 `pytest tests\test_tools.py tests\test_file_tools.py tests\test_shell_runtime.py tests\test_loop_tools_integration.py -q`：`65 passed, 1 skipped`。
+- 修复后运行 `pytest -q`：`74 passed, 1 skipped`。
+- 运行 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 运行 `python -m compileall src examples -q`：通过。
+
 ## 2026-06-09
 
 ### 本次完成

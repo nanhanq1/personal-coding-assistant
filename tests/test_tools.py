@@ -285,3 +285,37 @@ def test_builtin_coding_tools_export_parameter_schemas():
     assert "command" in schemas["run_command"]["parameters"]["required"]
     assert "workspace_root" in schemas["run_command"]["parameters"]["required"]
     assert "timeout_seconds" in schemas["run_command"]["parameters"]["required"]
+
+
+def test_builtin_coding_tool_schemas_describe_selection_boundaries():
+    """测试内置工具描述足够支持模型区分用途、边界和返回语义。"""
+    registry = create_coding_tool_registry()
+
+    schemas = {
+        schema["name"]: schema
+        for schema in registry.list_tool_schemas()
+    }
+
+    read_file = schemas["read_file"]
+    assert "只读取" in read_file["description"]
+    assert "不修改文件" in read_file["description"]
+    assert "workspace_root" in read_file["description"]
+    assert "返回文件文本" in read_file["description"]
+    assert "相对路径" in read_file["parameters"]["properties"]["path"]["description"]
+
+    write_file = schemas["write_file"]
+    assert "写入或覆盖" in write_file["description"]
+    assert "自动创建父目录" in write_file["description"]
+    assert "workspace_root" in write_file["description"]
+    assert "返回 ok" in write_file["description"]
+    assert "完整文本内容" in write_file["parameters"]["properties"]["content"]["description"]
+
+    run_command = schemas["run_command"]
+    assert "执行命令" in run_command["description"]
+    assert "workspace_root" in run_command["description"]
+    assert "timeout_seconds" in run_command["description"]
+    for output_field in ("stdout", "stderr", "returncode", "timed_out"):
+        assert output_field in run_command["description"]
+    assert "list[str]" in run_command["parameters"]["properties"]["command"]["description"]
+    assert "正数" in run_command["parameters"]["properties"]["timeout_seconds"]["description"]
+    assert "默认使用 workspace_root" in run_command["parameters"]["properties"]["cwd"]["description"]

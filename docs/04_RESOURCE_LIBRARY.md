@@ -69,6 +69,15 @@
 - Python `dataclasses` 官方文档：https://docs.python.org/3/library/dataclasses.html
 - 建议阅读顺序：先看 JSON Schema 的 `properties`、`required` 和 `additionalProperties`，再看 OpenAI tool calling 如何把函数名、描述和参数 schema 提供给模型，最后复习 `dataclass` 如何表达轻量数据结构。
 
+### Week 2 Day 2 工具 schema 与 LLM adapter 资料
+
+- OpenAI Function calling / tool calling guide：https://developers.openai.com/api/docs/guides/function-calling
+- OpenAI Using tools guide：https://developers.openai.com/api/docs/guides/tools
+- Anthropic Tool use overview：https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview
+- Anthropic Define tools：https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools
+- JSON Schema object 参考：https://json-schema.org/understanding-json-schema/reference/object
+- 建议阅读顺序：先看 OpenAI function calling 中工具 schema 与 strict mode 的要求，再看 Anthropic define tools 中 `name`、`description`、`input_schema` 和工具描述质量要求，最后回到本项目理解为什么当前先保持内部中立 schema。
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |

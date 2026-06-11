@@ -1,5 +1,109 @@
 # Learning Notes
 
+## 工具 schema 如何服务真实 LLM adapter：第 2 周 Day 2
+
+### 1. 直觉
+
+Day 1 做出的 `Tool.to_schema()` 和 `ToolRegistry.list_tool_schemas()`，不是为了让测试里多一个字典断言，而是为了让未来真实 LLM adapter 能稳定知道“当前 Agent 有哪些工具可以用，以及每个工具该怎么调用”。
+
+如果没有这个出口，adapter 只能手写工具列表，工具注册表和模型看到的工具清单就会逐渐不一致。工业级 Agent 里，这种不一致很危险：程序明明注册了工具，但模型不知道；或者模型以为能调用某个参数，程序侧却不接受。
+
+### 2. 一句话解释
+
+`ToolRegistry.list_tool_schemas()` 是内部工具系统通向真实 LLM adapter 的边界；adapter 负责把项目内部 schema 转换成具体模型 API 要求的外部格式。
+
+### 3. Day 2 目标调用链
+
+```text
+create_coding_tool_registry()
+  -> ToolRegistry.register(ReadFileTool / WriteFileTool / ShellCommandTool)
+  -> ToolRegistry.list_tool_schemas()
+  -> adapter 把内部 schema 转成模型 API 的 tools 参数
+  -> 模型根据 name / description / parameters 选择工具
+  -> 模型返回 ToolCall(name, arguments)
+  -> AgentLoop -> ToolRegistry.run(...) -> Tool.run(...)
+```
+
+### 4. 流程图
+
+```mermaid
+flowchart TD
+    A["内置 coding 工具注册表"] --> B["list_tool_schemas"]
+    B --> C["项目内部中立 schema"]
+    C --> D{"LLM adapter"}
+    D --> E["OpenAI tools/function schema"]
+    D --> F["Anthropic tools/input_schema"]
+    E --> G["模型选择工具并生成 arguments"]
+    F --> G
+    G --> H["ToolCall"]
+    H --> I["Tool.run 基础校验"]
+    I --> J["具体工具 / runtime 安全校验"]
+```
+
+### 5. 当前代码位置
+
+- 内部 schema 定义：`src/pca/tools/base.py`
+- schema 列表导出：`src/pca/tools/registry.py`
+- 默认工具注册表：`src/pca/tools/__init__.py`
+- 内置工具 schema：`src/pca/tools/file_tools.py`、`src/pca/tools/shell_tools.py`
+- 当前测试入口：`tests/test_tools.py`
+
+### 6. Day 1 审查发现的问题
+
+本次审查发现代码和 ADR-0006 出现漂移：`Tool.to_schema()` 导出了 `additionalProperties: False`，但 ADR-0006 明确写着 Day 1 暂不关闭 `additionalProperties`。
+
+这里的工程含义是：
+
+- 如果关闭 `additionalProperties`，就表示 schema 是闭合对象，未知字段不应出现。
+- 但当前项目还没有实现完整 JSON Schema 校验器，也没有让 `Tool.run(...)` 拒绝额外字段。
+- 因此 Day 1 更诚实的状态是：schema 先声明基础字段和类型，严格模式留给后续 adapter/schema hardening。
+
+### 7. Day 2 要补的能力
+
+- 用测试或示例展示 `create_coding_tool_registry().list_tool_schemas()` 的真实输出。
+- 讲清 adapter 会如何消费这份 schema，而不是让具体 adapter 手写工具定义。
+- 检查内置工具描述是否足够帮助模型区分 `read_file`、`write_file` 和 `run_command`。
+- 暂不接真实 API，仍用 mock 和测试证明 schema 边界。
+
+### 8. Day 2 本次实现
+
+本次选择先补一个可运行示例，而不是直接写 OpenAI adapter：
+
+- `examples/02_tool_agent.py` 创建默认 coding 工具注册表。
+- 调用 `registry.list_tool_schemas()` 取得内部中立 schema。
+- 用 JSON 打印出来，模拟未来 adapter 会拿到的输入。
+- `tests/test_examples.py` 通过子进程运行示例，解析 stdout 并验证 `read_file`、`write_file`、`run_command` 的关键 schema。
+
+这一步的价值是先固定内部工具系统到 adapter 之间的边界。等后续真正写 OpenAI / Anthropic adapter 时，它们应该消费这个出口，而不是在 adapter 里重新手写工具定义。
+
+### 9. 工具描述质量优化
+
+Day 2 后半段继续优化内置工具 schema 的描述质量。原因是：真实 LLM 选择工具时，不只看工具名，还会看工具描述和参数描述。
+
+本次把三个内置工具的描述补到更接近“模型可决策”的程度：
+
+- `read_file`：明确“只读取、不修改文件、返回文件文本”，避免模型把它误当成编辑工具。
+- `write_file`：明确“写入或覆盖、自动创建父目录、返回 ok”，让模型知道它有副作用。
+- `run_command`：明确“在 workspace_root 边界内执行命令、需要 timeout_seconds、返回 stdout/stderr/returncode/timed_out”，让模型知道它用于执行外部命令和观察结果。
+
+同时增强了参数描述：
+
+- `path` 说明相对路径会基于 `workspace_root` 解析。
+- `content` 说明是完整文本内容。
+- `command` 说明推荐使用 `list[str]`。
+- `cwd` 说明默认使用 `workspace_root`。
+- `timeout_seconds` 说明必须是正数。
+
+这仍然不是权限系统。描述质量只能帮助模型少犯错，不能替代 `Tool.run(...)` 的参数校验、具体工具的 `workspace_root` 边界、shell runtime 的超时和后续 Permission System。
+
+### 10. 检查问题
+
+1. 为什么 `list_tool_schemas()` 应该从 `ToolRegistry` 导出，而不是在 OpenAI adapter 里手写？
+2. 为什么内部 schema 最好保持中立格式，而不是一开始绑定某一家模型 API？
+3. `additionalProperties: True` 和 OpenAI strict mode 的 `additionalProperties: false` 有什么差别？
+4. 工具描述太短会如何影响模型选工具？
+5. Day 2 为什么仍然不应该直接接真实 LLM API？
+
 ## 周复盘和小重构：第 7 天
 
 ### 1. 直觉

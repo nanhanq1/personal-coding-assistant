@@ -1,5 +1,148 @@
 # Daily Tasks
 
+## 2026-06-11
+
+日期：2026-06-11
+当前阶段：第 2 周 Day 2
+当前模块：默认工具 schema 展示示例与内置工具描述质量
+预计用时：45 分钟
+
+### 1. 今日学习目标
+
+- 评审用户对 Day 2 三个检查问题的回答。
+- 理解 `ToolRegistry` 是工具 schema 的唯一事实源，adapter 只做格式转换。
+- 用 TDD 补充默认 coding 工具注册表的 schema 展示示例。
+- 让 `examples/02_tool_agent.py` 输出 `create_coding_tool_registry().list_tool_schemas()` 的 JSON，作为未来 adapter 消费 schema 的教学样例。
+- 优化内置工具描述质量，让模型能区分只读、写入覆盖和命令执行三类工具。
+
+### 2. 所需前置知识
+
+- `create_coding_tool_registry()` 会注册 `read_file`、`write_file`、`run_command`。
+- `ToolRegistry.list_tool_schemas()` 会导出已注册工具的内部中立 schema。
+- OpenAI / Anthropic adapter 后续应从内部 schema 转换格式，而不是重新手写工具清单。
+- 当前仍使用 mock / 示例 / 测试，不接真实 API。
+
+### 3. 今日必须理解的知识点
+
+- 工具系统的事实源是 registry，不是某个 adapter。
+- adapter 的职责是把内部 schema 改写成外部 API 格式，不负责决定项目有哪些工具。
+- 示例脚本也要有测试，否则未来重构时很容易变成过期展示。
+- `additionalProperties: True` 是当前项目宽松 schema 阶段的真实表达；严格模式属于后续 adapter/schema hardening。
+- 工具描述不只是给人看的注释，也是模型选工具时的重要上下文；描述必须讲清用途、副作用、安全边界和返回值。
+
+### 4. 今日代码 / 文档任务
+
+- 在 `tests/test_examples.py` 中新增 RED 测试，要求 `examples/02_tool_agent.py` 输出可解析的默认工具 schema JSON。
+- 将 `examples/02_tool_agent.py` 从占位文件改成 schema 展示示例。
+- 在 `tests/test_tools.py` 中新增 RED 测试，要求内置工具 schema 描述包含用途、边界、副作用和返回语义。
+- 优化 `ReadFileTool`、`WriteFileTool` 和 `ShellCommandTool` 的工具描述和参数描述。
+- 修复 `examples/02_tool_agent.py` 在 Windows 子进程测试中 stdout 编码不稳定的问题。
+- 将用户 Day 2 检查题回答归档到 `docs/Compilation-of-Interview-Questions.md`。
+- 更新学习日志和下一步行动。
+
+### 5. 今日资料推荐
+
+- OpenAI Function calling / tool calling guide：https://developers.openai.com/api/docs/guides/function-calling
+- OpenAI Using tools guide：https://developers.openai.com/api/docs/guides/tools
+- Anthropic Define tools：https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools
+- JSON Schema object 参考：https://json-schema.org/understanding-json-schema/reference/object
+
+### 6. 今日输出物
+
+- `tests/test_examples.py` 中的 schema 示例回归测试。
+- `examples/02_tool_agent.py` 默认工具 schema 展示示例。
+- 第 9 天面试题归档。
+
+### 7. 当前完成情况
+
+- 已评审用户 3 个检查问题：核心方向正确，需要补强“registry 是唯一事实源，adapter 是格式转换层”的表达。
+- 已按 TDD 写 RED 测试，失败原因为 `examples/02_tool_agent.py` 没有输出 JSON。
+- 已实现 `examples/02_tool_agent.py`，输出默认 coding 工具注册表的 schema JSON。
+- 已验证 `pytest tests\test_examples.py -q`：`2 passed`。
+- 已验证 `pytest tests\test_tools.py tests\test_examples.py -q`：`17 passed`。
+- 已验证 `pytest -q`：`75 passed, 1 skipped`。
+- 已验证 `python examples\02_tool_agent.py`：成功输出 `read_file`、`write_file`、`run_command` 的 schema JSON。
+- 已验证 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 已验证 `python -m compileall src examples -q`：通过。
+- 已按 TDD 新增工具描述质量 RED 测试，初始失败原因为 `read_file` 描述没有明确“只读取、不修改文件、返回文件文本”等模型选择边界。
+- 已优化 `read_file`、`write_file`、`run_command` 的工具描述和参数描述。
+- 已修复 `examples/02_tool_agent.py` 的 stdout UTF-8 编码设置，避免 Windows 子进程测试解码失败。
+- 已验证 `pytest tests\test_tools.py -q`：`16 passed`。
+- 已验证 `pytest tests\test_tools.py tests\test_examples.py -q`：`18 passed`。
+- 已验证 `pytest -q`：`76 passed, 1 skipped`。
+- 已验证 `python examples\02_tool_agent.py`：成功输出增强后的 schema JSON。
+- 已验证 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 已验证 `python -m compileall src examples -q`：通过。
+- 已评审用户对工具描述质量 3 个检查题的回答：前两题通过，第 3 题已补强“返回字段也是 LLM 调用前和调用后的契约”。
+- 已将第 10 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
+- Day 2 验收通过，下一步进入第 2 周 Day 3：`edit_file` 局部编辑雏形。
+- Day 2 收尾复核已重新运行：`pytest -q` 为 `76 passed, 1 skipped`；`python examples\02_tool_agent.py`、`python examples\01_minimal_agent.py` 和 `python -m compileall src examples -q` 均通过。
+- 已补充项目级外部技能调用规则：普通解释、状态说明、面试题评审和文档答疑不主动调用额外 Superpowers skill；代码实现、调试、验收和复杂设计场景再按需调用。
+
+## 2026-06-10
+
+日期：2026-06-10
+当前阶段：第 2 周 Day 2 启动
+当前模块：工具参数 schema 如何服务真实 LLM adapter
+预计用时：60 分钟
+
+### 1. 今日学习目标
+
+- 审查第 2 周 Day 1 工具 schema 是否真正完成，不能只相信文档记录。
+- 理解 `ToolRegistry.list_tool_schemas()` 为什么是未来 LLM adapter 的工具列表来源。
+- 理解同一份内部 schema 在不同模型厂商中会被转换成不同外部格式。
+- 理解工具名称、工具描述、参数描述和错误语义如何影响模型选工具。
+- 准备为默认 coding 工具注册表补充 schema 展示示例或测试。
+
+### 2. 所需前置知识
+
+- 第 2 周 Day 1：`ToolParameter`、`Tool.to_schema()`、`ToolRegistry.list_tool_schemas()`。
+- 第 1 周主链路：`AgentLoop -> ToolRegistry.run(...) -> Tool.run(...) -> handler/runtime`。
+- JSON Schema 中 `properties`、`required`、`additionalProperties` 的基础含义。
+- OpenAI / Anthropic tool calling 都需要把工具名、描述和参数 schema 提供给模型。
+
+### 3. 今日必须理解的知识点
+
+- `list_tool_schemas()` 不是给人看的文档函数，而是未来 adapter 拼接 `tools` 参数的输入来源。
+- 内部 schema 不应该直接绑定某一家 API；更稳妥的边界是先有项目内部中立格式，再由 adapter 转成 OpenAI / Anthropic 等格式。
+- Day 1 当前决策是“不关闭 `additionalProperties`”，因为项目还没有实现完整 JSON Schema 严格模式，也还没有 adapter 层的格式转换。
+- OpenAI strict tool schema 和当前项目 Day 1 schema 不是同一成熟度：OpenAI strict 模式要求对象内 `additionalProperties: false` 且字段都列为 required；当前项目先保留宽松 schema，避免假装已经具备严格模式。
+- 工具描述质量会直接影响模型是否选对工具；描述太短、参数含义不清、返回值不明，都会提高错误 tool call 的概率。
+
+### 4. 今日代码 / 文档任务
+
+- 先完成 Day 1 完成度审查：跑 schema 目标测试、相关工具链测试、全量测试、示例和编译。
+- 修复 Day 1 审查发现的 schema 契约漂移：`Tool.to_schema()` 必须与 ADR-0006 和测试一致。
+- 讲清 Day 2 调用链、目标文件、目标函数、输入输出、验收测试和安全边界。
+- 用户确认理解后，再按 TDD 为默认 coding 工具注册表补充 adapter-facing schema 展示示例或测试。
+- 结束时继续更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
+
+### 5. 今日资料推荐
+
+- OpenAI Function calling / tool calling guide：https://developers.openai.com/api/docs/guides/function-calling
+- OpenAI Using tools guide：https://developers.openai.com/api/docs/guides/tools
+- Anthropic Tool use overview：https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview
+- Anthropic Define tools：https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools
+- JSON Schema object 参考：https://json-schema.org/understanding-json-schema/reference/object
+
+### 6. 今日输出物
+
+- Day 1 完成度审查结论和修复。
+- Day 2 调用链和设计边界。
+- Day 2 学习笔记初稿。
+- 下一步 TDD 实现入口。
+
+### 7. 当前完成情况
+
+- 已发现 Day 1 当前 checkout 存在 schema 契约漂移：实现导出 `additionalProperties: False`，但 ADR-0006 和测试期望暂不关闭。
+- 已修复 `src/pca/tools/base.py`，让 `Tool.to_schema()` 导出 `additionalProperties: True`。
+- 已验证 `pytest tests\test_tools.py -q`：`15 passed`。
+- 已验证 `pytest tests\test_tools.py tests\test_file_tools.py tests\test_shell_runtime.py tests\test_loop_tools_integration.py -q`：`65 passed, 1 skipped`。
+- 已验证 `pytest -q`：`74 passed, 1 skipped`。
+- 已验证 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 已验证 `python -m compileall src examples -q`：通过。
+- 已开始 Day 2 教学设计；尚未进入 Day 2 新生产代码实现，等待用户确认理解后按 TDD 继续。
+
 ## 2026-06-09
 
 日期：2026-06-09

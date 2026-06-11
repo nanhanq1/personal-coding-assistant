@@ -10,14 +10,21 @@ class ReadFileTool(Tool):
     def __init__(self) -> None:
         super().__init__(
             name="read_file",
-            description="读取工作区内的文件内容。参数：path (文件路径), workspace_root (工作区根目录)",
+            description=(
+                "读取工作区内的文件内容；只读取 workspace_root 内的文本文件内容，不修改文件；"
+                "适合在编辑前查看真实文件状态，返回文件文本。"
+            ),
             handler=self._run,
             parameters=(
-                ToolParameter(name="path", type="string", description="要读取的文件路径"),
+                ToolParameter(
+                    name="path",
+                    type="string",
+                    description="要读取的文件路径；相对路径会基于 workspace_root 解析",
+                ),
                 ToolParameter(
                     name="workspace_root",
                     type="string",
-                    description="允许读取的工作区根目录",
+                    description="允许读取的工作区根目录；未提供时使用当前进程目录",
                     required=False,
                 ),
             ),
@@ -41,15 +48,26 @@ class WriteFileTool(Tool):
     def __init__(self) -> None:
         super().__init__(
             name="write_file",
-            description="写入工作区内的文件内容。参数：path (文件路径), content (内容), workspace_root (工作区根目录)",
+            description=(
+                "写入工作区内的文件内容；写入或覆盖 workspace_root 内的文本文件，必要时自动创建父目录；"
+                "适合生成新文件或整文件替换，成功时返回 ok。"
+            ),
             handler=self._run,
             parameters=(
-                ToolParameter(name="path", type="string", description="要写入的文件路径"),
-                ToolParameter(name="content", type="string", description="要写入的文本内容"),
+                ToolParameter(
+                    name="path",
+                    type="string",
+                    description="要写入的文件路径；相对路径会基于 workspace_root 解析",
+                ),
+                ToolParameter(
+                    name="content",
+                    type="string",
+                    description="要写入文件的完整文本内容",
+                ),
                 ToolParameter(
                     name="workspace_root",
                     type="string",
-                    description="允许写入的工作区根目录",
+                    description="允许写入的工作区根目录；未提供时使用当前进程目录",
                     required=False,
                 ),
             ),

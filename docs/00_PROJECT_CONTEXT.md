@@ -20,7 +20,7 @@ Personal Coding Assistant Agent
 
 - 12 周路线：第 2 周
 - 当前主题：Tool System 深化
-- 当前模块：工具参数 schema、工具元数据导出、统一参数入口校验
+- 当前模块：`edit_file` 局部编辑雏形
 
 ## 当前原则
 
