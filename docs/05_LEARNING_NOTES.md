@@ -1,5 +1,94 @@
 # Learning Notes
 
+## 结构化 tool result：第 2 周 Day 4
+
+### 1. 直觉
+
+现在工具返回值有三种混在一起的表达方式：成功时可能是字符串 `"ok"`，shell 工具可能返回 dict，失败时可能抛异常，再由 `AgentLoop` 拼成 `"Tool execution failed: ..."` 字符串。
+
+这能跑通最小闭环，但后续会越来越难维护：LLM adapter 不知道哪个字段表示成功，测试只能匹配字符串，可观测日志也很难稳定统计错误类型和耗时。
+
+`ToolResult` 的直觉是：先在程序内部把一次工具执行结果统一成结构化对象，再决定如何写回 `message history`。
+
+### 2. 一句话解释
+
+`ToolResult` 是工具执行的内部结果信封：它把成功状态、结果内容、错误类型、错误消息和耗时放到同一个稳定结构里。
+
+### 3. 目标调用链
+
+```text
+AgentLoop
+  -> ToolRegistry.run(tool_call.name, tool_call.arguments)
+  -> Tool.run(arguments)
+  -> handler/runtime(arguments)
+  -> ToolRegistry.run(...) 包装为 ToolResult(ok/result/error_type/error_message/duration_ms)
+  -> AgentLoop 把 ToolResult 序列化为 role="tool" Message
+  -> LLM 根据结构化观察继续决策
+```
+
+### 4. 流程图
+
+```mermaid
+flowchart TD
+    A["Assistant ToolCall"] --> B["ToolRegistry.run"]
+    B --> C["Tool.run validates arguments"]
+    C --> D["handler/runtime executes"]
+    D --> E{"Success?"}
+    E -->|Yes| F["ToolResult ok=True result=... duration_ms"]
+    E -->|No| G["ToolResult ok=False error_type error_message duration_ms"]
+    F --> H["AgentLoop serializes tool message"]
+    G --> H
+    H --> I["Message history"]
+    I --> J["LLM continues"]
+```
+
+### 5. 测试设计
+
+- `ToolResult.success(...)` 或等价构造方式能保存 `ok=True`、`result` 和 `duration_ms`。
+- `ToolResult.failure(...)` 或等价构造方式能保存 `ok=False`、`error_type`、`error_message` 和 `duration_ms`。
+- `ToolRegistry.run(...)` 成功执行普通 handler 时返回结构化结果，而不是裸字符串。
+- handler 抛出异常时，`ToolRegistry.run(...)` 返回结构化失败结果，保留异常类型和消息。
+- 参数校验失败、未知工具和 handler/runtime 异常都会在 registry 边界变成失败 `ToolResult`。
+- `Tool.run(...)` 暂时保持低层原始返回/异常语义，方便具体工具单元测试继续直接验证真实行为。
+- 初期保持 AgentLoop 的 `Message.content` 兼容字符串，避免一次性破坏既有示例和测试。
+
+### 6. 安全边界
+
+- `ToolResult` 不是权限系统，不判断命令是否危险。
+- `ToolResult` 不替代 `workspace_root`、参数 schema、路径越界和 shell 超时校验。
+- `ToolResult` 不直接做重试、回滚、审批或 sandbox。
+- `ToolResult` 只负责把已经发生的一次工具执行结果稳定表达出来，供 AgentLoop、测试、日志和未来 adapter 使用。
+
+### 7. 当前代码位置
+
+- 预期实现入口：`src/pca/tools/base.py` 或 `src/pca/tools/result.py`
+- 工具路由入口：`src/pca/tools/registry.py`
+- Agent 消息回写：`src/pca/core/agent_loop.py`
+- 目标测试入口：`tests/test_tools.py`，必要时补充 `tests/test_agent_loop.py`
+
+### 8. 当前限制
+
+- 已实现最小 `ToolResult`，当前放在 `src/pca/tools/base.py`。
+- 当前最终序列化格式仍是兼容旧行为的纯文本：`AgentLoop` 通过 `str(tool_result)` 写回 `Message.content`。
+- 尚未接入 trace id、审计日志、权限审批、重试策略和真实 LLM adapter。
+
+### 9. 本次实现
+
+- 在 `tests/test_tools.py` 中新增结构化结果测试，并先观察 RED：`ImportError: cannot import name 'ToolResult'`。
+- 在 `src/pca/tools/base.py` 中实现 `ToolResult`。
+- 在 `src/pca/tools/registry.py` 中用 `time.perf_counter()` 统计执行耗时，并把成功/失败都包装成 `ToolResult`。
+- 在 `src/pca/tools/__init__.py` 中导出 `ToolResult`。
+- 为降低迁移风险，`ToolResult` 提供三层兼容：
+  - `str(result)`：成功时是原始结果文本，失败时是 `Tool execution failed: ...`。
+  - `result == 原始值`：成功结果可和旧测试中的原始返回值比较。
+  - `result["field"]`：成功结果为 dict 时可继续按旧方式访问字段。
+
+### 10. 当前代码阶段定位
+
+当前代码处在第 2 周 Tool System 深化的中段：已经有工具参数 schema、默认工具 schema 展示、`edit_file` 局部编辑和最小结构化工具结果。
+
+它仍不是完整工业级工具系统。下一步还需要把 `ToolResult` 更正式地接入 AgentLoop 的 tool message 序列化、增加 trace id、明确错误分类枚举，并在后续 Permission System 中加入风险评估和人工审批。
+
 ## `edit_file` 局部编辑雏形：第 2 周 Day 3
 
 ### 1. 直觉

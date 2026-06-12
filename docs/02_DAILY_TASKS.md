@@ -1,5 +1,83 @@
 # Daily Tasks
 
+## 2026-06-12
+
+日期：2026-06-12
+当前阶段：第 2 周 Day 4
+当前模块：结构化 tool result
+预计用时：60 分钟
+
+### 1. 今日学习目标
+
+- 理解工具结果为什么不能长期只靠字符串和异常表达。
+- 区分“工具真实返回值”和“写回 message history 的文本内容”。
+- 设计最小 `ToolResult`，让成功、失败、错误类型、错误消息和耗时可被测试稳定消费。
+- 先从 `Tool.run(...)` / `ToolRegistry.run(...)` 形成结构化结果雏形，不一次性大改 AgentLoop。
+- 为后续 LLM adapter、可观测性、错误恢复和权限系统打基础。
+
+### 2. 所需前置知识
+
+- 第 1 周主链路：`AgentLoop -> ToolRegistry.run(...) -> Tool.run(...) -> handler/runtime`。
+- 第 2 周 Day 1：`ToolParameter` 在 `Tool.run(...)` 前做基础参数校验。
+- 第 2 周 Day 2：`ToolRegistry.list_tool_schemas()` 是 adapter 面向工具系统的入口。
+- 第 2 周 Day 3：`edit_file` 仍通过字符串 `"ok"` 或异常表达结果。
+- Python `dataclass`、异常类型、`time.perf_counter()` 和 pytest 断言。
+
+### 3. 今日必须理解的知识点
+
+- 字符串结果适合最小 Demo，但不适合长期表达成功、失败、错误分类和耗时。
+- 异常适合阻止坏路径继续执行，但如果 AgentLoop 只把异常转成一段字符串，后续 adapter 和测试很难稳定判断失败原因。
+- `ToolResult` 应该是程序内部结构化对象；写回 `Message.content` 时可以再序列化成字符串。
+- 第 2 周 Day 4 的范围是最小结构化结果，不提前做权限审批、重试策略、trace 系统或真实 LLM adapter。
+
+### 4. 今日代码 / 文档任务
+
+- 先讲清调用链、目标文件、目标类/函数、输入输出、验收测试和安全边界。
+- 按 TDD 设计 `ToolResult` RED 测试：成功结果、失败结果、错误类型、错误消息、耗时字段。
+- 在 `src/pca/tools/base.py` 或相邻模块中实现最小 `ToolResult` 数据结构。
+- 让 `Tool.run(...)` 或 `ToolRegistry.run(...)` 返回结构化结果雏形。
+- 保持 AgentLoop 的 message history 行为兼容，不一次性改变所有示例。
+- 更新学习笔记、实现日志和下一步行动。
+
+### 5. 今日资料推荐
+
+- Python `dataclasses` 官方文档：https://docs.python.org/3/library/dataclasses.html
+- Python `time.perf_counter()` 官方文档：https://docs.python.org/3/library/time.html
+- OpenTelemetry Observability Primer：https://opentelemetry.io/docs/concepts/observability-primer/
+- OpenAI Agents SDK Tools 文档：https://openai.github.io/openai-agents-python/tools/
+
+### 6. 今日输出物
+
+- `ToolResult`
+- `ToolRegistry.run(...) -> ToolResult`
+- `ToolResult.success(...)` / `ToolResult.failure(...)` / `ToolResult.from_exception(...)`
+- `ToolResult.__str__()` 兼容旧 message history 文本写回
+- Day 4 结构化结果学习笔记
+- ADR-0007：第 2 周 Day 4 在 ToolRegistry 边界返回结构化 ToolResult
+- 第 12 天面试题归档
+
+### 7. 当前完成情况
+
+- 已将 `docs/Compilation-of-Interview-Questions.md` 中的每日面试题按天数从小到大重排。
+- 已补充规则：新增的每日面试题记录必须追加到该文档末尾。
+- 已将该规则同步到 `AGENTS.md`、`docs/CODEX_PROJECT_BRIEF.md` 和 `docs/09_NEXT_ACTIONS.md`。
+- 已开始第 2 周 Day 4：结构化 tool result 的调用链、测试设计和安全边界讲解。
+- 已按 TDD 在 `tests/test_tools.py` 中新增 `ToolResult` RED 测试，初始失败原因为 `pca.tools.base` 中尚无 `ToolResult`。
+- 已实现 `ToolResult`，字段包括 `ok`、`result`、`error_type`、`error_message` 和 `duration_ms`。
+- 已让 `ToolRegistry.run(...)` 返回结构化 `ToolResult`；成功时包装原始返回值，失败时捕获异常并记录错误类型、错误消息和耗时。
+- 已保持 `Tool.run(...)` 的低层原始返回/异常语义，避免一次性改动所有具体工具 API。
+- 已保持 AgentLoop message history 兼容：`str(ToolResult)` 成功时等价旧结果文本，失败时等价旧错误文本。
+- 已新增 ADR-0007，记录为什么 Day 4 选择在 `ToolRegistry.run(...)` 边界返回结构化结果。
+- 第 12 天结构化 tool result 面试题已追加到 `docs/Compilation-of-Interview-Questions.md`，用户回答已补全并完成评审。
+- 已验证 `pytest tests\test_tools.py -q`：`21 passed`。
+- 已验证 `pytest tests\test_agent_loop.py tests\test_loop_tools_integration.py tests\test_file_tools.py tests\test_shell_runtime.py tests\test_examples.py -q`：`65 passed, 1 skipped`。
+- 已验证 `pytest -q`：`89 passed, 1 skipped`。
+- 已验证 `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 已验证 `python examples\02_tool_agent.py`：成功输出包含 `read_file`、`write_file`、`edit_file`、`run_command` 的 schema JSON。
+- 已验证 `python -m compileall src examples -q`：通过。
+- 已补全并评审第 12 天结构化 tool result 面试题用户回答。
+- Day 4 代码、文档、测试和学习验收已完成；下一步进入第 2 周 Day 5：整合 schema + edit_file + result。
+
 ## 2026-06-11
 
 日期：2026-06-11

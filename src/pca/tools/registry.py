@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
+from time import perf_counter
 from typing import Any
 
-from pca.tools.base import Tool
+from pca.tools.base import Tool, ToolResult
 
 
 @dataclass
@@ -37,17 +38,24 @@ class ToolRegistry:
             raise KeyError(f"Unknown tool: {name}")
         return self._tools[name]
 
-    def run(self, name: str, arguments: dict[str, Any]) -> Any:
+    def run(self, name: str, arguments: dict[str, Any]) -> ToolResult:
         """查找工具并执行，是 AgentLoop 面向工具系统的唯一入口。"""
         # 修改前旧代码：
         # tool = self.get(name)
         # return tool.run(arguments)
         #
         # 问题：arguments 不是 dict 时会一路传到具体工具，错误位置不清晰。
-        if not isinstance(arguments, dict):
-            raise TypeError("tool arguments must be a dictionary")
-        tool = self.get(name)
-        return tool.run(arguments)
+        started_at = perf_counter()
+        try:
+            if not isinstance(arguments, dict):
+                raise TypeError("tool arguments must be a dictionary")
+            tool = self.get(name)
+            result = tool.run(arguments)
+        except Exception as exc:
+            duration_ms = int((perf_counter() - started_at) * 1000)
+            return ToolResult.from_exception(exc, duration_ms=duration_ms)
+        duration_ms = int((perf_counter() - started_at) * 1000)
+        return ToolResult.success(result=result, duration_ms=duration_ms)
 
     def exists(self, name: str) -> bool:
         if not isinstance(name, str) or name.strip() == "":

@@ -1,5 +1,44 @@
 # Implementation Log
 
+## 2026-06-12
+
+### 第 2 周 Day 4：结构化 tool result
+
+### 本次完成
+
+- 整理 `docs/Compilation-of-Interview-Questions.md`：将每日面试题记录按天数从小到大排序。
+- 在 `docs/Compilation-of-Interview-Questions.md` 中补充规则：新增的每日面试题记录必须写在文档末尾。
+- 同步更新 `AGENTS.md`、`docs/CODEX_PROJECT_BRIEF.md` 和 `docs/09_NEXT_ACTIONS.md`，保证后续会话能从入口规则读到该要求。
+- 修正 `docs/00_PROJECT_CONTEXT.md` 的当前模块，从 Day 3 `edit_file` 更新为 Day 4 结构化 tool result。
+- 新增第 2 周 Day 4 的每日任务记录，明确当前先讲调用链、测试设计和安全边界，暂不直接写生产代码。
+- 更新 `docs/04_RESOURCE_LIBRARY.md` 和 `docs/05_LEARNING_NOTES.md`，补充结构化 tool result 的资料、调用链、测试设计和安全边界。
+- 按 TDD 在 `tests/test_tools.py` 中新增结构化结果测试，覆盖成功结果、失败结果、registry 成功包装、handler 异常包装、参数校验失败包装和未知工具包装。
+- RED：运行 `pytest tests\test_tools.py -q`，失败原因为 `ImportError: cannot import name 'ToolResult' from 'pca.tools.base'`。
+- 在 `src/pca/tools/base.py` 中新增 `ToolResult`，字段包括 `ok`、`result`、`error_type`、`error_message` 和 `duration_ms`。
+- 在 `src/pca/tools/registry.py` 中让 `ToolRegistry.run(...)` 返回 `ToolResult`，并用 `perf_counter()` 统计耗时。
+- 保持 `Tool.run(...)` 低层原始返回/异常语义，避免一次性改动所有具体工具 API。
+- 通过 `ToolResult.__str__()`、`__eq__()` 和 `__getitem__()` 保持旧 message history、旧字符串断言和旧 dict 访问方式兼容。
+- 在 `src/pca/tools/__init__.py` 中导出 `ToolResult`。
+- 新增 ADR-0007：第 2 周 Day 4 在 `ToolRegistry` 边界返回结构化 `ToolResult`。
+- 将第 12 天结构化 tool result 面试题追加到 `docs/Compilation-of-Interview-Questions.md`。
+- 已补全并评审第 12 天用户回答：整体方向通过，需要把 `ToolRegistry` 从“工厂”更准确地表述为工具注册、路由和执行边界。
+
+### 架构决策
+
+- 新增 ADR-0007。
+- Day 4 决策是在 `ToolRegistry.run(...)` 边界返回 `ToolResult`，暂不全面改变 `Tool.run(...)` 和 `Message.content` 的低层语义。
+
+### 验证
+
+- 已用 `Select-String` 确认 `docs/Compilation-of-Interview-Questions.md` 的记录顺序为第 1 天到第 12 天。
+- RED：`pytest tests\test_tools.py -q` 失败，原因为 `ToolResult` 尚不存在。
+- GREEN：`pytest tests\test_tools.py -q` 为 `21 passed`。
+- 相关链路验证：`pytest tests\test_agent_loop.py tests\test_loop_tools_integration.py tests\test_file_tools.py tests\test_shell_runtime.py tests\test_examples.py -q` 为 `65 passed, 1 skipped`。
+- 全量验证：`pytest -q` 为 `89 passed, 1 skipped`。
+- 示例验证：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
+- schema 示例验证：`python examples\02_tool_agent.py` 成功输出包含 `read_file`、`write_file`、`edit_file`、`run_command` 的 schema JSON。
+- 编译验证：`python -m compileall src examples -q` 通过。
+
 ## 2026-06-11
 
 ### 第 2 周 Day 3：`edit_file` 局部编辑雏形

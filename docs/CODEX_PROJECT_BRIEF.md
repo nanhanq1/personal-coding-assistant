@@ -235,7 +235,7 @@ personal-coding-assistant/
 2. 源码追问题：考察当天代码的调用链、输入输出和失败路径。
 3. 系统设计题：考察当天模块在完整 Personal Coding Assistant Agent 中如何扩展。
 
-完成一天的任务和要求后，必须把当天面试题保存到 `docs/Compilation-of-Interview-Questions.md`。保存格式必须是：
+完成一天的任务和要求后，必须把当天面试题保存到 `docs/Compilation-of-Interview-Questions.md`。新增的每日面试题记录必须追加到该文档末尾；正常情况下后续天数递增，因此末尾追加后仍应保持从小到大的天数顺序。保存格式必须是：
 
 ```markdown
 ## 第 N 天：YYYY-MM-DD

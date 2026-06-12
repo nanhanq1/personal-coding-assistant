@@ -1,5 +1,46 @@
 # Architecture Decisions
 
+## ADR-0007：第 2 周 Day 4 在 ToolRegistry 边界返回结构化 ToolResult
+
+日期：2026-06-12
+
+### 背景
+
+第 1 周和第 2 周前半段的工具结果主要依赖裸返回值和异常：
+
+- 文件工具成功时返回字符串，例如 `"ok"` 或文件内容。
+- shell runtime 成功时返回 dict，例如 `stdout`、`stderr`、`returncode` 和 `timed_out`。
+- 工具失败时抛异常，再由 `AgentLoop` 转成一段错误字符串。
+
+这种方式能跑通最小闭环，但不利于后续 LLM adapter、可观测性、错误恢复和测试稳定性。调用方很难统一判断一次工具调用是成功、失败、参数错误、运行时错误还是未知工具。
+
+### 决策
+
+新增 `ToolResult`，并把结构化结果放在 `ToolRegistry.run(...)` 边界：
+
+- `ToolResult.ok` 表示工具调用是否成功。
+- `ToolResult.result` 保存成功时的原始工具返回值。
+- `ToolResult.error_type` 保存失败时的异常类型名称。
+- `ToolResult.error_message` 保存失败时的异常消息。
+- `ToolResult.duration_ms` 保存工具路由和执行耗时。
+- `ToolRegistry.run(...)` 捕获查找、参数校验和 handler/runtime 执行中的异常，并返回失败 `ToolResult`。
+- `Tool.run(...)` 暂时保持原始返回值和异常语义，避免一次性改动所有具体工具测试和低层工具 API。
+- `ToolResult.__str__()` 保持现有 `AgentLoop` message history 兼容：成功时写回原结果文本，失败时写回 `Tool execution failed: ...`。
+
+### 理由
+
+- `ToolRegistry.run(...)` 是 `AgentLoop` 面向工具系统的统一入口，最适合作为结构化结果边界。
+- 保留 `Tool.run(...)` 的低层语义，可以让文件工具和 shell runtime 的直接单元测试继续验证真实工具行为。
+- `ToolResult` 先解决“结果信封”问题，为后续 trace id、审计日志、错误分类、权限审批和真实 LLM adapter 留出扩展点。
+- 兼容旧的 message history 文本格式，避免 Day 4 一次性大改 AgentLoop、示例和全部工具测试。
+
+### 暂不采用
+
+- 暂不把 `Tool.run(...)` 全面改成返回 `ToolResult`。
+- 暂不把 `Message.content` 改成 JSON payload 或专门的 tool result schema。
+- 暂不实现 trace id、重试策略、权限审批、sandbox 或 checkpoint / rollback。
+- 暂不接真实 LLM adapter；当前继续用 mock LLM 和测试证明工具边界。
+
 ## ADR-0006：第 2 周 Day 1 使用 ToolParameter 声明工具参数 schema
 
 日期：2026-06-09

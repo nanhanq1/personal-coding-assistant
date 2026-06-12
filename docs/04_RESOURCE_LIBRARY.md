@@ -85,6 +85,14 @@
 - Real Python `pathlib` 教程：https://realpython.com/python-pathlib/
 - 建议阅读顺序：先复习 `pathlib` 的路径读写和边界意识，再看 `difflib.unified_diff(...)` 如何表达文本差异，最后了解 `patch` 为什么需要上下文来把 diff 应用到文件。当前项目 Day 3 只实现精确文本替换，diff/patch 属于后续升级方向。
 
+### Week 2 Day 4 结构化 tool result 资料
+
+- Python `dataclasses` 官方文档：https://docs.python.org/3/library/dataclasses.html
+- Python `time.perf_counter()` 官方文档：https://docs.python.org/3/library/time.html
+- OpenTelemetry Observability Primer：https://opentelemetry.io/docs/concepts/observability-primer/
+- OpenAI Agents SDK Tools 文档：https://openai.github.io/openai-agents-python/tools/
+- 建议阅读顺序：先复习 `dataclass` 如何表达轻量结果对象，再看 `perf_counter()` 为什么适合测量工具执行耗时，然后用 OpenTelemetry 的 observability primer 理解成功、失败、耗时和错误字段为什么是后续 trace 的基础，最后回到 Agents SDK Tools 文档观察标准 Agent 工具如何被描述和调用。
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |

@@ -14,6 +14,90 @@ JSON_TYPE_TO_PYTHON_TYPES: dict[str, tuple[type[Any], ...]] = {
 
 
 @dataclass(frozen=True)
+class ToolResult:
+    """一次工具执行的结构化结果。"""
+
+    ok: bool
+    result: Any = None
+    error_type: str | None = None
+    error_message: str | None = None
+    duration_ms: int = 0
+
+    def __post_init__(self) -> None:
+        """校验结果信封自身，避免把含糊状态写回 Agent 轨迹。"""
+        if not isinstance(self.ok, bool):
+            raise TypeError("tool result ok must be a boolean")
+        if not isinstance(self.duration_ms, int) or isinstance(self.duration_ms, bool):
+            raise TypeError("tool result duration_ms must be an integer")
+        if self.duration_ms < 0:
+            raise ValueError("tool result duration_ms must be non-negative")
+        if self.ok:
+            if self.error_type is not None or self.error_message is not None:
+                raise ValueError("successful tool result cannot contain error fields")
+        else:
+            if not isinstance(self.error_type, str) or self.error_type.strip() == "":
+                raise ValueError("failed tool result must contain error_type")
+            if not isinstance(self.error_message, str):
+                raise TypeError("failed tool result error_message must be a string")
+
+    @classmethod
+    def success(cls, result: Any, duration_ms: int) -> "ToolResult":
+        """构造成功结果。"""
+        return cls(ok=True, result=result, duration_ms=duration_ms)
+
+    @classmethod
+    def failure(
+        cls,
+        error_type: str,
+        error_message: str,
+        duration_ms: int,
+    ) -> "ToolResult":
+        """构造失败结果。"""
+        return cls(
+            ok=False,
+            result=None,
+            error_type=error_type,
+            error_message=error_message,
+            duration_ms=duration_ms,
+        )
+
+    @classmethod
+    def from_exception(cls, exc: Exception, duration_ms: int) -> "ToolResult":
+        """把异常转换成结构化失败结果。"""
+        return cls.failure(
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+            duration_ms=duration_ms,
+        )
+
+    def __str__(self) -> str:
+        """保持现有 message history 文本兼容，同时保留结构化字段。"""
+        if self.ok:
+            return str(self.result)
+        return f"Tool execution failed: {self.error_type}: {self.error_message}"
+
+    def __eq__(self, other: object) -> bool:
+        """成功结果可与旧测试中的原始返回值比较。"""
+        if isinstance(other, ToolResult):
+            return (
+                self.ok == other.ok
+                and self.result == other.result
+                and self.error_type == other.error_type
+                and self.error_message == other.error_message
+                and self.duration_ms == other.duration_ms
+            )
+        return self.ok and self.result == other
+
+    def __getitem__(self, key: str) -> Any:
+        """成功结果为 dict 时兼容 result["field"] 访问。"""
+        if not self.ok:
+            raise KeyError(key)
+        if not isinstance(self.result, dict):
+            raise TypeError("tool result payload is not subscriptable")
+        return self.result[key]
+
+
+@dataclass(frozen=True)
 class ToolParameter:
     """工具参数 schema 中的一个字段。"""
 

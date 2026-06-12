@@ -60,6 +60,16 @@
 - Day 3 最新编译验证：`python -m compileall src examples -q` 通过。
 - 第 11 天 `edit_file` 检查题已评审并归档到 `docs/Compilation-of-Interview-Questions.md`。
 - 下一阶段：第 2 周 Day 4，进入结构化 tool result。
+- 已整理 `docs/Compilation-of-Interview-Questions.md`：每日面试题记录已按天数从小到大排序；新增的每日面试题记录必须追加到文档末尾。
+- 已完成第 2 周 Day 4 最小结构化 tool result 实现：新增 `ToolResult`，并让 `ToolRegistry.run(...)` 返回结构化结果；`Tool.run(...)` 暂时保持低层原始语义。
+- Day 4 已新增 ADR-0007：在 `ToolRegistry` 边界返回结构化 `ToolResult`。
+- Day 4 focused 测试结果：`pytest tests\test_tools.py -q` 为 `21 passed`。
+- Day 4 相关链路测试结果：`pytest tests\test_agent_loop.py tests\test_loop_tools_integration.py tests\test_file_tools.py tests\test_shell_runtime.py tests\test_examples.py -q` 为 `65 passed, 1 skipped`。
+- Day 4 最新全量测试结果：`pytest -q` 为 `89 passed, 1 skipped`。
+- Day 4 最新最小 Agent 示例验证：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
+- Day 4 最新 schema 示例验证：`python examples\02_tool_agent.py` 成功输出包含 `read_file`、`write_file`、`edit_file`、`run_command` 的 schema JSON。
+- Day 4 最新编译验证：`python -m compileall src examples -q` 通过。
+- 第 12 天结构化 tool result 面试题已追加到 `docs/Compilation-of-Interview-Questions.md`，用户回答已补全并完成评审。
 - 已补充外部技能调用规则：普通解释、状态说明、面试题评审和文档答疑不主动调用额外 Superpowers skill；代码实现、调试失败、完成验收和复杂设计时再按需调用对应流程。
 - 已更新 `README.md`，将 GitHub 项目说明同步到第 2 周 Day 2 已完成状态；已提交并推送到 GitHub `origin/main`：`2aae93e docs: update README for tool schema progress`。
 - 已完成第 1 周 Day 7：周复盘和小重构。
@@ -80,7 +90,7 @@
 - 已补充每日任务规则：后续每日任务必须包含面试题。
 - 已补充代码评审后讲解规则：用户写完代码并完成评审、中文注释和参考实现对比后，必须指出当前代码处于项目整体的哪个阶段，以及它在整体架构、完整代码、安全性和容错性方面仍存在哪些问题。
 - 已补充资料和视频推荐规则：后续资料推荐和视频推荐必须提供有效、正确、可访问链接，优先官方资料、GitHub、公开视频或课程页面；链接不确定时先验证再推荐。
-- 已补充每日面试题归档规则：完成一天的任务和要求后，必须把当天面试题保存到 `docs/Compilation-of-Interview-Questions.md`，标题格式为“第几天 + 年月日”，内容包含面试题、用户回答和标准回答。
+- 已补充每日面试题归档规则：完成一天的任务和要求后，必须把当天面试题保存到 `docs/Compilation-of-Interview-Questions.md`，标题格式为“第几天 + 年月日”，内容包含面试题、用户回答和标准回答；新增的每日面试题记录必须追加到该文档末尾。
 - 已补全第 1 天和第 2 天的面试题归档内容：第 1 天用户回答根据学习验收记录整理；第 2 天当前没有找到用户原回答记录，用户回答字段先标记为“待补充”。
 - 已完成 2026-06-02 收尾复核：当前没有新增业务代码，测试仍然通过。
 - 最新测试结果：`python -m pytest -q` 为 `8 passed, 1 warning in 0.16s`；warning 来自 `.pytest_cache` 写入权限，不影响功能验收。
@@ -125,20 +135,19 @@
 
 ## 下一次应该继续做什么
 
-继续第 2 周 Tool System 深化，进入 Day 4：结构化 tool result。
+继续第 2 周 Tool System 深化，进入 Day 5：整合 schema + edit_file + result。
 
-教学执行方式：先讲清为什么工具结果不能长期只靠字符串和异常，再讲调用链、目标文件、输入输出、验收测试和安全边界。当前不要直接跳到 planner、RAG、MCP 或真实 API；继续用 mock LLM、示例和测试证明工具系统边界。
+教学执行方式：先讲清 Day 5 的调用链、目标文件、目标类/函数、输入输出、验收测试和安全边界，再按 TDD 让 `AgentLoop` 更明确地消费结构化 `ToolResult`。当前不要直接跳到 planner、RAG、MCP 或真实 API；继续用 mock LLM、示例和测试证明工具系统边界。
 
 建议任务：
 
-1. 先讲 Day 4 调用链：`ToolRegistry.run(...) -> Tool.run(...) -> handler/runtime -> ToolResult -> AgentLoop message history`。
-2. 讲清当前问题：字符串 `"ok"`、普通返回 dict 和异常混在一起，后续不利于 LLM adapter、可观测性和错误恢复。
-3. 按 TDD 设计最小 `ToolResult`：成功状态、结果内容、错误类型、错误消息、耗时字段。
-4. 先让 `Tool.run(...)` 或 `ToolRegistry.run(...)` 形成结构化结果的雏形，避免一次性大改 AgentLoop。
-5. 结束时运行 focused pytest、全量 pytest、示例和编译检查，并更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md`、`docs/09_NEXT_ACTIONS.md`。
+1. 讲清 Day 5 调用链：`LLM ToolCall -> AgentLoop -> ToolRegistry.run(...) -> ToolResult -> tool Message -> LLM continue`。
+2. 设计 Day 5 RED 测试：AgentLoop 工具消息应能稳定表达结构化成功和失败结果，同时保持旧示例兼容。
+3. 让 Day 5 整合默认工具 schema、`edit_file` 和 `ToolResult`，不要新增真实 LLM adapter。
+4. 更新学习笔记、实现日志、下一步行动和当天面试题归档。
 
 ## 用户下次应发送的指令
 
 ```text
-继续项目，进入第 2 周 Day 4：结构化 tool result。请先讲调用链、测试设计和安全边界。
+继续项目，进入第 2 周 Day 5：整合 schema + edit_file + result。请先讲调用链、目标文件、测试设计和安全边界。
 ```

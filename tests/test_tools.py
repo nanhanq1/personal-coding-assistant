@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 from pca.tools import create_coding_tool_registry
-from pca.tools.base import Tool, ToolParameter
+from pca.tools.base import Tool, ToolParameter, ToolResult
 from pca.tools.registry import ToolRegistry
 
 
@@ -27,7 +27,8 @@ def test_tool_registry_basic_operations():
 
     # 3. 执行工具
     result = registry.run("echo", {"text": "hello"})
-    assert result == "hello"
+    assert result.ok is True
+    assert result.result == "hello"
 
     # 4. 检查工具是否存在
     assert registry.exists("echo") is True
@@ -55,13 +56,17 @@ def test_duplicate_registration_raises_keyerror():
         registry.register(tool2)
 
 
-def test_run_nonexistent_tool_raises_keyerror():
-    """测试执行不存在的工具会报 KeyError"""
+def test_run_nonexistent_tool_returns_structured_failure():
+    """测试执行不存在的工具会返回结构化失败结果。"""
     registry = ToolRegistry()
 
-    # 执行不存在的工具应该抛出 KeyError
-    with pytest.raises(KeyError, match="Unknown tool: nonexistent"):
-        registry.run("nonexistent", {})
+    result = registry.run("nonexistent", {})
+
+    assert result.ok is False
+    assert result.result is None
+    assert result.error_type == "KeyError"
+    assert "Unknown tool: nonexistent" in result.error_message
+    assert result.duration_ms >= 0
 
 
 def test_get_nonexistent_tool_raises_keyerror():
@@ -268,6 +273,100 @@ def test_tool_registry_exports_registered_tool_schemas():
             },
         }
     ]
+
+
+def test_tool_result_success_carries_result_and_duration():
+    """测试成功 ToolResult 能稳定表达结果和耗时。"""
+    result = ToolResult.success(result={"stdout": "ok"}, duration_ms=12)
+
+    assert result.ok is True
+    assert result.result == {"stdout": "ok"}
+    assert result.error_type is None
+    assert result.error_message is None
+    assert result.duration_ms == 12
+
+
+def test_tool_result_failure_carries_error_and_duration():
+    """测试失败 ToolResult 能稳定表达错误类型、错误消息和耗时。"""
+    result = ToolResult.failure(
+        error_type="ValueError",
+        error_message="bad argument",
+        duration_ms=3,
+    )
+
+    assert result.ok is False
+    assert result.result is None
+    assert result.error_type == "ValueError"
+    assert result.error_message == "bad argument"
+    assert result.duration_ms == 3
+
+
+def test_tool_registry_run_returns_structured_success_result():
+    """测试 ToolRegistry.run 成功时返回结构化结果，而不是裸 handler 返回值。"""
+    registry = ToolRegistry()
+    tool = Tool(
+        name="echo",
+        description="回显",
+        handler=lambda arguments: arguments["text"],
+        parameters=(ToolParameter(name="text", type="string", description="文本"),),
+    )
+    registry.register(tool)
+
+    result = registry.run("echo", {"text": "hello"})
+
+    assert result.ok is True
+    assert result.result == "hello"
+    assert result.error_type is None
+    assert result.error_message is None
+    assert result.duration_ms >= 0
+
+
+def test_tool_registry_run_returns_structured_failure_when_handler_raises():
+    """测试 handler 抛异常时 ToolRegistry.run 返回结构化失败结果。"""
+
+    def handler(arguments: dict[str, Any]) -> str:
+        raise RuntimeError("boom")
+
+    registry = ToolRegistry()
+    tool = Tool(name="explode", description="失败工具", handler=handler)
+    registry.register(tool)
+
+    result = registry.run("explode", {})
+
+    assert result.ok is False
+    assert result.result is None
+    assert result.error_type == "RuntimeError"
+    assert result.error_message == "boom"
+    assert result.duration_ms >= 0
+
+
+def test_tool_registry_run_returns_structured_failure_for_bad_arguments():
+    """测试参数校验失败时 ToolRegistry.run 返回结构化失败结果。"""
+    called = False
+
+    def handler(arguments: dict[str, Any]) -> str:
+        nonlocal called
+        called = True
+        return "ok"
+
+    registry = ToolRegistry()
+    registry.register(
+        Tool(
+            name="write_file",
+            description="写入文件",
+            handler=handler,
+            parameters=(ToolParameter(name="path", type="string", description="文件路径"),),
+        )
+    )
+
+    result = registry.run("write_file", {})
+
+    assert called is False
+    assert result.ok is False
+    assert result.result is None
+    assert result.error_type == "ValueError"
+    assert "Missing required argument: path" in result.error_message
+    assert result.duration_ms >= 0
 
 
 def test_builtin_coding_tools_export_parameter_schemas():
