@@ -360,6 +360,8 @@
 - 按用户要求，在核心修改后的新源码中补充“修改前旧代码”注释片段，用于和当前实现就地对比；涉及敏感 API key 的旧代码片段已脱敏。
 - 更新长期教学要求：把“不能直接给代码 / 必须先让用户自己写”调整为“先讲清代码逻辑并确认理解，再给出完整、安全、全面、工程级代码”。
 - 同步更新 `AGENTS.md`、`docs/CODEX_PROJECT_BRIEF.md`、`docs/02_DAILY_TASKS.md` 和 `docs/09_NEXT_ACTIONS.md`。
+- 新增教学规则：如果出现流程、调用链、状态流转、模块关系或架构关系，必须给出 Mermaid 流程图或架构图。
+- 审查并整理 `AGENTS.md`：合并重复教学输出要求，压缩外部技能调用规则，保持 `AGENTS.md` 作为简洁规则入口。
 - 评审用户重新修改的文件工具和 shell runtime 代码。
 - 修复 `ReadFileTool`、`WriteFileTool`、`ShellCommandTool` 继承 `Tool` 后缺少 `handler` 的初始化问题。
 - 修复 `write_file` 缺少 `content` 时的异常语义。

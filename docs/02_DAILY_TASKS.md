@@ -698,6 +698,8 @@
 - 已让非法 `timeout_seconds` 在参数边界抛 `ValueError`，不再被伪装成命令执行失败。
 - 已将测试中的子进程 Python 命令改为使用 `sys.executable`，降低 PATH 依赖。
 - 已更新教学要求：从“不能直接给代码”调整为“先让被教学者真正理解代码逻辑，再给出完整、安全、全面、工程级代码”。
+- 已新增教学要求：只要出现流程、调用链、状态流转、模块关系或架构关系，就必须给出 Mermaid 流程图或架构图。
+- 已审查并整理 `AGENTS.md`：合并重复教学输出要求，压缩外部技能调用规则，完整长期细节仍保留在 `docs/CODEX_PROJECT_BRIEF.md`。
 - 已创建修改前代码快照：`docs/code_reviews/2026-06-06-before-industrial-refactor/`，其中旧版 API key 已脱敏。
 - 已移除正式源码中的硬编码 API key，Responses API 实验脚本改为从环境变量惰性创建 client。
 - 已补充 `tests/test_api_experiments.py`，防止 `src/` 再出现硬编码 key，并验证实验模块导入时不创建真实 client。
