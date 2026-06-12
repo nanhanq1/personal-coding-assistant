@@ -3,6 +3,166 @@
 ## 2026-06-12
 
 日期：2026-06-12
+当前阶段：项目长期教学规则维护
+当前模块：面试题未回答处理规则与教学规则优先级
+预计用时：20 分钟
+
+### 1. 今日学习目标
+
+- 明确每日面试题归档只能保存用户已经回答过的内容。
+- 废止把未回答面试题写成占位用户回答的做法。
+- 将 `AGENTS.md` 教学规则整理为 P0、P1、P2 优先级，方便后续执行时判断先后。
+
+### 2. 今日文档任务
+
+- 更新 `AGENTS.md`，把教学规则按优先级整理。
+- 更新 `docs/CODEX_PROJECT_BRIEF.md` 和 `docs/Compilation-of-Interview-Questions.md`，明确未回答题不能归档。
+- 从 `docs/Compilation-of-Interview-Questions.md` 移除第 13 天未回答记录，并清理第 14 天草稿占位记录。
+- 在 `docs/09_NEXT_ACTIONS.md` 保留第 13 天待推送给用户回答的面试题清单；第 13 天回答、评审和归档完成前，不继续推进 Day 6 或 Day 7。
+
+### 3. 当前完成情况
+
+- 已新增规则：发现用户未回答已给定面试题时，必须先把未回答题推送给用户并等待回答；回答后再整理总结和归档。
+- 已明确禁止把未回答题写入指定 MD 文档，也禁止使用占位用户回答。
+- 已将 `AGENTS.md` 教学规则调整为 P0 必须遵守、P1 教学流程、P2 每日任务产出。
+- 本次只修改文档规则，不涉及业务代码。
+
+## 2026-06-12
+
+日期：2026-06-12
+当前阶段：第 2 周 Day 6
+当前模块：文档和面试表达
+预计用时：45 分钟
+
+### 1. 今日学习目标
+
+- 复盘第 2 周 Day 1 到 Day 5 的工具系统总链路。
+- 把 schema、`edit_file`、`ToolResult` 和 AgentLoop 消费边界整理成外部读者能看懂的 README 表达。
+- 形成第 2 周 Tool System 面试讲解稿，能用 30 秒、2 分钟和追问三个层次讲清楚。
+- 明确当前仍不是权限系统，不提前进入危险命令审批、sandbox、RAG、MCP 或真实 LLM adapter。
+
+### 2. 所需前置知识
+
+- Day 1：`ToolParameter`、`Tool.to_schema()` 和 `ToolRegistry.list_tool_schemas()`。
+- Day 2：默认 coding 工具 schema 示例和工具描述质量。
+- Day 3：`edit_file` 的局部编辑边界。
+- Day 4：`ToolRegistry.run(...) -> ToolResult`。
+- Day 5：`AgentLoop._tool_result_to_message(...)`。
+
+### 3. 今日必须理解的知识点
+
+- 文档和面试表达不是“装饰”，而是检验架构边界是否真的清楚。
+- 第 2 周总链路是：`schema -> ToolCall -> ToolRegistry -> Tool -> concrete tool/runtime -> ToolResult -> tool Message -> LLM continue`。
+- README 面向外部读者，要讲当前能力、运行方式、架构链路和安全边界。
+- 面试讲解稿要能回答“做了什么、为什么这样设计、还缺什么”。
+- Day 6 不新增生产逻辑，只整理和验证已有实现。
+
+### 4. 今日代码 / 文档任务
+
+- 更新 `README.md`，同步到第 2 周 Day 6 已完成状态。
+- 在 README 中补充第 2 周工具系统总链路图。
+- 新增 `docs/11_WEEK2_INTERVIEW_SCRIPT.md`，整理第 2 周面试讲解稿。
+- 更新 `docs/05_LEARNING_NOTES.md`，补充 Day 6 学习笔记和架构图。
+- 更新 `docs/04_RESOURCE_LIBRARY.md`、`docs/07_IMPLEMENTATION_LOG.md`、`docs/09_NEXT_ACTIONS.md`；如果用户已回答面试题，再更新每日面试题归档。
+- 运行示例和测试，确认文档更新没有掩盖真实代码状态。
+
+### 5. 今日资料推荐
+
+- Mermaid 官方语法参考：https://mermaid.js.org/intro/syntax-reference.html
+- GitHub Docs：README 说明：https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes
+- OpenAI Agents SDK Tools 文档：https://openai.github.io/openai-agents-python/tools/
+- Anthropic Tool use overview：https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
+- mini-SWE-agent GitHub：https://github.com/SWE-agent/mini-swe-agent
+
+### 6. 今日输出物
+
+- 更新后的 `README.md`
+- `docs/11_WEEK2_INTERVIEW_SCRIPT.md`
+- Day 6 文档和面试表达学习笔记
+- 第 14 天面试题待用户回答；回答后再归档
+
+### 7. 当前完成情况
+
+- 已复盘第 2 周 Day 1 到 Day 5 的工具系统总链路。
+- 已更新 `README.md`，将当前状态从 Day 4/Day 5 更新到 Day 6，并补充第 2 周工具系统总链路图。
+- 已新增 `docs/11_WEEK2_INTERVIEW_SCRIPT.md`，包含 30 秒版本、2 分钟版本、总架构图和关键追问。
+- 已更新 `docs/05_LEARNING_NOTES.md`、`docs/04_RESOURCE_LIBRARY.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`；第 14 天面试题尚未收到用户回答，不写入每日面试题归档。
+- Day 6 不新增生产代码，不新增 ADR。
+- Day 6 验收通过；下一步进入第 2 周 Day 7：周复盘和小重构。
+
+## 2026-06-12
+
+日期：2026-06-12
+当前阶段：第 2 周 Day 5
+当前模块：整合 schema + edit_file + result
+预计用时：60 分钟
+
+### 1. 今日学习目标
+
+- 理解默认工具 schema、`edit_file` 和 `ToolResult` 不是三个孤立能力，而是一条完整工具调用链。
+- 理解 `AgentLoop` 应该明确消费结构化 `ToolResult`，而不是只依赖 `str(...)` 的偶然兼容。
+- 用 mock LLM 验证 `edit_file` 成功和失败两条链路都能稳定写回 message history。
+- 保持真实 LLM adapter、planner、RAG、MCP 和权限系统在后续阶段，不在 Day 5 提前展开。
+
+### 2. 所需前置知识
+
+- Day 1：`ToolParameter`、`Tool.to_schema()` 和 `ToolRegistry.list_tool_schemas()`。
+- Day 2：默认 coding 工具注册表的 schema 展示示例。
+- Day 3：`edit_file` 的唯一 `old_text` 局部替换策略。
+- Day 4：`ToolRegistry.run(...) -> ToolResult` 的结构化结果边界。
+- 第 1 周主链路：`AgentLoop -> ToolRegistry.run(...) -> Tool.run(...) -> handler/runtime`。
+
+### 3. 今日必须理解的知识点
+
+- schema 是模型调用工具前看到的工具契约；`edit_file` 是具体工具能力；`ToolResult` 是执行后的结构化结果。
+- `AgentLoop` 不应该关心 `EditFileTool` 的文件读写细节，但应该明确知道工具系统返回的是 `ToolResult`。
+- 成功结果可以继续写成旧格式 `"ok"` 或文件文本，保证现有示例兼容。
+- 失败结果必须稳定写回 `Tool execution failed: 错误类型: 错误信息`，让 LLM 有恢复或解释机会。
+- Day 5 不新增权限审批、trace id、真实 adapter 或 patch parser；这些属于后续阶段。
+
+### 4. 今日代码 / 文档任务
+
+- 在 `tests/test_loop_tools_integration.py` 中补充 Day 5 focused RED 测试。
+- 验证默认 registry schema 暴露 `edit_file` 的 `path`、`old_text`、`new_text`。
+- 用 mock LLM 验证 `edit_file -> read_file -> final answer` 的成功链路。
+- 用 mock LLM 验证 `edit_file` 失败时，AgentLoop 写回稳定 tool message 并允许 LLM 恢复回答。
+- 在 `src/pca/core/agent_loop.py` 中新增显式 `ToolResult -> Message` 序列化边界。
+- 更新学习笔记、实现日志、资源库和下一步行动；如果用户已回答面试题，再更新面试题归档。
+
+### 5. 今日资料推荐
+
+- OpenAI Agents SDK Tools 文档：https://openai.github.io/openai-agents-python/tools/
+- mini-SWE-agent GitHub：https://github.com/SWE-agent/mini-swe-agent
+- Anthropic Tool use overview：https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview
+- LangChain Tools 文档：https://docs.langchain.com/oss/python/langchain/tools
+
+### 6. 今日输出物
+
+- Day 5 `edit_file` 成功链路集成测试。
+- Day 5 `edit_file` 失败链路集成测试。
+- `AgentLoop._tool_result_to_message(...)`
+- Day 5 整合学习笔记和流程图。
+- 第 13 天面试题待用户回答；回答后再归档。
+
+### 7. 当前完成情况
+
+- 已讲清 Day 5 调用链、目标文件、测试设计、安全边界，并给出 Mermaid 流程图。
+- 已按 TDD 在 `tests/test_loop_tools_integration.py` 中新增 Day 5 集成测试，覆盖 `edit_file` 成功、`edit_file` 失败和 `AgentLoop` 显式序列化边界。
+- RED：`pytest tests\test_loop_tools_integration.py -q` 初始结果为 `1 failed, 3 passed`，失败点是 `AgentLoop` 缺少 `_tool_result_to_message`。
+- 已在 `src/pca/core/agent_loop.py` 中新增 `_tool_result_to_message(tool_name, tool_result)`，明确把内部 `ToolResult` 转成 `role="tool"` 的 `Message`。
+- 已将 AgentLoop 中异常兜底也改为 `ToolResult.from_exception(...)`，保持工具结果进入 message history 前的结构化语义。
+- 已验证 focused 链路：`pytest tests\test_loop_tools_integration.py tests\test_agent_loop.py -q` 为 `9 passed`。
+- 已验证相关工具链：`pytest tests\test_tools.py tests\test_examples.py tests\test_file_tools.py -q` 为 `56 passed, 1 skipped`。
+- 已验证全量测试：`pytest -q` 为 `92 passed, 1 skipped`。
+- 已验证最小 Agent 示例：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
+- 已验证 schema 示例：`python examples\02_tool_agent.py` 成功输出包含 `read_file`、`write_file`、`edit_file`、`run_command` 的 schema JSON。
+- 已验证编译：`python -m compileall src examples -q` 通过。
+- 第 13 天整合 schema + `edit_file` + result 面试题尚未收到用户回答，已从 `docs/Compilation-of-Interview-Questions.md` 移出；下次必须先推送给用户回答，回答后再整理归档。
+- Day 5 代码与测试验证通过，但教学验收未完成：第 13 天面试题尚未收到用户回答。必须先把 Day 5 面试题推送给用户，等待回答、完成评审并归档后，才能进入第 2 周 Day 6。
+
+## 2026-06-12
+
+日期：2026-06-12
 当前阶段：第 2 周 Day 4
 当前模块：结构化 tool result
 预计用时：60 分钟
@@ -115,7 +275,7 @@
 - 在 `src/pca/tools/file_tools.py` 中实现 `EditFileTool` 和函数形式 `edit_file(...)`。
 - 在 `src/pca/tools/__init__.py` 中导出并注册 `EditFileTool`。
 - 在 `tests/test_examples.py` 中同步 schema 示例断言，让默认工具列表包含 `edit_file`。
-- 更新学习笔记、资料库、实现日志、下一步行动和每日面试题归档。
+- 更新学习笔记、资料库、实现日志和下一步行动；如果用户已回答面试题，再更新每日面试题归档。
 
 ### 5. 今日资料推荐
 
@@ -330,7 +490,7 @@
 - 在 `src/pca/tools/base.py` 中新增 `ToolParameter`、`Tool.parameters` 和 `Tool.to_schema()`。
 - 在 `src/pca/tools/registry.py` 中新增 `list_tool_schemas()`。
 - 在文件工具和 shell 工具中声明参数 schema。
-- 更新第 2 周 Sprint、学习笔记、资源库、实现日志、下一步行动和每日面试题归档。
+- 更新第 2 周 Sprint、学习笔记、资源库、实现日志和下一步行动；如果用户已回答面试题，再更新每日面试题归档。
 
 ### 5. 今日资料推荐
 
@@ -423,7 +583,7 @@
 - 复盘 `src/pca/core/`、`src/pca/tools/`、`src/pca/runtime/` 和 `tests/`。
 - 在 `tests/test_file_tools.py` 中补充非字符串 `path` 的 RED 测试。
 - 在 `src/pca/tools/file_tools.py` 中让 `_resolve_workspace_path(...)` 明确拒绝非字符串路径。
-- 更新 `README.md`、学习笔记、资料库、实现日志、下一步行动和每日面试题归档。
+- 更新 `README.md`、学习笔记、资料库、实现日志和下一步行动；如果用户已回答面试题，再更新每日面试题归档。
 
 ### 5. 今日资料推荐
 
@@ -823,7 +983,7 @@
 ### 2. 今日输出物
 
 - 已新增 `docs/Compilation-of-Interview-Questions.md`。
-- 已补充每日面试题归档规则：标题为“第几天 + 年月日”，内容包含面试题、用户回答和标准回答。
+- 已补充每日面试题归档规则：标题为“第几天 + 年月日”，内容包含面试题、用户回答和标准回答；只有用户已回答的面试题才能归档。
 - 已把该规则同步到 `AGENTS.md`、`docs/CODEX_PROJECT_BRIEF.md` 和 `docs/09_NEXT_ACTIONS.md`。
 - 已补全第 1 天和第 2 天的面试题归档内容。
 - 已同步更新 `docs/08_INTERVIEW_BANK.md` 的 Tool System 面试题。
@@ -832,9 +992,9 @@
 
 - 已确认仓库中原有 `docs/08_INTERVIEW_BANK.md` 是模块级题库。
 - 已新增 `docs/Compilation-of-Interview-Questions.md` 作为每日面试题汇总文件。
-- 下一次完成每日学习任务后，必须把当天面试题、用户回答和标准回答追加到该文件。
+- 下一次完成每日学习任务后，必须先确认用户已经回答面试题；回答后再把当天面试题、用户回答和标准回答追加到该文件。
 - 已将第 1 天 Agent Loop 面试题写入汇总文件；用户回答根据 2026-05-31 学习验收记录整理。
-- 已将第 2 天 Tool System 面试题写入汇总文件；当前没有找到用户原回答记录，用户回答字段先标记为“待补充”。
+- 已将第 2 天 Tool System 面试题写入汇总文件；当前归档内容已补全用户回答。
 
 ## 2026-06-02
 

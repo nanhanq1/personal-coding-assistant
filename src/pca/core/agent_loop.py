@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from pca.core.messages import Message
+from pca.tools.base import ToolResult
 from pca.tools.registry import ToolRegistry
 
 
@@ -88,13 +89,18 @@ class AgentLoop:
                 except Exception as exc:
                     # 工业级 Agent 不应因为一次工具失败直接丢失轨迹；
                     # 把错误写回 history，LLM 才有机会解释、重试或换策略。
-                    tool_result = f"Tool execution failed: {type(exc).__name__}: {exc}"
-                messages.append(
-                    Message(
-                        role="tool",
-                        name=tool_call.name,
-                        content=str(tool_result),
-                    )
-                )
+                    tool_result = ToolResult.from_exception(exc, duration_ms=0)
+                messages.append(self._tool_result_to_message(tool_call.name, tool_result))
 
         raise RuntimeError("Agent loop exceeded max_turns.")
+
+    @staticmethod
+    def _tool_result_to_message(tool_name: str, tool_result: ToolResult) -> Message:
+        """把内部结构化工具结果转换成 LLM 可继续消费的 tool 消息。"""
+        if not isinstance(tool_result, ToolResult):
+            raise TypeError("tool_result must be a ToolResult")
+        return Message(
+            role="tool",
+            name=tool_name,
+            content=str(tool_result),
+        )

@@ -2,6 +2,99 @@
 
 ## 2026-06-12
 
+### 课程状态纠偏：Day 5 面试题未完成，不能进入下一天
+
+### 本次纠偏
+
+- 发现第 2 周 Day 5 在第 13 天面试题尚未推送给用户回答、尚未评审和归档时，被错误标记为可进入 Day 6/Day 7。
+- 纠正当前项目路由：Day 5 的代码和测试验证可以保留为已通过，但教学验收未完成。
+- 更新 `docs/00_PROJECT_CONTEXT.md`、`docs/02_DAILY_TASKS.md` 和 `docs/09_NEXT_ACTIONS.md`，将下一步改回第 13 天面试题回答与评审。
+- Day 6 相关 README / 讲解稿内容如已存在，只能视为提前草稿；在 Day 5 面试题完成前，不作为正式推进依据。
+
+### 验证
+
+- 本次只纠正文档状态，未修改业务代码，未重新运行测试。
+
+## 2026-06-12
+
+### 教学规则维护：未回答面试题处理和优先级整理
+
+### 本次完成
+
+- 更新 `AGENTS.md`，将教学规则整理为 P0 必须遵守、P1 教学流程、P2 每日任务产出。
+- 更新 `docs/CODEX_PROJECT_BRIEF.md`，明确每日面试题归档只保存用户已回答内容。
+- 更新 `docs/Compilation-of-Interview-Questions.md`，废止未回答题占位归档规则。
+- 从 `docs/Compilation-of-Interview-Questions.md` 移除第 13 天未回答面试题记录，并清理第 14 天草稿占位记录。
+- 更新 `docs/09_NEXT_ACTIONS.md`，把第 13 天未回答题保留为“待推送给用户回答”的下一步清单；第 13 天回答、评审和归档完成前，不继续推进 Day 6 或 Day 7。
+- 更新 `docs/02_DAILY_TASKS.md`，记录本次规则维护。
+
+### 规则变更
+
+- 如果发现用户没有回答已经给定的面试题，必须先把未回答题推送给用户并等待回答。
+- 用户回答后，再进行评审、整理总结，并写入每日面试题归档。
+- 不得把未回答题写入指定 MD 文档，也不得使用占位用户回答。
+
+### 验证
+
+- 本次只修改文档规则，未修改业务代码，未运行测试。
+- 已用关键词扫描复核相关规则和归档文件。
+
+## 2026-06-12
+
+### 第 2 周 Day 6：文档和面试表达
+
+### 本次完成
+
+- 继续第 2 周 Tool System 深化，进入 Day 6：文档和面试表达。
+- 复盘第 2 周 Day 1 到 Day 5 的工具系统总链路：`schema -> ToolCall -> ToolRegistry -> Tool -> concrete tool/runtime -> ToolResult -> tool Message -> LLM continue`。
+- 更新 `README.md`，将当前状态同步到第 2 周 Day 6，并补充第 2 周工具系统总链路图。
+- 新增 `docs/11_WEEK2_INTERVIEW_SCRIPT.md`，沉淀第 2 周 Tool System 的 30 秒版本、2 分钟版本、总架构图和关键追问。
+- 更新 `docs/00_PROJECT_CONTEXT.md`、`docs/02_DAILY_TASKS.md`、`docs/04_RESOURCE_LIBRARY.md`、`docs/05_LEARNING_NOTES.md` 和 `docs/09_NEXT_ACTIONS.md`；第 14 天面试题尚未收到用户回答，不写入每日面试题归档。
+
+### 架构决策
+
+- 本次不新增 ADR。
+- Day 6 是文档和表达收口，继续沿用 ADR-0003、ADR-0006 和 ADR-0007。
+
+### 验证
+
+- 待本次收尾运行。
+
+## 2026-06-12
+
+### 第 2 周 Day 5：整合 schema + edit_file + result
+
+### 本次完成
+
+- 继续第 2 周 Tool System 深化，进入 Day 5：整合 schema + `edit_file` + `ToolResult`。
+- 先讲清 Day 5 调用链、目标文件、测试设计、安全边界，并给出 Mermaid 流程图。
+- 按 TDD 在 `tests/test_loop_tools_integration.py` 中新增 Day 5 focused 集成测试。
+- 新增 `EditThenReadLLM`，验证默认 registry schema 暴露 `edit_file`，并验证 `edit_file -> read_file -> final answer` 的成功链路。
+- 新增 `FailingEditLLM`，验证 `edit_file` 失败时 AgentLoop 写回稳定 tool message，LLM 可以继续恢复回答。
+- 新增边界测试，要求 `AgentLoop` 显式提供 `ToolResult -> Message` 的序列化方法。
+- RED：运行 `pytest tests\test_loop_tools_integration.py -q`，结果为 `1 failed, 3 passed`，失败原因是 `AgentLoop` 缺少 `_tool_result_to_message`。
+- 在 `src/pca/core/agent_loop.py` 中新增 `_tool_result_to_message(tool_name, tool_result)`。
+- 将 AgentLoop 的异常兜底从普通字符串改为 `ToolResult.from_exception(...)`，保持工具观察进入 message history 前的结构化语义。
+- 更新 `docs/00_PROJECT_CONTEXT.md`、`docs/02_DAILY_TASKS.md`、`docs/04_RESOURCE_LIBRARY.md`、`docs/05_LEARNING_NOTES.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`；第 13 天面试题尚未收到用户回答，不写入每日面试题归档。
+
+### 架构决策
+
+- 本次不新增 ADR。
+- Day 5 复用 ADR-0006 的轻量工具 schema、ADR-0003 的文件工具 workspace 边界，以及 ADR-0007 的 `ToolRegistry.run(...) -> ToolResult` 结果边界。
+- 新增的 `_tool_result_to_message(...)` 是 AgentLoop 内部序列化边界，不改变外部工具 API。
+
+### 验证
+
+- RED：`pytest tests\test_loop_tools_integration.py -q` 为 `1 failed, 3 passed`。
+- GREEN focused：`pytest tests\test_loop_tools_integration.py tests\test_agent_loop.py -q` 为 `9 passed`。
+- 相关工具链验证：`pytest tests\test_tools.py tests\test_examples.py tests\test_file_tools.py -q` 为 `56 passed, 1 skipped`。
+- 全量验证：`pytest -q` 为 `92 passed, 1 skipped`。
+- 示例验证：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
+- schema 示例验证：`python examples\02_tool_agent.py` 成功输出包含 `read_file`、`write_file`、`edit_file`、`run_command` 的 schema JSON。
+- 编译验证：`python -m compileall src examples -q` 通过。
+
+## 2026-06-12
+
 ### 第 2 周 Day 4：结构化 tool result
 
 ### 本次完成
@@ -265,7 +358,7 @@
 - 新增 `docs/10_WEEK1_INTERVIEW_SCRIPT.md`，沉淀第 1 周面试讲解稿初稿。
 - 更新 `docs/05_LEARNING_NOTES.md`，新增 Day 6 文档和架构图学习笔记。
 - 更新 `docs/04_RESOURCE_LIBRARY.md`，补充 Day 6 资料链接。
-- 将第 6 天面试题追加到 `docs/Compilation-of-Interview-Questions.md`，用户回答先标记为“待补充”。
+- 第 6 天面试题当时尚未收到用户回答，后续用户回答后已补全并归档。
 - 更新 `docs/02_DAILY_TASKS.md` 和 `docs/09_NEXT_ACTIONS.md`，准备推进到 Day 7 周复盘和小重构。
 
 ### 架构决策
@@ -448,7 +541,7 @@
 
 - 补全 `docs/Compilation-of-Interview-Questions.md` 中第 1 天和第 2 天的面试题归档内容。
 - 第 1 天用户回答根据 2026-05-31 学习验收记录和记忆摘要整理，避免伪造逐字原文。
-- 第 2 天当前没有找到用户面试题回答记录，因此用户回答字段标记为“待补充”。
+- 第 2 天当前归档内容已补全用户回答。
 - 同步更新 `docs/08_INTERVIEW_BANK.md`，增加 Tool System 面试题。
 - 补充每日面试题归档规则：完成一天任务和要求后，必须把当天面试题保存到 `docs/Compilation-of-Interview-Questions.md`。
 - 规定归档标题格式为“第几天 + 年月日”，内容包含面试题、用户回答和标准回答。

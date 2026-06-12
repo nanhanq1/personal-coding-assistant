@@ -1,5 +1,155 @@
 # Learning Notes
 
+## 文档和面试表达：第 2 周 Day 6
+
+### 1. 直觉
+
+Day 6 不是继续堆功能，而是把第 2 周已经实现的工具系统能力讲清楚。能跑通测试说明实现成立，能画出链路、写进 README、回答面试追问，才说明架构边界真正理解了。
+
+### 2. 一句话解释
+
+Day 6 把第 2 周的工具系统整理成对外 README 和面试讲解稿，证明 schema、`edit_file`、`ToolResult` 和 AgentLoop 消费边界是一条完整工具链路。
+
+### 3. 第 2 周总调用链
+
+```text
+ToolParameter / Tool.to_schema()
+  -> ToolRegistry.list_tool_schemas()
+  -> future LLM adapter exposes tools
+  -> LLM returns ToolCall
+  -> AgentLoop.run(...)
+  -> ToolRegistry.run(...)
+  -> Tool.run(...) validates arguments
+  -> concrete tool / runtime executes
+  -> ToolResult
+  -> AgentLoop._tool_result_to_message(...)
+  -> role="tool" Message
+  -> LLM continues or final answer
+```
+
+### 4. 架构图
+
+```mermaid
+flowchart TD
+    A["ToolParameter / Tool.to_schema"] --> B["ToolRegistry.list_tool_schemas"]
+    B --> C["Future LLM adapter"]
+    C --> D["LLM returns ToolCall"]
+    D --> E["AgentLoop.run"]
+    E --> F["ToolRegistry.run"]
+    F --> G["Tool.run validates arguments"]
+    G --> H{"Concrete tool"}
+    H --> I["ReadFileTool / WriteFileTool / EditFileTool"]
+    H --> J["ShellCommandTool -> ShellRuntime"]
+    I --> K["ToolResult"]
+    J --> K
+    K --> L["AgentLoop._tool_result_to_message"]
+    L --> M["Append role=tool Message"]
+    M --> N["LLM continues or final answer"]
+```
+
+### 5. 本次实现
+
+- 更新 `README.md`，把当前状态同步到第 2 周 Day 6，并补充第 2 周工具系统总链路。
+- 新增 `docs/11_WEEK2_INTERVIEW_SCRIPT.md`，沉淀第 2 周 Tool System 的 30 秒版本、2 分钟版本、架构图和追问回答。
+- 更新资源库、每日任务、实现日志、下一步行动和面试题归档。
+
+### 6. 当前代码阶段定位
+
+当前代码处在第 2 周 Tool System 深化的尾声：已经有工具 schema、默认工具导出、局部编辑、结构化结果和 AgentLoop 消费结果的最小闭环。
+
+它仍不是完整工业级 Coding Agent。还缺权限系统、危险命令分类、人工审批、审计日志、trace id、checkpoint/rollback、sandbox、真实 LLM adapter 和上下文工程。
+
+### 7. 检查问题
+
+1. 为什么 Day 6 要更新 README 和面试讲解稿，而不是继续写新工具？
+2. 第 2 周工具系统总链路的每一层分别解决什么问题？
+3. 面试时如何区分“schema 契约”和“具体工具安全校验”？
+4. 为什么 `ToolResult` 和 `tool Message` 不是同一个层次？
+5. 第 2 周结束后，进入权限系统前最值得修补的边界缺口是什么？
+
+## 整合 schema + edit_file + result：第 2 周 Day 5
+
+### 1. 直觉
+
+Day 1 到 Day 4 分别做了工具 schema、默认工具展示、`edit_file` 和结构化 `ToolResult`。Day 5 的目标不是新增一个大功能，而是证明这些能力可以被 `AgentLoop` 串成完整工具链路。
+
+直觉上，schema 是工具调用前的说明书，`edit_file` 是真实执行能力，`ToolResult` 是执行后的结果信封，`AgentLoop` 是把三者串起来的控制器。
+
+### 2. 一句话解释
+
+Day 5 让 `AgentLoop` 明确消费 `ToolResult`，并用 `edit_file` 成功/失败集成测试证明 schema、工具执行和结果回写能稳定协作。
+
+### 3. 核心调用链
+
+```text
+create_coding_tool_registry()
+  -> ToolRegistry.list_tool_schemas()
+  -> LLM 知道 edit_file 的 path / old_text / new_text
+  -> LLM 输出 ToolCall(name="edit_file", arguments={...})
+  -> AgentLoop.run(...)
+  -> ToolRegistry.run(...)
+  -> Tool.run(...) 做 schema 基础校验
+  -> EditFileTool._run(...) 做 workspace_root 和 old_text 唯一性校验
+  -> ToolResult.success(...) 或 ToolResult.failure(...)
+  -> AgentLoop._tool_result_to_message(...)
+  -> role="tool" Message
+  -> LLM 继续生成最终回答
+```
+
+### 4. 流程图
+
+```mermaid
+flowchart TD
+    A["ToolRegistry.list_tool_schemas"] --> B["LLM sees edit_file schema"]
+    B --> C["LLM returns ToolCall edit_file"]
+    C --> D["AgentLoop.run"]
+    D --> E["ToolRegistry.run"]
+    E --> F["Tool.run validates schema"]
+    F --> G["EditFileTool checks workspace and old_text"]
+    G --> H{"Edit succeeded?"}
+    H -->|Yes| I["ToolResult ok=True result=ok"]
+    H -->|No| J["ToolResult ok=False error_type/error_message"]
+    I --> K["AgentLoop._tool_result_to_message"]
+    J --> K
+    K --> L["Append role=tool Message"]
+    L --> M["LLM continues"]
+```
+
+### 5. 本次测试设计
+
+- 成功链路：先创建一个包含 `status: draft` 的文件，mock LLM 调用 `edit_file` 改成 `status: verified`，再调用 `read_file` 验证文件内容，最后生成最终回答。
+- 失败链路：mock LLM 调用 `edit_file` 修改不存在的 `old_text`，AgentLoop 不崩溃，而是写回 `Tool execution failed: ValueError: old_text was not found`。
+- schema 链路：默认 registry 的 schema 必须包含 `edit_file`，且 required 参数为 `path`、`old_text`、`new_text`。
+- 边界链路：`AgentLoop` 必须显式提供 `_tool_result_to_message(...)`，避免结构化结果只靠 `str(...)` 偶然散落在循环内部。
+
+### 6. 本次实现
+
+- 在 `tests/test_loop_tools_integration.py` 中新增 `EditThenReadLLM`，验证 `edit_file -> read_file -> final answer`。
+- 在 `tests/test_loop_tools_integration.py` 中新增 `FailingEditLLM`，验证失败的 `ToolResult` 会稳定写回 tool message。
+- 在 `src/pca/core/agent_loop.py` 中新增 `AgentLoop._tool_result_to_message(tool_name, tool_result)`。
+- 将 AgentLoop 的异常兜底改为 `ToolResult.from_exception(...)`，让进入 message history 的工具执行观察都先经过结构化结果边界。
+
+### 7. 安全边界
+
+- Day 5 不新增权限系统，不判断命令是否危险。
+- Day 5 不新增真实 LLM adapter，仍使用 mock LLM 和测试证明控制流。
+- Day 5 不把 `edit_file` 升级为 diff/patch，不做模糊匹配。
+- `ToolResult` 只表达执行结果，不替代 `workspace_root`、参数 schema、`edit_file` 唯一匹配策略和后续 sandbox。
+
+### 8. 当前代码阶段定位
+
+当前代码处在第 2 周 Tool System 深化的后半段：工具系统已经具备轻量 schema、默认工具导出、局部编辑、结构化结果和 AgentLoop 消费结构化结果的最小闭环。
+
+它仍不是工业级 Coding Agent。后续还需要补第 2 周 Day 6 文档和面试表达，然后 Day 7 修补一个真实边界缺口；第 3 周才进入权限系统、危险命令分类和人工审批。
+
+### 9. 检查问题
+
+1. Day 5 为什么不是重新设计 `ToolResult`，而是让 `AgentLoop` 明确消费它？
+2. schema、`edit_file` 和 `ToolResult` 在同一条工具链路中分别解决什么问题？
+3. 为什么 `edit_file` 失败时要写回 tool message，而不是直接让 AgentLoop 抛异常结束？
+4. `_tool_result_to_message(...)` 这个小方法为什么是一个有价值的边界？
+5. Day 5 完成后，工具系统距离权限系统还差哪些能力？
+
 ## 结构化 tool result：第 2 周 Day 4
 
 ### 1. 直觉

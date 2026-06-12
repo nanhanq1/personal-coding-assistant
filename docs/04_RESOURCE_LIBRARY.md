@@ -93,6 +93,23 @@
 - OpenAI Agents SDK Tools 文档：https://openai.github.io/openai-agents-python/tools/
 - 建议阅读顺序：先复习 `dataclass` 如何表达轻量结果对象，再看 `perf_counter()` 为什么适合测量工具执行耗时，然后用 OpenTelemetry 的 observability primer 理解成功、失败、耗时和错误字段为什么是后续 trace 的基础，最后回到 Agents SDK Tools 文档观察标准 Agent 工具如何被描述和调用。
 
+### Week 2 Day 5 整合 schema + edit_file + result 资料
+
+- OpenAI Agents SDK Tools 文档：https://openai.github.io/openai-agents-python/tools/
+- mini-SWE-agent GitHub：https://github.com/SWE-agent/mini-swe-agent
+- Anthropic Tool use overview：https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview
+- LangChain Tools 文档：https://docs.langchain.com/oss/python/langchain/tools
+- 建议阅读顺序：先看 OpenAI Agents SDK 如何把工具作为 Agent 可执行动作，再看 mini-SWE-agent 如何通过简单工具链完成软件工程任务，然后对比 Anthropic 和 LangChain 对工具描述、参数和执行结果的组织方式，最后回到本项目理解为什么 Day 5 只整合链路、不提前接真实 adapter。
+
+### Week 2 Day 6 文档和面试表达资料
+
+- Mermaid 官方语法参考：https://mermaid.js.org/intro/syntax-reference.html
+- GitHub Docs：README 说明：https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes
+- OpenAI Agents SDK Tools 文档：https://openai.github.io/openai-agents-python/tools/
+- Anthropic Tool use overview：https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
+- mini-SWE-agent GitHub：https://github.com/SWE-agent/mini-swe-agent
+- 建议阅读顺序：先用 Mermaid 把第 2 周工具链路画清楚，再用 GitHub README 指南检查外部读者能否快速理解项目，最后对照 OpenAI / Anthropic / mini-SWE-agent 的工具表达方式，打磨自己的面试讲解。
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |

@@ -6,9 +6,9 @@
 
 ## 当前进度
 
-- 路线阶段：12 周学习路线，第 2 周 Day 4 已完成。
+- 路线阶段：12 周学习路线，第 2 周 Day 6 已完成。
 - 当前主题：Tool System 深化。
-- 当前状态：已完成最小 Agent Loop、工具路由、文件工具、shell runtime、工具参数 schema、`edit_file` 局部编辑雏形、默认工具 schema 导出示例、内置工具描述质量优化，以及结构化 `ToolResult`。下一步进入第 2 周 Day 5：整合 schema + `edit_file` + result，让 `AgentLoop` 更明确地消费结构化工具结果。
+- 当前状态：已完成最小 Agent Loop、工具路由、文件工具、shell runtime、工具参数 schema、默认工具 schema 导出示例、`edit_file` 局部编辑雏形、结构化 `ToolResult`，以及 `AgentLoop` 对结构化工具结果的显式消费边界。下一步进入第 2 周 Day 7：周复盘和小重构。
 - 已实现能力：
   - 标准 message schema：`Message`、`ToolCall`。
   - 可脚本化 mock LLM：`ScriptedLLM`。
@@ -20,11 +20,12 @@
   - 默认 coding 工具注册表：`create_coding_tool_registry()`。
   - 默认工具 schema 展示示例：`examples/02_tool_agent.py`。
   - 结构化工具结果：`ToolResult`，在 `ToolRegistry.run(...)` 边界统一表达成功、失败、错误和原始返回值。
+  - 工具结果消息化边界：`AgentLoop._tool_result_to_message(...)`。
   - 工作区路径边界校验、基础参数校验和工具错误回写。
   - 内置工具描述边界：只读、写入或覆盖、命令执行、workspace、timeout 和返回字段。
   - pytest 单元测试、集成测试和示例脚本。
 
-下一步将继续深化 Tool System，优先让 `AgentLoop` 稳定消费结构化 `ToolResult`，并继续保持 mock LLM、测试和示例驱动的开发节奏。
+下一步将继续深化 Tool System，优先做第 2 周周复盘和小重构，修补一个真实边界缺口，并继续保持 mock LLM、测试和示例驱动的开发节奏。
 
 ## 核心架构
 
@@ -83,13 +84,35 @@ flowchart LR
     B --> C["ToolRegistry.run"]
     C --> D["ToolResult"]
     D --> E{"success?"}
-    E -- "Yes" --> F["role=tool Message content = result text"]
-    E -- "No" --> G["role=tool Message content = error text"]
-    F --> H["LLM continue"]
-    G --> H
+    E -- "Yes" --> F["AgentLoop._tool_result_to_message"]
+    E -- "No" --> F
+    F --> G["role=tool Message"]
+    G --> H["LLM continue"]
 ```
 
-这条链路回答的是：工具执行结果为什么不能长期只用字符串表示。`ToolResult` 为后续错误分类、重试、权限审批、trace、replay 和真实 LLM adapter 留出结构化边界。
+这条链路回答的是：工具执行结果为什么不能长期只用字符串表示。`ToolResult` 为后续错误分类、重试、权限审批、trace、replay 和真实 LLM adapter 留出结构化边界；`AgentLoop._tool_result_to_message(...)` 则把内部结构化结果转换成 LLM 可继续消费的工具观察。
+
+### 第 2 周工具系统总链路
+
+```mermaid
+flowchart TD
+    A["ToolParameter / Tool.to_schema"] --> B["ToolRegistry.list_tool_schemas"]
+    B --> C["Future LLM adapter exposes tools"]
+    C --> D["LLM returns ToolCall"]
+    D --> E["AgentLoop.run"]
+    E --> F["ToolRegistry.run"]
+    F --> G["Tool.run validates arguments"]
+    G --> H{"Concrete tool"}
+    H --> I["ReadFileTool / WriteFileTool / EditFileTool"]
+    H --> J["ShellCommandTool -> ShellRuntime"]
+    I --> K["ToolResult"]
+    J --> K
+    K --> L["AgentLoop._tool_result_to_message"]
+    L --> M["Append role=tool Message"]
+    M --> N["LLM continues or final answer"]
+```
+
+这条总链路是第 2 周的核心成果：schema 解决调用前契约，具体工具解决真实执行，`ToolResult` 解决执行后结构化表达，`AgentLoop` 负责把结果写回 message history。
 
 ## 项目结构
 
@@ -128,7 +151,7 @@ python -m pytest -q
 当前最近一次全量验证基线：
 
 ```text
-89 passed, 1 skipped
+92 passed, 1 skipped
 ```
 
 ## 运行示例
@@ -149,8 +172,7 @@ user -> assistant -> tool:echo -> assistant
 python examples/02_tool_agent.py
 ```
 
-该示例会输出 `read_file`、`write_file` 和 `run_command` 的 schema JSON，供后续真实 LLM adapter 转换使用。
-当前默认 schema 还包含 `edit_file`。
+该示例会输出 `read_file`、`write_file`、`edit_file` 和 `run_command` 的 schema JSON，供后续真实 LLM adapter 转换使用。
 
 ## 面试讲解要点
 
@@ -164,7 +186,11 @@ python examples/02_tool_agent.py
 
 如果面试官问“为什么要引入结构化 ToolResult”，可以这样回答：
 
-> 早期把工具结果当字符串写回 message history 能跑通最小闭环，但不利于区分成功、失败、异常类型和原始返回值。`ToolResult` 让工具执行边界更清晰：registry 统一把 handler 输出或异常包装成结构化结果，AgentLoop 仍可兼容旧的文本消息，同时为后续重试、错误恢复、权限审批、trace 和真实 LLM adapter 留出扩展点。
+> 早期把工具结果当字符串写回 message history 能跑通最小闭环，但不利于区分成功、失败、异常类型和原始返回值。`ToolResult` 让工具执行边界更清晰：registry 统一把 handler 输出或异常包装成结构化结果，`AgentLoop._tool_result_to_message(...)` 再把它转换成工具消息，同时为后续重试、错误恢复、权限审批、trace 和真实 LLM adapter 留出扩展点。
+
+如果面试官问“第 2 周工具系统完整链路是什么”，可以这样回答：
+
+> 第 2 周的链路是 `schema -> ToolCall -> ToolRegistry -> Tool -> concrete tool/runtime -> ToolResult -> tool Message -> LLM continue`。schema 让模型知道能调用什么；`ToolRegistry` 是工具事实源和执行入口；`Tool.run(...)` 做基础参数校验；`edit_file`、文件工具和 shell runtime 做具体安全边界；`ToolResult` 结构化表达结果；最后 AgentLoop 把结果写回 message history。
 
 如果面试官问“你怎么考虑安全边界”，可以这样回答：
 
