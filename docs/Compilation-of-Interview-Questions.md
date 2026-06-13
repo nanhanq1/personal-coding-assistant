@@ -295,3 +295,30 @@
 
 - 用户回答：不能表示工具的分类、工具名称、`agent_loop` 的循环次数、具体情况的错误类型标识。
 - 标准回答：当前实现只是最小结果信封，还缺少 trace id、工具名、参数摘要、错误分类枚举、输出截断标记、重试建议、权限审批结果、结构化 JSON 序列化、审计日志持久化，以及和真实 LLM adapter 的 tool message 格式适配。后续 Day 5 可以先让 AgentLoop 更明确地消费 `ToolResult`，再逐步扩展 observability 和 permission metadata。
+
+## 第 13 天：2026-06-13
+
+### 面试题 1：Day 5 为什么不是重新设计 `ToolResult`，而是让 `AgentLoop` 明确消费它？
+
+- 用户回答：先用最小测试跑通，主要增添或修改的内容。
+- 标准回答：Day 4 已经完成了最小 `ToolResult`，并且 `ToolRegistry.run(...)` 已经会返回结构化结果。Day 5 的重点不是重新设计结果对象，而是补齐调用链上的消费边界：`AgentLoop` 应该明确知道工具系统返回的是 `ToolResult`，并把它转换成 LLM 能继续读取的 `role="tool"` 消息。这样可以用最小测试证明 `schema -> edit_file -> ToolResult -> tool Message -> LLM continue` 跑通，同时避免过早重构 `ToolResult` 字段、真实 adapter、trace 或权限系统。
+
+### 面试题 2：schema、`edit_file` 和 `ToolResult` 在同一条工具链路中分别解决什么问题？
+
+- 用户回答：Schema 主要的作用就是让模型知道工具的功能、边界以及参数限制，并可以规范模型的定义以及进行后续工具参数的校验；`edit_file` 就是对已有的文件中的特定的内容进行修改覆盖；`ToolResult` 就是统一格式封装工具调用的情况，还可以用于后续日志以及定位错误的位置，用于后续 LLM adapter 对各种模型厂商的不同的规范的实现。
+- 标准回答：整体方向正确。schema 解决工具调用前的契约问题，让模型知道工具名、用途、边界、参数名、类型和必填字段，也让 `Tool.run(...)` 能在进入具体工具前做基础校验。`edit_file` 解决具体能力问题：在已有文件中把唯一出现的 `old_text` 精确替换成 `new_text`，并继续受 `workspace_root` 约束；它不是整文件覆盖工具。`ToolResult` 解决工具执行后的结果表达问题，用统一结构表达成功、失败、错误类型、错误消息和耗时，方便测试、日志、错误恢复和未来 adapter 序列化。
+
+### 面试题 3：为什么 `edit_file` 失败时要写回 tool message，而不是直接让 AgentLoop 抛异常结束？
+
+- 用户回答：因为 `edit_file` 的失败情况可能是由于 LLM 的幻觉或者 attention 机制导致的，将错误返回有利于 LLM 根据错误做出决策，比如是传入的参数错误还是网络问题或者权限问题，后续可能会人工介入。
+- 标准回答：方向正确。`edit_file` 失败常见原因是上下文过期、`old_text` 不存在、`old_text` 出现多次、参数类型错误、路径越界或未来权限拒绝。失败本身也是环境反馈。如果 AgentLoop 直接抛异常结束，LLM 看不到错误原因，也无法重新读取文件、修正参数、请求用户确认或解释失败。把失败通过 `ToolResult` 转成 tool message 写回 history，可以保留完整轨迹，让 LLM 基于错误继续决策。当前 `edit_file` 是本地文件工具，通常不涉及网络问题；网络失败更常见于未来真实 LLM adapter 或远程工具。
+
+### 面试题 4：`_tool_result_to_message(...)` 这个小方法为什么是一个有价值的边界？
+
+- 用户回答：不太清楚，我感觉就是可以对特定字段进行选择，然后生成不同情况下的描述。
+- 标准回答：这是本轮最需要补强的一题。`ToolResult` 是程序内部结构化对象，`Message.content` 是写给 LLM 的文本观察，二者不是同一层。`_tool_result_to_message(...)` 把“内部结果信封”到“LLM 可读 tool message”的转换集中起来。现在它只是 `str(tool_result)`，但边界固定后，未来可以在这里改成 JSON、增加 trace id、截断大输出、隐藏敏感字段、加入权限审批结果，或适配不同模型厂商的 tool message 格式，而不用在 AgentLoop 主循环里到处改字符串拼接。
+
+### 面试题 5：Day 5 完成后，工具系统距离权限系统还差哪些能力？
+
+- 用户回答：日志、沙箱、人工介入、危险命令的分类和 permission。
+- 标准回答：正确。Day 5 后工具系统已经有 schema、`edit_file`、结构化结果和 message history 回写，但还没有权限系统需要的执行前控制。进入 Permission System 前还需要补：危险命令和危险文件操作分类、人工审批流程、权限策略、审计日志、trace id、sandbox 或隔离 runtime、checkpoint / rollback、输出截断、敏感信息脱敏，以及把审批结果纳入 `ToolResult` 或工具轨迹。也就是说，Day 5 解决的是“工具调用能稳定表达和回写”，Permission System 解决的是“工具调用是否允许执行”。

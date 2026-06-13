@@ -142,7 +142,7 @@
 - Day 5 `edit_file` 失败链路集成测试。
 - `AgentLoop._tool_result_to_message(...)`
 - Day 5 整合学习笔记和流程图。
-- 第 13 天面试题待用户回答；回答后再归档。
+- 第 13 天面试题已回答、评审并归档。
 
 ### 7. 当前完成情况
 
@@ -157,8 +157,8 @@
 - 已验证最小 Agent 示例：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
 - 已验证 schema 示例：`python examples\02_tool_agent.py` 成功输出包含 `read_file`、`write_file`、`edit_file`、`run_command` 的 schema JSON。
 - 已验证编译：`python -m compileall src examples -q` 通过。
-- 第 13 天整合 schema + `edit_file` + result 面试题尚未收到用户回答，已从 `docs/Compilation-of-Interview-Questions.md` 移出；下次必须先推送给用户回答，回答后再整理归档。
-- Day 5 代码与测试验证通过，但教学验收未完成：第 13 天面试题尚未收到用户回答。必须先把 Day 5 面试题推送给用户，等待回答、完成评审并归档后，才能进入第 2 周 Day 6。
+- 第 13 天整合 schema + `edit_file` + result 面试题已收到用户回答，已完成逐题评审，并追加归档到 `docs/Compilation-of-Interview-Questions.md`。
+- Day 5 代码、测试、文档和教学验收已完成。下一步进入第 2 周 Day 6：文档和面试表达草稿复核。
 
 ## 2026-06-12
 

@@ -6,9 +6,9 @@
 
 ## 当前进度
 
-- 路线阶段：12 周学习路线，第 2 周 Day 6 已完成。
+- 路线阶段：12 周学习路线，第 2 周 Day 5 已完成。
 - 当前主题：Tool System 深化。
-- 当前状态：已完成最小 Agent Loop、工具路由、文件工具、shell runtime、工具参数 schema、默认工具 schema 导出示例、`edit_file` 局部编辑雏形、结构化 `ToolResult`，以及 `AgentLoop` 对结构化工具结果的显式消费边界。下一步进入第 2 周 Day 7：周复盘和小重构。
+- 当前状态：已完成最小 Agent Loop、工具路由、文件工具、shell runtime、工具参数 schema、默认工具 schema 导出示例、`edit_file` 局部编辑雏形、结构化 `ToolResult`，以及 `AgentLoop` 对结构化工具结果的显式消费边界。第 2 周 Day 5 的代码、测试、文档和面试题归档已完成；下一步是正式复核第 2 周 Day 6 的 README 和面试表达草稿，确认文档和当前代码一致。
 - 已实现能力：
   - 标准 message schema：`Message`、`ToolCall`。
   - 可脚本化 mock LLM：`ScriptedLLM`。
@@ -25,7 +25,7 @@
   - 内置工具描述边界：只读、写入或覆盖、命令执行、workspace、timeout 和返回字段。
   - pytest 单元测试、集成测试和示例脚本。
 
-下一步将继续深化 Tool System，优先做第 2 周周复盘和小重构，修补一个真实边界缺口，并继续保持 mock LLM、测试和示例驱动的开发节奏。
+下一步将继续深化 Tool System，优先复核第 2 周 Day 6 的文档和面试表达草稿；复核通过并完成 Day 6 面试题回答、评审和归档后，再进入第 2 周周复盘和小重构。
 
 ## 核心架构
 

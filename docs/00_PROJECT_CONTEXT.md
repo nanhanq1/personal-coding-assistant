@@ -20,7 +20,7 @@ Personal Coding Assistant Agent
 
 - 12 周路线：第 2 周
 - 当前主题：Tool System 深化
-- 当前模块：第 2 周 Day 5：面试题回答与验收待完成
+- 当前模块：第 2 周 Day 6：文档和面试表达草稿复核
 
 ## 当前原则
 

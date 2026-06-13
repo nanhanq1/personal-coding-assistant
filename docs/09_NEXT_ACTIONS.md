@@ -70,7 +70,7 @@
 - Day 4 最新 schema 示例验证：`python examples\02_tool_agent.py` 成功输出包含 `read_file`、`write_file`、`edit_file`、`run_command` 的 schema JSON。
 - Day 4 最新编译验证：`python -m compileall src examples -q` 通过。
 - 第 12 天结构化 tool result 面试题已追加到 `docs/Compilation-of-Interview-Questions.md`，用户回答已补全并完成评审。
-- 第 2 周 Day 5 的代码实现与验证已完成，但教学验收未完成：第 13 天面试题尚未收到用户回答，不能进入第 2 周 Day 6。
+- 已完成第 2 周 Day 5：整合 schema + `edit_file` + `ToolResult`，包括代码实现、测试验证和第 13 天面试题评审归档。
 - Day 5 已新增 `AgentLoop._tool_result_to_message(...)`，明确把内部结构化 `ToolResult` 转成 `role="tool"` 的 `Message`。
 - Day 5 已补充 `edit_file -> read_file -> final answer` 成功链路集成测试，并验证默认 schema 暴露 `edit_file` 的 `path`、`old_text`、`new_text`。
 - Day 5 已补充 `edit_file` 失败链路集成测试：`old_text` 不存在时不会中断 AgentLoop，而是写回稳定 tool message 让 LLM 恢复回答。
@@ -81,8 +81,8 @@
 - Day 5 最新最小 Agent 示例验证：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
 - Day 5 最新 schema 示例验证：`python examples\02_tool_agent.py` 成功输出包含 `read_file`、`write_file`、`edit_file`、`run_command` 的 schema JSON。
 - Day 5 最新编译验证：`python -m compileall src examples -q` 通过。
-- 第 13 天整合 schema + `edit_file` + result 面试题尚未收到用户回答，已从 `docs/Compilation-of-Interview-Questions.md` 移出；下次必须先推送给用户回答，回答后再整理归档。
-- 注意：Day 6 相关 README / 讲解稿内容曾被提前写入，只能视为草稿；在第 13 天面试题回答、评审和归档完成前，不得继续推进 Day 6 或 Day 7。
+- 第 13 天整合 schema + `edit_file` + result 面试题已完成评审，并追加归档到 `docs/Compilation-of-Interview-Questions.md`。
+- 注意：Day 6 相关 README / 讲解稿内容此前曾被提前写入；下一步应先正式复核这些草稿是否真实反映当前代码和 Day 5 完成状态，再决定是否认定 Day 6 完成。
 - 已补充外部技能调用规则：普通解释、状态说明、面试题评审和文档答疑不主动调用额外 Superpowers skill；代码实现、调试失败、完成验收和复杂设计时再按需调用对应流程。
 - 已更新 `README.md`，将 GitHub 项目说明同步到第 2 周 Day 2 已完成状态；已提交并推送到 GitHub `origin/main`：`2aae93e docs: update README for tool schema progress`。
 - 已完成第 1 周 Day 7：周复盘和小重构。
@@ -150,29 +150,19 @@
 
 ## 下一次应该继续做什么
 
-继续第 2 周 Tool System 深化，但当前不能进入 Day 6 或 Day 7。下一步必须先完成第 2 周 Day 5 的第 13 天面试题回答、评审和归档。
+继续第 2 周 Tool System 深化，进入 Day 6：文档和面试表达草稿复核。
 
-教学执行方式：先把第 13 天 5 道面试题推送给用户回答；用户回答后，逐题评审，补充标准回答，再把“题目、用户回答、标准回答”追加到 `docs/Compilation-of-Interview-Questions.md`。当前不要继续写 Day 6 文档、Day 7 小重构、planner、RAG、MCP、真实 API 或权限系统。
+教学执行方式：先复核已经提前写入的 README、`docs/11_WEEK2_INTERVIEW_SCRIPT.md`、学习笔记和下一步行动，确认它们是否和当前代码、测试、Day 5 面试归档一致。当前不要直接进入 Day 7 小重构、planner、RAG、MCP、真实 API 或权限系统。
 
 建议任务：
 
-1. 推送第 13 天 5 道面试题给用户回答。
-2. 等用户回答后，逐题评审回答是否抓住 schema、`edit_file`、`ToolResult`、tool message 和权限系统前置边界。
-3. 把第 13 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
-4. 更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`，确认 Day 5 教学验收完成后，再进入 Day 6。
-
-## 待推送给用户回答的面试题
-
-### 第 13 天：2026-06-12
-
-1. Day 5 为什么不是重新设计 `ToolResult`，而是让 `AgentLoop` 明确消费它？
-2. schema、`edit_file` 和 `ToolResult` 在同一条工具链路中分别解决什么问题？
-3. 为什么 `edit_file` 失败时要写回 tool message，而不是直接让 AgentLoop 抛异常结束？
-4. `_tool_result_to_message(...)` 这个小方法为什么是一个有价值的边界？
-5. Day 5 完成后，工具系统距离权限系统还差哪些能力？
+1. 复核 `README.md` 是否真实反映第 2 周 Day 1 到 Day 5 的工具系统状态。
+2. 复核 `docs/11_WEEK2_INTERVIEW_SCRIPT.md` 是否能清楚讲出 schema、`edit_file`、`ToolResult` 和 AgentLoop 消费边界。
+3. 运行必要验证，确认文档没有宣称未验证能力。
+4. Day 6 面试题必须先推送给用户回答，用户回答后再评审并归档；不得再次提前进入 Day 7。
 
 ## 用户下次应发送的指令
 
 ```text
-继续项目，先完成第 2 周 Day 5 第 13 天面试题回答与评审。
+继续项目，进入第 2 周 Day 6：文档和面试表达草稿复核。先检查 README 和第 2 周面试讲解稿是否和当前代码一致。
 ```
