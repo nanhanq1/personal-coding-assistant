@@ -349,3 +349,30 @@
 
 - 用户回答：`env` 环境和危险命令分类。
 - 标准回答：方向正确，尤其危险命令分类是第 3 周 Permission System 的核心入口。更完整地说，进入权限系统前最值得修补的是“工具执行前控制”和“执行轨迹可审计”：危险命令和危险文件操作分类、环境变量和敏感信息处理、人工审批流程、权限策略、审计日志、trace id、sandbox 或隔离 runtime、checkpoint / rollback、输出截断和错误分类枚举。当前 `run_command` 已有 `workspace_root`、`timeout_seconds` 和 `env` 基础边界，但还没有判断命令是否危险，也没有审批和回滚能力。
+
+## 第 15 天：2026-06-14
+
+### 面试题 1：为什么 `run_command` 的 `env` 参数既是能力入口，也是安全风险入口？
+
+- 用户回答：env 会包含敏感信息。
+- 标准回答：方向正确。`env` 是能力入口，因为它允许 Agent 给子进程传入必要配置，例如测试变量、PATH、语言环境或未来 API 相关配置；没有它，很多命令无法在隔离环境中正确运行。它也是安全风险入口，因为环境变量常用来保存 `API_KEY`、token、secret、password 等敏感信息。子进程可以读取这些变量，也可能把它们打印到 stdout/stderr；一旦输出进入 `ToolResult`、message history、日志或未来 LLM 上下文，敏感值就会从运行时环境扩散到 Agent 轨迹中。
+
+### 面试题 2：为什么敏感值输出脱敏应该放在 `ShellRuntime` 层，而不是只写在 `ShellCommandTool` 描述里？
+
+- 用户回答：不知道。
+- 标准回答：`ShellCommandTool` 的描述只是给模型看的工具契约文本，只能提醒模型“敏感值会脱敏”，不能真正修改命令输出。真正拿到 stdout、stderr、returncode 和 timed_out 的地方是 `ShellRuntime.run(...)`，它直接调用 `subprocess.run(...)` 并封装返回结果。因此输出脱敏应该放在 runtime 层：这里能在结果进入 `ToolResult` 和 message history 之前统一清洗 stdout/stderr。tool 包装层负责暴露工具名、描述和 schema；runtime 层负责真实执行和执行结果边界。
+
+### 面试题 3：输出脱敏和权限审批有什么区别？为什么本次不能把它当成完整 Permission System？
+
+- 用户回答：不知道。
+- 标准回答：输出脱敏是执行后的结果清洗：命令已经运行了，只是在 stdout/stderr 返回给 Agent 之前把已知敏感值替换成 `[REDACTED]`。权限审批是执行前控制：在命令真正运行之前判断它是否危险、是否需要用户批准、是否应该拒绝或要求更严格 sandbox。本次 Day 7 只解决“敏感值不要直接进入工具结果和轨迹”的小边界，不会阻止危险命令执行，也没有风险分类、人工审批、策略引擎、审计日志、checkpoint/rollback 或 sandbox，所以不能称为完整 Permission System。
+
+### 面试题 4：当前基于 key 名称识别 `API_KEY`、`TOKEN`、`SECRET`、`PASSWORD`、`CREDENTIAL` 有什么局限？
+
+- 用户回答：不知道。
+- 标准回答：基于 key 名称识别简单直接，但覆盖不完整。第一，敏感变量可能使用其他命名，例如 `PRIVATE_KEY`、`AUTH_HEADER`、`SESSION_COOKIE` 或业务自定义名称；第二，有些变量名看起来不敏感但值本身是 secret；第三，命令可能把 secret 做截断、拼接、编码、base64、hash 或分多段输出，简单字符串替换抓不到；第四，本次只处理显式传入 `env` 的值，不扫描父进程已有环境变量、命令参数、文件内容或第三方程序日志。因此它是最小防线，不是完整 secret scanner。
+
+### 面试题 5：第 2 周完成后，进入第 3 周 Permission System 前，工具系统已经具备了哪些基础？还缺哪些执行前控制能力？
+
+- 用户回答：不知道。
+- 标准回答：第 2 周完成后，工具系统已经具备了几个基础：`ToolParameter` 和 `Tool.to_schema()` 能表达工具调用契约；`ToolRegistry.list_tool_schemas()` 能统一导出真实注册工具；`read_file`、`write_file`、`edit_file` 和 `run_command` 有默认工具注册表；`edit_file` 有局部编辑和唯一匹配边界；`ToolRegistry.run(...)` 会返回结构化 `ToolResult`；`AgentLoop._tool_result_to_message(...)` 有结果写回边界；Day 7 还补了 `run_command.env` 敏感输出脱敏。仍然缺少的是执行前控制：危险命令分类、危险文件操作分类、权限策略、人工审批流程、拒绝/允许/询问决策、审计日志、trace id、sandbox、checkpoint/rollback，以及把审批结果纳入工具轨迹。

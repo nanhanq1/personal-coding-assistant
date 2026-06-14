@@ -110,6 +110,14 @@
 - mini-SWE-agent GitHub：https://github.com/SWE-agent/mini-swe-agent
 - 建议阅读顺序：先用 Mermaid 把第 2 周工具链路画清楚，再用 GitHub README 指南检查外部读者能否快速理解项目，最后对照 OpenAI / Anthropic / mini-SWE-agent 的工具表达方式，打磨自己的面试讲解。
 
+### Week 2 Day 7 周复盘和 env 输出脱敏资料
+
+- Python `subprocess` 官方文档：https://docs.python.org/3/library/subprocess.html
+- Python `os.environ` 官方文档：https://docs.python.org/3/library/os.html#os.environ
+- OWASP 环境变量信息暴露说明：https://owasp.org/www-community/vulnerabilities/Information_exposure_through_environment_variables
+- OpenAI Agents SDK Tools 文档：https://openai.github.io/openai-agents-python/tools/
+- 建议阅读顺序：先看 `subprocess.run(..., env=...)` 如何把环境变量传给子进程，再看 `os.environ` 理解环境变量的进程边界，最后用 OWASP 信息暴露说明理解为什么工具输出不能把 secret 原样写回 Agent 轨迹。
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |

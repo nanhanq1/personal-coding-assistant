@@ -491,7 +491,7 @@ flowchart TD
 - shell runtime 还缺危险命令分类、权限审批、sandbox、输出大小限制和进程树清理。
 - message history 还没有持久化 trace、压缩、检索和长期记忆。
 - 复杂任务还没有 planner / todo 状态机。
-- Day 6 和 Day 7 面试题的用户回答仍待补充。
+- Day 6 和 Day 7 面试题后续已完成回答、评审和归档。
 
 ### 8. 检查问题
 
@@ -786,6 +786,92 @@ Agent Loop 就是让模型不只“一次性回答”，而是能在回答过程
 ### 2. 一句话解释
 
 Agent Loop 是 `LLM -> tool_call -> tool_result -> LLM` 的循环控制器。
+
+## 第 2 周 Day 7：run_command env 敏感输出脱敏
+
+### 1. 直觉
+
+`run_command` 允许调用方传入 `env`，这让 Agent 可以给子进程提供必要配置，例如测试变量、路径变量或未来的 API 配置。但环境变量也常用来保存 token、secret、password、API key。
+
+如果命令执行过程中把这些变量打印到了 stdout/stderr，工具结果会进入 `ToolResult`，再被 `AgentLoop` 写回 message history。也就是说，敏感值可能从“运行时环境”扩散到“Agent 轨迹、日志和未来 LLM 上下文”。
+
+Day 7 的小重构只做一件事：当敏感 env 值是本次工具调用显式传入的，并且出现在 stdout/stderr 时，返回结果中用 `[REDACTED]` 替换它。
+
+### 2. 调用链
+
+```text
+LLM / caller 生成 run_command arguments
+  -> Tool.run(...) 做基础参数校验
+  -> ShellRuntime.run(arguments)
+  -> _build_environment(arguments) 合并 env
+  -> subprocess.run(...) 执行命令
+  -> 捕获 stdout / stderr
+  -> _redact_sensitive_values(...) 脱敏
+  -> 返回 dict
+  -> ToolRegistry.run(...) 包装为 ToolResult
+  -> AgentLoop._tool_result_to_message(...)
+  -> 写回 message history
+```
+
+### 3. 流程图
+
+```mermaid
+flowchart TD
+    A["run_command ToolCall"] --> B["Tool.run validates schema-level arguments"]
+    B --> C["ShellRuntime.run"]
+    C --> D["Build subprocess env"]
+    D --> E["Extract sensitive values from explicit env"]
+    D --> F["subprocess.run captures stdout/stderr"]
+    F --> G["Redact sensitive values"]
+    G --> H["Return stdout/stderr/returncode/timed_out"]
+    H --> I["ToolResult"]
+    I --> J["tool Message for LLM"]
+```
+
+### 4. 安全边界
+
+- 本次只处理显式传给 `run_command` 的 `env` 字典。
+- 当前敏感 key 规则覆盖 `API_KEY`、`TOKEN`、`SECRET`、`PASSWORD`、`CREDENTIAL`。
+- 脱敏发生在输出返回前，能降低 stdout/stderr 进入 message history 的泄漏风险。
+- 这不是权限系统：命令仍然会执行，危险命令分类、人工审批、sandbox、checkpoint 和 rollback 都属于后续阶段。
+- 这也不是完整 secret scanner：命令参数、文件内容、父进程已有环境变量和第三方程序自己的日志格式仍需要后续更完整策略。
+
+### 5. 测试设计
+
+- RED：命令打印 `OPENAI_API_KEY`，断言返回 stdout 不包含原始 secret，且包含 `[REDACTED]`。
+- GREEN：在 runtime 层提取敏感 env 值，并对 stdout/stderr 做字符串替换。
+- schema 测试：`run_command` 的 `env` 参数描述必须写清楚敏感变量值会脱敏。
+- 回归测试：原有普通 `TEST_VAR` 环境变量测试仍通过，说明非敏感 env 的正常传递没有被破坏。
+
+### 6. 当前局限
+
+- 脱敏是精确字符串替换，不处理编码变体、截断拼接、hash、base64 或多段输出。
+- 只根据 key 名称判断敏感变量，不根据 value 形态判断。
+- 不会阻止命令读取或使用 secret，只是在返回输出前降低泄漏。
+- 还没有 trace id、审计日志、风险分类字段或审批结果字段。
+
+### 7. 检查问题
+
+1. 为什么 `env` 是能力入口，也是安全风险入口？
+2. 为什么敏感值脱敏应该放在 `ShellRuntime` 层，而不是 `ShellCommandTool` 包装层？
+3. 输出脱敏和权限审批有什么区别？
+4. 当前基于 key 名称判断敏感变量有什么局限？
+5. 进入第 3 周 Permission System 前，这个小重构还缺哪些配套能力？
+
+### 8. 第 2 周总复盘
+
+- schema 解决调用前契约。
+- 默认工具注册表解决“模型看到的工具”和“程序能执行的工具”一致性。
+- `edit_file` 解决局部编辑能力。
+- `ToolResult` 解决执行后结构化结果。
+- `AgentLoop._tool_result_to_message(...)` 解决内部结果到 LLM 观察消息的序列化边界。
+- Day 7 的 env 脱敏把工具结果和后续权限系统连接起来：先保证明显敏感输出不直接进入轨迹，再进入更完整的 Permission System。
+
+### 9. 本阶段仍不是完整工业级 Coding Agent
+
+当前代码仍缺少危险命令分类、人工审批、权限策略、审计日志、checkpoint/rollback、真实 LLM adapter、上下文选择、RAG、MCP 和长期记忆。第 2 周的产出是 Tool System 的稳定骨架，不是完整安全执行系统。
+
+## Agent Loop：第 1 周 Day 1
 
 ### 3. 流程图
 

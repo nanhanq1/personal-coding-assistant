@@ -41,7 +41,7 @@ class ShellCommandTool(Tool):
                 ToolParameter(
                     name="env",
                     type="object",
-                    description="附加环境变量；会合并到当前进程环境中",
+                    description="附加环境变量；会合并到当前进程环境中，敏感变量值会在返回输出中脱敏",
                     required=False,
                 ),
             ),

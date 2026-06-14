@@ -430,3 +430,5 @@ def test_builtin_coding_tool_schemas_describe_selection_boundaries():
     assert "list[str]" in run_command["parameters"]["properties"]["command"]["description"]
     assert "正数" in run_command["parameters"]["properties"]["timeout_seconds"]["description"]
     assert "默认使用 workspace_root" in run_command["parameters"]["properties"]["cwd"]["description"]
+    assert "敏感" in run_command["parameters"]["properties"]["env"]["description"]
+    assert "脱敏" in run_command["parameters"]["properties"]["env"]["description"]

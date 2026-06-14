@@ -331,6 +331,28 @@ class TestShellRuntime:
                 }
             )
 
+    def test_sensitive_env_values_are_redacted_from_output(self, tmp_path):
+        """测试敏感环境变量值不会从命令输出中泄漏。"""
+        secret_value = "sk-test-secret-value"
+
+        result = runtime_run_command(
+            {
+                "command": [
+                    sys.executable,
+                    "-c",
+                    "import os; print(os.environ['OPENAI_API_KEY'])",
+                ],
+                "cwd": ".",
+                "workspace_root": str(tmp_path),
+                "timeout_seconds": 5,
+                "env": {"OPENAI_API_KEY": secret_value},
+            }
+        )
+
+        assert result["returncode"] == 0
+        assert secret_value not in result["stdout"]
+        assert "[REDACTED]" in result["stdout"]
+
     def test_missing_required_arguments(self):
         """测试缺少必需参数"""
         tool = ShellCommandTool()

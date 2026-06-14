@@ -1,5 +1,68 @@
 # Daily Tasks
 
+## 2026-06-14
+
+日期：2026-06-14
+当前阶段：第 2 周 Day 7
+当前模块：周复盘和小重构
+预计用时：60 分钟
+
+### 1. 今日学习目标
+
+- 复盘第 2 周 Tool System 的完整调用链。
+- 选择一个真实但足够小的边界缺口，用 TDD 修补。
+- 理解 `run_command` 的 `env` 参数既是能力入口，也是敏感信息风险入口。
+- 明确本次只是输出脱敏边界，不提前实现完整权限系统、危险命令分类、审批、sandbox 或 rollback。
+
+### 2. 所需前置知识
+
+- 第 2 周 Day 1：`ToolParameter` 和工具 schema。
+- 第 2 周 Day 2：工具描述如何帮助模型选工具。
+- 第 2 周 Day 4：`ToolResult` 如何表达工具执行结果。
+- 第 1 周 Day 4：`ShellRuntime` 如何执行命令、合并 env、捕获 stdout/stderr。
+
+### 3. 今日必须理解的知识点
+
+- `env` 会进入子进程环境，命令本身可以把环境变量打印到 stdout/stderr。
+- schema 描述只能提醒模型，不能阻止命令泄漏敏感值。
+- runtime 层比 tool 包装层更适合做 stdout/stderr 输出脱敏，因为它直接拥有 subprocess 返回结果。
+- 输出脱敏是“事后降低泄漏风险”，不是权限审批，也不能替代危险命令拦截。
+
+### 4. 今日代码 / 文档任务
+
+- 在 `tests/test_shell_runtime.py` 中新增 RED 测试：敏感 env 值出现在命令输出时必须脱敏。
+- 在 `src/pca/runtime/shell_runtime.py` 中实现最小敏感 env 输出脱敏。
+- 在 `tests/test_tools.py` 中补充 schema 描述测试，要求 `env` 参数说明敏感值会脱敏。
+- 在 `src/pca/tools/shell_tools.py` 中同步 `env` 参数描述。
+- 更新 `docs/05_LEARNING_NOTES.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`。
+
+### 5. 今日资料推荐
+
+- Python `subprocess` 官方文档：https://docs.python.org/3/library/subprocess.html
+- Python `os.environ` 官方文档：https://docs.python.org/3/library/os.html#os.environ
+- OWASP 环境变量信息暴露说明：https://owasp.org/www-community/vulnerabilities/Information_exposure_through_environment_variables
+- OpenAI Agents SDK Tools 文档：https://openai.github.io/openai-agents-python/tools/
+
+### 6. 今日输出物
+
+- `run_command` 对显式传入的敏感 env 值做 stdout/stderr 脱敏。
+- focused RED/GREEN 测试记录。
+- 第 2 周 Day 7 学习笔记。
+- 第 15 天面试题已回答、评审并归档。
+
+### 7. 当前完成情况
+
+- 已选择小重构边界：`run_command` 的显式 `env` 敏感值输出脱敏。
+- RED：`E:\python\Scripts\pytest.exe tests\test_shell_runtime.py -q` 初次失败，失败点是 stdout 原样包含 `sk-test-secret-value`。
+- GREEN：新增 `_sensitive_env_values(...)`、`_is_sensitive_env_key(...)` 和 `_redact_sensitive_values(...)`，对子进程 stdout/stderr 和超时输出做敏感值替换。
+- 已同步 `run_command` 的 `env` 参数 schema 描述，说明敏感变量值会在返回输出中脱敏。
+- focused 验证已通过：`E:\python\Scripts\pytest.exe tests\test_shell_runtime.py -q` 为 `25 passed`；`E:\python\Scripts\pytest.exe tests\test_tools.py -q` 为 `21 passed`。
+- 全量验证已通过：`E:\python\Scripts\pytest.exe -q` 为 `93 passed, 1 skipped`。
+- 示例验证已通过：`E:\python\python.exe examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`；`E:\python\python.exe examples\02_tool_agent.py` 成功输出包含 `run_command.env` 脱敏说明的 schema JSON。
+- 编译验证已通过：`E:\python\python.exe -m compileall src examples -q` 通过。
+- 第 15 天 Day 7 面试题已收到用户回答，已完成逐题评审，并追加归档到 `docs/Compilation-of-Interview-Questions.md`。
+- 第 2 周 Day 7 已完成；下一步进入第 3 周 Day 1：Permission System 起步。
+
 ## 2026-06-12
 
 日期：2026-06-12

@@ -149,24 +149,37 @@
 - Day 6 文档完成时全量测试结果：`python -m pytest -q` 为 `66 passed, 1 skipped`。
 - 最新示例验证：`python examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`。
 - 最新编译验证：`python -m compileall src examples -q` 通过。
+- 已开始第 2 周 Day 7：周复盘和小重构。
+- Day 7 已选择小边界缺口：`run_command` 的显式 `env` 敏感值输出脱敏。
+- Day 7 已按 TDD 新增敏感 env 输出测试：命令打印 `OPENAI_API_KEY` 时，返回 stdout 不应包含原始 secret，应包含 `[REDACTED]`。
+- Day 7 RED 结果：`E:\python\Scripts\pytest.exe tests\test_shell_runtime.py -q` 为 `1 failed, 24 passed`，失败点是 stdout 原样包含 `sk-test-secret-value`。
+- Day 7 已实现 `_sensitive_env_values(...)`、`_is_sensitive_env_key(...)` 和 `_redact_sensitive_values(...)`，对子进程 stdout/stderr 和超时输出做敏感值脱敏。
+- Day 7 已同步 `run_command` 的 `env` 参数 schema 描述：敏感变量值会在返回输出中脱敏。
+- Day 7 focused 验证结果：`E:\python\Scripts\pytest.exe tests\test_shell_runtime.py -q` 为 `25 passed`；`E:\python\Scripts\pytest.exe tests\test_tools.py -q` 为 `21 passed`。
+- Day 7 全量验证结果：`E:\python\Scripts\pytest.exe -q` 为 `93 passed, 1 skipped`。
+- Day 7 示例验证结果：`E:\python\python.exe examples\01_minimal_agent.py` 成功输出 `user -> assistant -> tool:echo -> assistant`；`E:\python\python.exe examples\02_tool_agent.py` 成功输出包含 `run_command.env` 脱敏说明的 schema JSON。
+- Day 7 编译验证结果：`E:\python\python.exe -m compileall src examples -q` 通过。
+- 默认 `python -m pytest ...` 在本机失败，原因是 `F:\DevTools\Python311\python.exe` 没有安装 pytest；当前可用测试入口是 `E:\python\Scripts\pytest.exe`。
+- 第 15 天 Day 7 面试题已收到用户回答，已完成逐题评审，并追加归档到 `docs/Compilation-of-Interview-Questions.md`。
+- 已完成第 2 周 Day 7：周复盘和小重构。
 - 当前阻塞：无。
 
 ## 下一次应该继续做什么
 
-继续第 2 周 Tool System 深化，进入 Day 7：周复盘和小重构。
+进入第 3 周 Day 1：Permission System 起步，重点做危险命令识别与最小权限策略。
 
-教学执行方式：Day 7 只做第 2 周 Tool System 收口和一个真实边界缺口小重构；当前不要提前进入 planner、RAG、MCP、真实 API 或完整权限系统。实现前先讲清调用链、目标文件、输入输出、验收测试和安全边界。
+教学执行方式：Day 1 只做最小风险分类和策略骨架，不提前实现完整审批 UI、复杂 sandbox、checkpoint/rollback、真实 LLM adapter、RAG 或 MCP。实现前先讲清调用链、目标文件、输入输出、验收测试和安全边界。
 
 建议任务：
 
-1. 先复盘第 2 周工具系统：schema、默认工具、`edit_file`、`ToolResult`、AgentLoop 消费边界。
-2. 选择一个小而真实的边界缺口，优先考虑 `run_command` 的 `env` 敏感信息处理、命令风险分类前置字段、输出截断，或 `edit_file` 的文件大小 / 二进制文本边界。
-3. 按 TDD 写一个 focused RED 测试，再实现最小修补。
-4. 运行 focused 测试、全量测试、示例和编译验证。
-5. 更新学习笔记、实现日志、下一步行动；如果 Day 7 面试题已回答，再追加到 `docs/Compilation-of-Interview-Questions.md`。
+1. 先复盘第 2 周 Tool System 和第 3 周 Permission System 的边界：Tool System 负责“怎么调用工具”，Permission System 负责“是否允许执行”。
+2. 设计最小 `CommandRisk` / `RiskLevel` 或等价数据结构，先覆盖 `safe`、`needs_approval`、`blocked` 三类。
+3. 按 TDD 写 focused RED 测试：安全命令、删除/覆盖类危险命令、越界或高风险命令分类。
+4. 实现最小危险命令分类器，但暂不真正拦截 `run_command` 执行链路，除非 Day 1 测试明确要求。
+5. 更新学习笔记、实现日志、下一步行动；Day 1 面试题回答后再追加到 `docs/Compilation-of-Interview-Questions.md`。
 
 ## 用户下次应发送的指令
 
 ```text
-继续项目，进入第 2 周 Day 7：周复盘和小重构。先复盘第 2 周工具系统，再选择一个小边界缺口按 TDD 修补。
+继续项目，开始第 3 周 Day 1：Permission System 起步。先讲清危险命令识别的调用链、目标文件、测试设计和安全边界，再按 TDD 实现最小风险分类器。
 ```

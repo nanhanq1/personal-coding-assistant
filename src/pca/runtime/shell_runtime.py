@@ -33,6 +33,7 @@ class ShellRuntime:
         timeout_seconds = _normalize_timeout(arguments, self._max_timeout_seconds)
         resolved_cwd = _resolve_cwd(arguments, workspace_root)
         full_env = _build_environment(arguments)
+        sensitive_env_values = _sensitive_env_values(arguments.get("env"))
         output_encoding = locale.getpreferredencoding(False)
 
         started_at = time.monotonic()
@@ -50,17 +51,23 @@ class ShellRuntime:
             )
         except subprocess.TimeoutExpired as exc:
             return {
-                "stdout": _coerce_output(exc.stdout),
-                "stderr": _coerce_output(exc.stderr)
-                or f"Command timed out after {timeout_seconds} seconds",
+                "stdout": _redact_sensitive_values(
+                    _coerce_output(exc.stdout),
+                    sensitive_env_values,
+                ),
+                "stderr": _redact_sensitive_values(
+                    _coerce_output(exc.stderr)
+                    or f"Command timed out after {timeout_seconds} seconds",
+                    sensitive_env_values,
+                ),
                 "returncode": -1,
                 "timed_out": True,
                 "duration_ms": _elapsed_ms(started_at),
             }
 
         return {
-            "stdout": result.stdout,
-            "stderr": result.stderr,
+            "stdout": _redact_sensitive_values(result.stdout, sensitive_env_values),
+            "stderr": _redact_sensitive_values(result.stderr, sensitive_env_values),
             "returncode": result.returncode,
             "timed_out": False,
             "duration_ms": _elapsed_ms(started_at),
@@ -181,6 +188,42 @@ def _build_environment(arguments: dict[str, Any]) -> dict[str, str] | None:
             raise ValueError("env keys must be non-empty strings")
         full_env[key] = value
     return full_env
+
+
+def _sensitive_env_values(env: Any) -> tuple[str, ...]:
+    """提取调用方显式传入的敏感环境变量值，用于返回输出脱敏。"""
+    if not isinstance(env, dict):
+        return ()
+
+    sensitive_values: list[str] = []
+    for key, value in env.items():
+        if (
+            isinstance(key, str)
+            and isinstance(value, str)
+            and value != ""
+            and _is_sensitive_env_key(key)
+        ):
+            sensitive_values.append(value)
+    return tuple(sensitive_values)
+
+
+def _is_sensitive_env_key(key: str) -> bool:
+    normalized_key = key.upper()
+    sensitive_markers = (
+        "API_KEY",
+        "TOKEN",
+        "SECRET",
+        "PASSWORD",
+        "CREDENTIAL",
+    )
+    return any(marker in normalized_key for marker in sensitive_markers)
+
+
+def _redact_sensitive_values(output: str, sensitive_values: tuple[str, ...]) -> str:
+    redacted_output = output
+    for value in sensitive_values:
+        redacted_output = redacted_output.replace(value, "[REDACTED]")
+    return redacted_output
 
 
 def _coerce_output(value: str | bytes | None) -> str:

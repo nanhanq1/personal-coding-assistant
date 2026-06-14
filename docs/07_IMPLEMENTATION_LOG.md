@@ -2,6 +2,50 @@
 
 ## 2026-06-14
 
+### 第 2 周 Day 7：周复盘和 run_command env 输出脱敏
+
+### 本次完成
+
+- 开始第 2 周 Day 7：周复盘和小重构。
+- 选择真实边界缺口：`run_command` 的显式 `env` 敏感值输出脱敏。
+- 按 TDD 新增 `tests/test_shell_runtime.py::TestShellRuntime::test_sensitive_env_values_are_redacted_from_output`。
+- RED 验证：`E:\python\Scripts\pytest.exe tests\test_shell_runtime.py -q` 失败，失败原因为 stdout 原样包含 `sk-test-secret-value`。
+- 在 `src/pca/runtime/shell_runtime.py` 中新增 `_sensitive_env_values(...)`、`_is_sensitive_env_key(...)` 和 `_redact_sensitive_values(...)`。
+- 对正常返回和 `TimeoutExpired` 路径的 stdout/stderr 都做敏感值脱敏。
+- 在 `tests/test_tools.py` 中补充 schema 描述测试，要求 `run_command.env` 描述包含“敏感”和“脱敏”。
+- 更新 `src/pca/tools/shell_tools.py`，说明附加环境变量中的敏感变量值会在返回输出中脱敏。
+- 更新 `docs/02_DAILY_TASKS.md` 和 `docs/05_LEARNING_NOTES.md`，记录 Day 7 学习目标、调用链、测试设计和安全边界。
+
+### 修改文件
+
+- 修改 `src/pca/runtime/shell_runtime.py`。
+- 修改 `src/pca/tools/shell_tools.py`。
+- 修改 `tests/test_shell_runtime.py`。
+- 修改 `tests/test_tools.py`。
+- 更新 `docs/02_DAILY_TASKS.md`。
+- 更新 `docs/05_LEARNING_NOTES.md`。
+
+### 架构决策
+
+- 本次没有新增 ADR。
+- 这是第 2 周 Tool System 的边界补强：输出脱敏属于 runtime 返回结果清洗，不等同于第 3 周 Permission System。
+
+### 验证
+
+- `python -m pytest tests\test_shell_runtime.py -q`：失败，默认 `F:\DevTools\Python311\python.exe` 没有安装 pytest。
+- `E:\python\Scripts\pytest.exe tests\test_shell_runtime.py -q` RED：`1 failed, 24 passed`，失败点是敏感 env 值泄漏到 stdout。
+- `E:\python\Scripts\pytest.exe tests\test_shell_runtime.py -q` GREEN：`25 passed`。
+- `E:\python\Scripts\pytest.exe tests\test_tools.py -q` schema RED：`1 failed, 20 passed`，失败点是 `env` 描述未说明敏感值脱敏。
+- `E:\python\Scripts\pytest.exe tests\test_tools.py -q` GREEN：`21 passed`。
+- `E:\python\Scripts\pytest.exe -q`：`93 passed, 1 skipped`。
+- `E:\python\python.exe examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant` 链路。
+- `E:\python\python.exe examples\02_tool_agent.py`：成功输出包含 `run_command.env` 脱敏说明的 schema JSON。
+- `E:\python\python.exe -m compileall src examples -q`：通过。
+- 第 15 天 Day 7 面试题已收到用户回答，已完成逐题评审，并追加归档到 `docs/Compilation-of-Interview-Questions.md`。
+- 第 2 周 Day 7 代码、测试、文档和面试门禁均已完成；下一步进入第 3 周 Permission System 起步。
+
+## 2026-06-14
+
 ### 第 2 周 Day 6：第 14 天面试题评审与归档
 
 ### 本次完成

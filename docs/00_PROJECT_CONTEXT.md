@@ -18,9 +18,9 @@ Personal Coding Assistant Agent
 
 ## 当前阶段
 
-- 12 周路线：第 2 周
-- 当前主题：Tool System 深化
-- 当前模块：第 2 周 Day 7：周复盘和小重构
+- 12 周路线：第 3 周
+- 当前主题：Permission System
+- 当前模块：第 3 周 Day 1：危险命令识别与权限策略起步
 
 ## 当前原则
 
