@@ -1,5 +1,52 @@
 # Implementation Log
 
+## 2026-06-14
+
+### 第 2 周 Day 6：第 14 天面试题评审与归档
+
+### 本次完成
+
+- 收到用户对第 14 天 5 道面试题的回答。
+- 逐题评审用户回答：第 2、3、4 题方向正确；第 1 题需要补强“Day 6 不只是总结，也是文档与代码边界一致性校验”；第 5 题需要补强“危险命令分类之外，还要有审批、审计、trace、sandbox、checkpoint / rollback 等权限系统边界”。
+- 将第 14 天面试题、用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md`。
+- 更新 `README.md`、`docs/00_PROJECT_CONTEXT.md`、`docs/02_DAILY_TASKS.md`、`docs/05_LEARNING_NOTES.md`、`docs/11_WEEK2_INTERVIEW_SCRIPT.md` 和 `docs/09_NEXT_ACTIONS.md`，确认 Day 6 教学验收完成，下一步进入 Day 7 周复盘和小重构。
+
+### 架构决策
+
+- 本次不新增 ADR。
+- 本次只完成 Day 6 面试验收和文档收尾，不改变源码架构。
+
+### 验证
+
+- 本次只修改文档归档和路由状态，未修改业务代码。
+
+## 2026-06-13
+
+### 第 2 周 Day 6：文档和面试表达草稿正式复核
+
+### 本次完成
+
+- 复核 `README.md`、`docs/11_WEEK2_INTERVIEW_SCRIPT.md`、`docs/05_LEARNING_NOTES.md` 和 `docs/09_NEXT_ACTIONS.md`，确认第 2 周工具系统主链路与当前源码一致。
+- 确认 README 和讲解稿中的核心边界仍然成立：`ToolRegistry.list_tool_schemas()` 是 schema 出口，`edit_file` 只做唯一文本替换，`ToolRegistry.run(...)` 返回 `ToolResult`，`AgentLoop._tool_result_to_message(...)` 负责把结构化结果写回 tool message。
+- 修正文档状态：Day 6 文档复核和验证可以认定通过，但第 14 天面试题未收到用户回答，不能写入 `docs/Compilation-of-Interview-Questions.md`，也不能进入 Day 7。
+
+### 架构决策
+
+- 本次不新增 ADR。
+- Day 6 只复核文档表达与当前代码一致性，不改变源码边界。
+
+### 验证
+
+- `pytest -q`：`92 passed, 1 skipped`
+- `python examples\01_minimal_agent.py`：成功输出 `user -> assistant -> tool:echo -> assistant` 链路
+- `python examples\02_tool_agent.py`：成功输出 `read_file`、`write_file`、`edit_file`、`run_command` 的 schema JSON
+- `python -m compileall src examples -q`：通过
+
+### 下一步
+
+- 推送第 14 天面试题给用户回答。
+- 用户回答后，先评审并追加归档到 `docs/Compilation-of-Interview-Questions.md`，再进入第 2 周 Day 7。
+
 ## 2026-06-12
 
 ### 第 2 周 Day 5：第 13 天面试题评审与归档

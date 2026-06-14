@@ -82,7 +82,10 @@
 - Day 5 最新 schema 示例验证：`python examples\02_tool_agent.py` 成功输出包含 `read_file`、`write_file`、`edit_file`、`run_command` 的 schema JSON。
 - Day 5 最新编译验证：`python -m compileall src examples -q` 通过。
 - 第 13 天整合 schema + `edit_file` + result 面试题已完成评审，并追加归档到 `docs/Compilation-of-Interview-Questions.md`。
-- 注意：Day 6 相关 README / 讲解稿内容此前曾被提前写入；下一步应先正式复核这些草稿是否真实反映当前代码和 Day 5 完成状态，再决定是否认定 Day 6 完成。
+- Day 6 相关 README / 讲解稿内容此前曾被提前写入；2026-06-13 已正式复核，确认主链路与当前代码一致。
+- Day 6 当前验证结果：`pytest -q` 为 `92 passed, 1 skipped`；`python examples\01_minimal_agent.py`、`python examples\02_tool_agent.py` 和 `python -m compileall src examples -q` 均通过。
+- Day 6 文档复核和验证已通过；第 14 天面试题已收到用户回答，完成评审并追加归档到 `docs/Compilation-of-Interview-Questions.md`。
+- 已完成第 2 周 Day 6：文档和面试表达草稿复核、验证、第 14 天面试题评审归档。
 - 已补充外部技能调用规则：普通解释、状态说明、面试题评审和文档答疑不主动调用额外 Superpowers skill；代码实现、调试失败、完成验收和复杂设计时再按需调用对应流程。
 - 已更新 `README.md`，将 GitHub 项目说明同步到第 2 周 Day 2 已完成状态；已提交并推送到 GitHub `origin/main`：`2aae93e docs: update README for tool schema progress`。
 - 已完成第 1 周 Day 7：周复盘和小重构。
@@ -150,19 +153,20 @@
 
 ## 下一次应该继续做什么
 
-继续第 2 周 Tool System 深化，进入 Day 6：文档和面试表达草稿复核。
+继续第 2 周 Tool System 深化，进入 Day 7：周复盘和小重构。
 
-教学执行方式：先复核已经提前写入的 README、`docs/11_WEEK2_INTERVIEW_SCRIPT.md`、学习笔记和下一步行动，确认它们是否和当前代码、测试、Day 5 面试归档一致。当前不要直接进入 Day 7 小重构、planner、RAG、MCP、真实 API 或权限系统。
+教学执行方式：Day 7 只做第 2 周 Tool System 收口和一个真实边界缺口小重构；当前不要提前进入 planner、RAG、MCP、真实 API 或完整权限系统。实现前先讲清调用链、目标文件、输入输出、验收测试和安全边界。
 
 建议任务：
 
-1. 复核 `README.md` 是否真实反映第 2 周 Day 1 到 Day 5 的工具系统状态。
-2. 复核 `docs/11_WEEK2_INTERVIEW_SCRIPT.md` 是否能清楚讲出 schema、`edit_file`、`ToolResult` 和 AgentLoop 消费边界。
-3. 运行必要验证，确认文档没有宣称未验证能力。
-4. Day 6 面试题必须先推送给用户回答，用户回答后再评审并归档；不得再次提前进入 Day 7。
+1. 先复盘第 2 周工具系统：schema、默认工具、`edit_file`、`ToolResult`、AgentLoop 消费边界。
+2. 选择一个小而真实的边界缺口，优先考虑 `run_command` 的 `env` 敏感信息处理、命令风险分类前置字段、输出截断，或 `edit_file` 的文件大小 / 二进制文本边界。
+3. 按 TDD 写一个 focused RED 测试，再实现最小修补。
+4. 运行 focused 测试、全量测试、示例和编译验证。
+5. 更新学习笔记、实现日志、下一步行动；如果 Day 7 面试题已回答，再追加到 `docs/Compilation-of-Interview-Questions.md`。
 
 ## 用户下次应发送的指令
 
 ```text
-继续项目，进入第 2 周 Day 6：文档和面试表达草稿复核。先检查 README 和第 2 周面试讲解稿是否和当前代码一致。
+继续项目，进入第 2 周 Day 7：周复盘和小重构。先复盘第 2 周工具系统，再选择一个小边界缺口按 TDD 修补。
 ```

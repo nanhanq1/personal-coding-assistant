@@ -86,9 +86,11 @@
 - 已复盘第 2 周 Day 1 到 Day 5 的工具系统总链路。
 - 已更新 `README.md`，将当前状态从 Day 4/Day 5 更新到 Day 6，并补充第 2 周工具系统总链路图。
 - 已新增 `docs/11_WEEK2_INTERVIEW_SCRIPT.md`，包含 30 秒版本、2 分钟版本、总架构图和关键追问。
-- 已更新 `docs/05_LEARNING_NOTES.md`、`docs/04_RESOURCE_LIBRARY.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`；第 14 天面试题尚未收到用户回答，不写入每日面试题归档。
+- 已正式复核 `README.md`、`docs/11_WEEK2_INTERVIEW_SCRIPT.md`、`docs/05_LEARNING_NOTES.md` 和 `docs/09_NEXT_ACTIONS.md`，确认主要讲解链路与当前代码一致。
+- 已重新运行验证：`pytest -q` 为 `92 passed, 1 skipped`；`python examples\01_minimal_agent.py`、`python examples\02_tool_agent.py` 和 `python -m compileall src examples -q` 均通过。
+- 已更新 `docs/05_LEARNING_NOTES.md`、`docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`；第 14 天面试题已收到用户回答，完成评审后追加到 `docs/Compilation-of-Interview-Questions.md`。
 - Day 6 不新增生产代码，不新增 ADR。
-- Day 6 验收通过；下一步进入第 2 周 Day 7：周复盘和小重构。
+- Day 6 文档复核、验证和教学验收均已完成；下一步进入第 2 周 Day 7：周复盘和小重构。
 
 ## 2026-06-12
 

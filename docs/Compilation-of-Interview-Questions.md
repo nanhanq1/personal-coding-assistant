@@ -322,3 +322,30 @@
 
 - 用户回答：日志、沙箱、人工介入、危险命令的分类和 permission。
 - 标准回答：正确。Day 5 后工具系统已经有 schema、`edit_file`、结构化结果和 message history 回写，但还没有权限系统需要的执行前控制。进入 Permission System 前还需要补：危险命令和危险文件操作分类、人工审批流程、权限策略、审计日志、trace id、sandbox 或隔离 runtime、checkpoint / rollback、输出截断、敏感信息脱敏，以及把审批结果纳入 `ToolResult` 或工具轨迹。也就是说，Day 5 解决的是“工具调用能稳定表达和回写”，Permission System 解决的是“工具调用是否允许执行”。
+
+## 第 14 天：2026-06-14
+
+### 面试题 1：为什么 Day 6 要更新 README 和面试讲解稿，而不是继续写新工具？
+
+- 用户回答：Day 6 的主要作用就是对这个星期的任务进行总结。
+- 标准回答：方向正确。Day 6 是第 2 周 Tool System 的表达收口日，核心不是新增工具，而是把 Day 1 到 Day 5 的能力整理成外部读者和面试官能理解的 README、架构图和讲解稿。更工程化地说，文档复核也是一种边界校验：确认 README 没有宣称未实现能力，确认 schema、`edit_file`、`ToolResult` 和 AgentLoop 消费边界能串成一条真实链路，并明确当前还不是权限系统、RAG、MCP 或真实 LLM adapter。
+
+### 面试题 2：第 2 周工具系统总链路的每一层分别解决什么问题？
+
+- 用户回答：`Tool` 对工具进行封装 -> `ToolRegistry` 工具的注册路由和统一处理 -> `AgentLoop` 工具与 LLM 的结合。
+- 标准回答：抓住了主干。更完整的第 2 周链路是：`ToolParameter / Tool.to_schema()` 解决调用前契约，让模型和程序知道工具参数形状；`ToolRegistry.list_tool_schemas()` 统一导出当前真实注册工具，避免 adapter 手写工具列表；LLM 返回 `ToolCall` 表示调用意图；`AgentLoop` 接收 tool call 并把工具结果写回 message history；`ToolRegistry.run(...)` 负责查找工具、执行工具并把结果包装成 `ToolResult`；`Tool.run(...)` 做基础参数校验；具体工具或 runtime 负责真实读写、编辑、命令执行和安全边界；最后 `_tool_result_to_message(...)` 把内部结构化结果转换成 LLM 可继续消费的 tool message。
+
+### 面试题 3：面试时如何区分“schema 契约”和“具体工具安全校验”？
+
+- 用户回答：schema 契约是编码工具和 LLM 之间的规范，具体的工具校验是真实工具对 LLM 传入参数的兜底。
+- 标准回答：正确。schema 契约面向调用前，告诉模型工具叫什么、做什么、需要哪些参数、参数类型和必填字段，也让 `Tool.run(...)` 能做第一层通用校验。具体工具安全校验面向真实执行，处理 schema 无法表达或不应该替代的业务边界，例如路径是否在 `workspace_root` 内、`old_text` 是否唯一、命令是否有超时、工作目录是否存在、未来是否需要人工审批。schema 能减少坏调用，但不能替代 runtime 安全和权限系统。
+
+### 面试题 4：为什么 `ToolResult` 和 `tool Message` 不是同一个层次？
+
+- 用户回答：`ToolResult` 是给程序看的，`Tool Message` 是给 LLM 的。
+- 标准回答：正确。`ToolResult` 是程序内部的结构化结果信封，包含 `ok`、`result`、`error_type`、`error_message` 和 `duration_ms`，适合测试、日志、错误分类和后续权限/可观测性扩展。`tool Message` 是写回 message history 给 LLM 继续阅读的观察文本或未来 JSON。二者之间需要一个序列化边界，也就是 `AgentLoop._tool_result_to_message(...)`：当前可以简单转成字符串，未来可以在这里做 JSON 格式、trace id、输出截断、敏感字段隐藏或不同模型厂商的 tool message 适配。
+
+### 面试题 5：第 2 周结束后，进入权限系统前最值得修补的边界缺口是什么？
+
+- 用户回答：`env` 环境和危险命令分类。
+- 标准回答：方向正确，尤其危险命令分类是第 3 周 Permission System 的核心入口。更完整地说，进入权限系统前最值得修补的是“工具执行前控制”和“执行轨迹可审计”：危险命令和危险文件操作分类、环境变量和敏感信息处理、人工审批流程、权限策略、审计日志、trace id、sandbox 或隔离 runtime、checkpoint / rollback、输出截断和错误分类枚举。当前 `run_command` 已有 `workspace_root`、`timeout_seconds` 和 `env` 基础边界，但还没有判断命令是否危险，也没有审批和回滚能力。
