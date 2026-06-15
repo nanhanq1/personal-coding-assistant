@@ -2,13 +2,15 @@
 
 一个学习优先、工程实践驱动的 Personal Coding Assistant Agent 项目。
 
-本项目的目标不是快速拼装 Demo，而是从零实现 Coding Agent 的核心机制，并逐步演进到可以放入作品集和面试讲解的工业级雏形。当前阶段优先使用 mock LLM，先把 Agent Loop、工具调用、文件工具、shell runtime、测试和安全边界打牢，再逐步接入真实模型、RAG、MCP、Memory、权限系统和可观测性。
+本项目的目标不是快速拼装 Demo，而是从零实现 Coding Agent 的核心机制，并逐步演进到可以放入作品集和面试讲解的工业级项目。当前阶段优先使用 mock LLM，先把 Agent Loop、工具调用、文件工具、shell runtime、测试和安全边界打牢，再逐步接入真实模型、RAG、MCP、Memory、权限系统和可观测性。
+
+“最小实现”在本项目中只表示当天切片足够小、方便学习和测试，不表示最终质量停留在 Demo。每一周都需要补齐测试、失败路径、安全边界、文档、面试表达和工业级差距说明，并在后续周持续加固前面模块。
 
 ## 当前进度
 
-- 路线阶段：12 周学习路线，第 2 周 Day 6 已完成。
-- 当前主题：Tool System 深化。
-- 当前状态：已完成最小 Agent Loop、工具路由、文件工具、shell runtime、工具参数 schema、默认工具 schema 导出示例、`edit_file` 局部编辑雏形、结构化 `ToolResult`，以及 `AgentLoop` 对结构化工具结果的显式消费边界。第 2 周 Day 6 的 README 和面试表达草稿已按当前代码重新复核；第 14 天面试题已完成评审并归档。下一步进入第 2 周 Day 7：周复盘和小重构。
+- 路线阶段：12 周学习路线，第 2 周 Tool System 已收口，下一步进入第 3 周 Day 1。
+- 当前主题：Permission System 起步。
+- 当前状态：已完成最小 Agent Loop、工具路由、文件工具、shell runtime、工具参数 schema、默认工具 schema 导出示例、`edit_file` 局部编辑雏形、结构化 `ToolResult`，以及 `AgentLoop` 对结构化工具结果的显式消费边界。第 2 周 Day 7 已补强 `run_command.env` 敏感输出脱敏，并完成第 15 天面试题评审归档。下一步进入第 3 周 Day 1：危险命令识别与最小权限策略。
 - 已实现能力：
   - 标准 message schema：`Message`、`ToolCall`。
   - 可脚本化 mock LLM：`ScriptedLLM`。
@@ -17,6 +19,7 @@
   - 工具参数 schema：`ToolParameter`、`Tool.to_schema()`、`ToolRegistry.list_tool_schemas()`。
   - 文件工具：`read_file`、`write_file`、`edit_file`。
   - shell runtime：`run_command`，返回 `stdout`、`stderr`、`returncode`、`timed_out`、`duration_ms`。
+  - `run_command.env` 显式传入敏感值的 stdout/stderr 脱敏。
   - 默认 coding 工具注册表：`create_coding_tool_registry()`。
   - 默认工具 schema 展示示例：`examples/02_tool_agent.py`。
   - 结构化工具结果：`ToolResult`，在 `ToolRegistry.run(...)` 边界统一表达成功、失败、错误和原始返回值。
@@ -25,7 +28,7 @@
   - 内置工具描述边界：只读、写入或覆盖、命令执行、workspace、timeout 和返回字段。
   - pytest 单元测试、集成测试和示例脚本。
 
-下一步进入第 2 周 Day 7：周复盘和小重构，优先修补一个真实边界缺口，不提前进入权限系统、planner、RAG、MCP 或真实 LLM adapter。
+下一步进入第 3 周 Day 1：Permission System 起步，优先实现危险命令识别与最小权限策略；当前仍不提前进入 planner、RAG、MCP 或真实 LLM adapter。
 
 ## 核心架构
 
@@ -151,7 +154,7 @@ python -m pytest -q
 当前最近一次全量验证基线：
 
 ```text
-92 passed, 1 skipped
+93 passed, 1 skipped
 ```
 
 ## 运行示例
@@ -202,7 +205,8 @@ python examples/02_tool_agent.py
 - 测试优先：核心模块必须配套单元测试。
 - 本地优先：初期不依赖真实 API，使用 mock LLM 降低不确定性。
 - 安全优先：文件和命令执行必须限制在 `workspace_root` 内。
-- 可演进：先做最小闭环，再逐步扩展权限、上下文、MCP、Memory 和可观测性。
+- 工业级优先：每天的小切片都要说明它在最终工业级系统中的位置、已覆盖边界和仍缺能力。
+- 可演进：先做可验证垂直切片，再逐步扩展权限、上下文、MCP、Memory 和可观测性。
 - 教学优先：讲到流程、调用链、状态流转、模块关系或架构关系时，必须配套 Mermaid 流程图或架构图。
 
 ## 学习路线
@@ -213,6 +217,7 @@ python examples/02_tool_agent.py
 - `docs/02_DAILY_TASKS.md`
 - `docs/05_LEARNING_NOTES.md`
 - `docs/09_NEXT_ACTIONS.md`
+- `docs/12_IMPLEMENTED_ARCHITECTURE_AND_INDUSTRIAL_GAPS.md`
 
 当前 12 周主题包括：
 
