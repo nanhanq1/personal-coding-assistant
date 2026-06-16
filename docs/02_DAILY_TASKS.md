@@ -65,6 +65,7 @@ python -m compileall src examples -q
 - 归档 `docs/07_IMPLEMENTATION_LOG.md` 的 2026-06-15 旧记录。
 - 删除根目录纯导航文件，改用 `docs/INDEX.md` 作为唯一导航入口。
 - 用 `DOC_RULES.md` 承载文档规则，避免把文档规则误当成状态记忆。
+- 新增 `docs/15_MEMORY_SYSTEM.md`，区分项目协作记忆和未来产品运行时记忆。
 - 更新 `docs/02_DAILY_TASKS.md` 为 Week 3 Day 1 活跃任务。
 - 更新 `docs/07_IMPLEMENTATION_LOG.md` 记录状态纠偏结果。
 - 更新 `docs/09_NEXT_ACTIONS.md`，记录 Day 1 验证完成，但面试题回答并归档前不推进 Day 2。
@@ -83,6 +84,7 @@ python -m compileall src examples -q
 - 占位模块仍被明确标记为占位或未接入主链。
 - 基线验证命令全部通过。
 - `docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md` 低于行数上限。
+- 记忆系统文档不复制实时状态，不把 `src/pca/memory/` 宣传为已实现能力。
 - `docs/09_NEXT_ACTIONS.md` 记录 Day 1 验证完成，但在面试题回答并归档前不推进到 Week 3 Day 2。
 
 ### 8. 今日面试题

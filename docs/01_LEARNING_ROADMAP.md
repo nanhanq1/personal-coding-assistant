@@ -68,4 +68,5 @@
 - 评估策略：`EVALUATION.md`
 - 参考项目映射：`docs/13_REFERENCE_PROJECT_MAPPING.md`
 - 完整 24 周计划：`docs/14_24_WEEK_PLAN.md`
+- 记忆系统边界：`docs/15_MEMORY_SYSTEM.md`
 - 当前下一步：`docs/09_NEXT_ACTIONS.md`

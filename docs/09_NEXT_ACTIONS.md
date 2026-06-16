@@ -11,7 +11,7 @@
 - 最新示例：`examples\01_minimal_agent.py`、`examples\02_tool_agent.py` 均通过。
 - 最新编译验证：`python -m compileall src examples -q` 通过。
 - 阻塞项：Week 3 Day 1 面试题尚未回答，不能归档 Day 1，不能推进 Day 2。
-- 最新文档维护：已瘦身文档入口、归档实现日志、删除根目录纯导航文件。
+- 最新文档维护：已瘦身文档入口、归档实现日志，并新增 `docs/15_MEMORY_SYSTEM.md` 定义记忆边界。
 
 ## 当前能力边界
 
@@ -20,6 +20,7 @@
 仍是占位或未接入主链：`permissions`、`context`、`memory`、`mcp`、`observability`、`workspace/checkpoint/docker_runtime`、`cli`。
 
 详细已实现主线与差距见 `docs/12_IMPLEMENTED_ARCHITECTURE_AND_INDUSTRIAL_GAPS.md`。
+记忆系统文档边界见 `docs/15_MEMORY_SYSTEM.md`。
 
 ## 下一步行动
 

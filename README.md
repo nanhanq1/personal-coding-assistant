@@ -48,7 +48,8 @@ flowchart LR
 │   ├── 07_IMPLEMENTATION_LOG.md
 │   ├── 09_NEXT_ACTIONS.md
 │   ├── 13_REFERENCE_PROJECT_MAPPING.md
-│   └── 14_24_WEEK_PLAN.md
+│   ├── 14_24_WEEK_PLAN.md
+│   └── 15_MEMORY_SYSTEM.md
 ├── examples/
 ├── src/pca/
 ├── tests/

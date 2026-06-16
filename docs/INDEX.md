@@ -33,6 +33,7 @@
 | `docs/12_IMPLEMENTED_ARCHITECTURE_AND_INDUSTRIAL_GAPS.md` | 已实现主线和工业级差距 |
 | `docs/13_REFERENCE_PROJECT_MAPPING.md` | 外部参考项目到本项目模块的映射 |
 | `docs/14_24_WEEK_PLAN.md` | 完整 24 周工业级路线和每日任务 |
+| `docs/15_MEMORY_SYSTEM.md` | 项目协作记忆与未来运行时记忆边界 |
 
 ## 代码实现时读取
 

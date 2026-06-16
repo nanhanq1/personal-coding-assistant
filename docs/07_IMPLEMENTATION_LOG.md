@@ -27,3 +27,19 @@
 
 - 仍需用户回答 Week 3 Day 1 面试题。
 - 回答并归档后，进入 Week 3 Day 2 trace 数据结构设计与实现。
+
+## 2026-06-16
+
+### 记忆系统边界优化
+
+### 本次完成
+
+- 新增 `docs/15_MEMORY_SYSTEM.md`，把项目协作记忆和未来产品运行时记忆分开定义。
+- 明确 `src/pca/memory/` 当前仍是占位模块，未接入 Agent 主链。
+- 在 `docs/INDEX.md` 和 `DOC_RULES.md` 中登记记忆系统文档，避免重新引入根目录 `MEMORY.md` 状态源。
+- 更新 `docs/09_NEXT_ACTIONS.md` 与 `docs/02_DAILY_TASKS.md`，记录本次文档边界调整。
+
+### 验证
+
+- 本次只修改 Markdown 文档，未修改业务源码。
+- 记忆系统文档不复制实时测试数字或下一步状态。
