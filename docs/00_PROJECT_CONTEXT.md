@@ -2,7 +2,7 @@
 
 ## 项目名称
 
-Personal Coding Assistant Agent
+Personal Coding Assistant
 
 ## 默认路径
 
@@ -14,18 +14,18 @@ Personal Coding Assistant Agent
 
 ## 长期目标
 
-实现一个可放入作品集和面试讲解的 Personal Coding Assistant Agent，具备代码库理解、任务规划、工具调用、Agent Loop、上下文工程、权限控制、MCP、状态机、长期记忆、安全运行和可观测性。
+实现一个可放入作品集和面试讲解的 Personal Coding Assistant，具备代码库理解、任务规划、工具调用、Agent Loop、上下文工程、权限控制、MCP、状态机、长期记忆、安全运行、评估体系和可观测性。
 
 ## 当前阶段
 
-- 12 周路线：第 3 周
-- 当前主题：Permission System
-- 当前模块：第 3 周 Day 1：危险命令识别与权限策略起步
+- 当前阶段：24 周工业级路线，Week 3
+- 当前主题：Agent Core + Tool Runtime 工业级加固
+- 实时状态、阻塞项和下一步见 `docs/09_NEXT_ACTIONS.md`
 
 ## 当前原则
 
 - 每次只聚焦一个模块。
 - 初期使用 mock LLM，不依赖真实 API。
 - 所有核心行为先写测试，再实现。
-- 每次结束更新长期记忆文件。
+- 每次结束更新 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md`、`docs/09_NEXT_ACTIONS.md`。
 

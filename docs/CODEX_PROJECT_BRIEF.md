@@ -24,11 +24,13 @@
 
 工业级最低完成定义：端到端可运行主链 + 可配置工具/权限/上下文/记忆/运行时 + 执行前控制 + 系统化测试 + 可观测性 + 清晰文档 + 明确列出未达标部分。
 
-详细架构见 `docs/12_IMPLEMENTED_ARCHITECTURE_AND_INDUSTRIAL_GAPS.md`。
+当前真实架构和目标架构见 `ARCHITECTURE.md`；已实现主线与工业级差距见 `docs/12_IMPLEMENTED_ARCHITECTURE_AND_INDUSTRIAL_GAPS.md`。
 
 ## 二、学习主线
 
-详见 `docs/01_LEARNING_ROADMAP.md`。10 阶段：learn-claude-code → mini-SWE-agent → OpenAI Agents SDK → MCP → LangGraph → Aider → Cline → OpenHands → Mem0/Letta/Graphiti → LlamaIndex。
+详见 `docs/01_LEARNING_ROADMAP.md` 和 `docs/14_24_WEEK_PLAN.md`。当前路线为 24 周工业级项目路线：Agent Core + Tool Runtime、Permission + Sandbox + Git Safety、Coding Agent、Retrieval / RAG、Personal Assistant Memory、Planner / State Machine / Events、Evaluation / Observability / CI、Productization / Portfolio。
+
+参考项目映射见 `docs/13_REFERENCE_PROJECT_MAPPING.md`，包括 mini-SWE-agent、Aider、Cline、OpenHands、Khoj、Letta/Mem0、Graphiti/Zep、LangGraph 和 LangChain。
 
 ## 三、教学模板（精简版）
 
@@ -47,11 +49,16 @@
 详见 `docs/INDEX.md`。核心文件：
 
 - `AGENTS.md`：核心执行规则
+- `DOC_RULES.md`：文档写入、归档和反漂移规则
 - `docs/09_NEXT_ACTIONS.md`：当前状态和下一步
 - `docs/02_DAILY_TASKS.md`：当前周任务（历史归档到 `docs/archive/`）
 - `docs/07_IMPLEMENTATION_LOG.md`：当前周实现日志
 - `docs/05_LEARNING_NOTES.md`：当前模块学习笔记
 - `docs/06_ARCHITECTURE_DECISIONS.md`：架构决策记录（ADR）
+- `PROJECT_REQUIREMENTS.md`：最终工业级项目需求
+- `ARCHITECTURE.md`：当前真实架构和目标架构
+- `EVALUATION.md`：测试、评估和 CI 策略
+- `docs/14_24_WEEK_PLAN.md`：完整 24 周路线
 
 每周结束时必须把历史内容归档到 `docs/archive/`，保持活跃文件短小。
 
@@ -63,7 +70,7 @@ personal-coding-assistant/
 │   ├── archive/                   # 历史归档
 │   └── ...
 ├── src/pca/
-│   ├── core/                      # Agent Loop、消息、可观测性
+│   ├── core/                      # Agent Loop、消息、Mock LLM、状态控制
 │   ├── tools/                     # 工具系统
 │   ├── permissions/               # 权限系统
 │   ├── context/                   # 上下文工程
@@ -95,6 +102,6 @@ personal-coding-assistant/
 
 ## 八、会话流程
 
-**开始时**：读取必读文件 → 总结进度 → 给出今日任务 → 实现核心代码 → 更新测试和文档
+**开始时**：读取必读文件 → 总结真实进度 → 给出今日任务 → 实现核心代码或文档 → 更新测试和文档
 
 **结束时**：输出完成内容、修改文件、面试题、已更新的记忆文件。面试题未回答时不归档。

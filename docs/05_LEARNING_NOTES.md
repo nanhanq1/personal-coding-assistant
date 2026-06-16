@@ -2,17 +2,18 @@
 
 本文件只保留**当前模块**的学习笔记。历史记录已归档到 `docs/archive/learning_notes/`。
 
-## 当前模块：工业级加固（第 1-2 周加固周）
+## 当前模块：Week 3 Agent Core + Tool Runtime 工业级加固
 
 ### 核心概念
 
-| 概念 | 一句话解释 | 代码位置 |
+| 概念 | 一句话解释 | 当前状态或目标位置 |
 |---|---|---|
-| 结构化日志 | 用 JSON 格式记录操作，不是 print | `src/pca/core/observability.py` |
-| trace_id | 贯穿整个调用链的唯一标识 | `src/pca/core/observability.py` |
-| 输出截断 | 防止大量输出撑爆 message history | `src/pca/tools/base.py` → `truncate_output()` |
-| 调用统计 | 记录每个工具的调用次数、成功率、耗时 | `src/pca/tools/registry.py` → `get_stats()` |
-| AgentLoopStats | 一次 Agent 运行的资源消耗统计 | `src/pca/core/agent_loop.py` |
+| 结构化日志 | 用结构化事件记录操作，不是散落的 `print` | 目标位置：`src/pca/observability/logger.py`，当前仍是占位 |
+| trace_id | 贯穿一次 Agent 运行或工具调用链的唯一标识 | 目标位置：`src/pca/core/events.py`，Week 3 Day 2 计划实现 |
+| AgentEvent | 描述 Agent loop、工具调用、工具结果等运行事件 | 目标位置：`src/pca/core/events.py`，Week 3 Day 2 计划实现 |
+| 输出截断 | 防止大量 stdout、stderr 或文件内容撑爆 message history | 目标位置：`src/pca/tools/base.py` 或具体 tool/runtime 边界 |
+| 调用统计 | 记录每个工具的调用次数、成功率、耗时 | 目标位置：`src/pca/tools/registry.py` → `get_stats()` |
+| 文件资源边界 | 限制文件大小并识别二进制文件，避免误读不可处理内容 | 目标位置：`src/pca/tools/file_tools.py` |
 
 ### 九个工业级维度（精简版）
 
@@ -28,9 +29,15 @@
 8. **代码质量**：中文注释 + 有意义命名 + 短小函数 + DRY
 9. **真实验证**：用真实代码库验证，不只是单元测试
 
+### 当前边界
+
+- 已实现主链仍是 `AgentLoop`、`ToolRegistry`、`ToolResult`、文件工具和 `ShellRuntime`。
+- `src/pca/observability/` 当前是占位目录，不能宣传为已接入主链。
+- Week 3 Day 1 已完成状态纠偏和基线验证，但面试题未回答，不能推进 Day 2。
+
 ### 加固执行流程
 
-现状评估 → 优先级排序 → 逐项加固 → 集成验证 → 真实验证 → 文档更新 → 验收签字
+现状评估 -> 状态纠偏 -> trace 数据结构 -> ToolResult 元数据 -> Registry stats -> 输出截断 -> 文件资源边界 -> 集成验证 -> 真实验证 -> 文档更新 -> 验收签字
 
 ## 历史笔记索引
 
