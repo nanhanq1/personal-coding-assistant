@@ -2,56 +2,53 @@
 
 本文件只保留当前活跃任务。历史任务归档在 `docs/archive/daily_tasks/`。完整 24 周每日计划见 `docs/14_24_WEEK_PLAN.md`。
 
-## 2026-06-15
+## 2026-06-19
 
-日期：2026-06-15
-当前阶段：Week 3 Day 1
-当前模块：Agent Core + Tool Runtime 工业级加固准备
+日期：2026-06-19
+当前阶段：Week 3 Day 3
+当前模块：ToolResult 元数据
 预计用时：1-2 小时
+执行状态：待开始。
 
 ### 1. 今日学习目标
 
-- 理解为什么工业级项目必须先做“状态纠偏”，不能在文档不准确时继续新增能力。
-- 区分“目录存在”“模块占位”“模块已接入主链”三种状态。
-- 明确 Week 3 加固目标：trace、`ToolResult` 元数据、`ToolRegistry` stats、输出截断、文件大小限制、二进制检测。
-- 学会把验收标准绑定到当前可运行命令，而不是只写抽象目标。
+- 理解 `ToolResult` 为什么是工具执行结果的统一信封。
+- 在不破坏旧测试和旧 message history 的前提下，为 `ToolResult` 增加 trace 元数据。
+- 区分 `trace_id`、`tool_call_id` 和 `output_truncated` 的职责。
+- 学会用兼容性测试约束数据模型演进。
 
 ### 2. 今日代码任务
 
-今天不新增业务源码功能。
+更新：
 
-需要核对的源码边界：
-
-- `src/pca/core/agent_loop.py`
-- `src/pca/core/messages.py`
 - `src/pca/tools/base.py`
-- `src/pca/tools/registry.py`
-- `src/pca/tools/file_tools.py`
-- `src/pca/tools/shell_tools.py`
-- `src/pca/runtime/shell_runtime.py`
-- `src/pca/context/`
-- `src/pca/memory/`
-- `src/pca/mcp/`
-- `src/pca/observability/`
-- `src/pca/permissions/`
+- `tests/test_tools.py`
+
+建议新增字段：
+
+- `ToolResult.trace_id: str | None = None`
+- `ToolResult.tool_call_id: str | None = None`
+- `ToolResult.output_truncated: bool = False`
 
 ### 3. 今日阅读任务
 
-- `AGENTS.md`
-- `docs/INDEX.md`
-- `docs/09_NEXT_ACTIONS.md`
-- `docs/00_PROJECT_CONTEXT.md`
-- `docs/01_LEARNING_ROADMAP.md`
-- `docs/03_WEEKLY_SPRINTS.md`
-- `README.md`
-- `docs/12_IMPLEMENTED_ARCHITECTURE_AND_INDUSTRIAL_GAPS.md`
+- `docs/03_WEEKLY_SPRINTS.md` 的 Week 3 Day 3 行。
+- `docs/14_24_WEEK_PLAN.md` 的 Week 3 Day 3 行。
+- LangSmith Observability concepts：https://docs.langchain.com/langsmith/observability-concepts
+- LangChain Academy：https://academy.langchain.com/
 
 ### 4. 今日测试任务
 
-确认当前真实基线：
+先写失败测试，再实现，建议从兼容性测试开始：
 
 ```powershell
-python -m pytest -q
+E:\python\Scripts\pytest.exe tests\test_tools.py -q
+```
+
+完成后再跑：
+
+```powershell
+E:\python\Scripts\pytest.exe -q
 python examples\01_minimal_agent.py
 python examples\02_tool_agent.py
 python -m compileall src examples -q
@@ -59,46 +56,27 @@ python -m compileall src examples -q
 
 ### 5. 今日文档任务
 
-- 修正 `docs/INDEX.md` 中路线周期残留描述。
-- 确认 `README.md` 没有把占位目录宣传为已实现能力。
-- 瘦身 `docs/09_NEXT_ACTIONS.md`，让它只保留当前状态、能力边界和下一步。
-- 归档 `docs/07_IMPLEMENTATION_LOG.md` 的 2026-06-15 旧记录。
-- 删除根目录纯导航文件，改用 `docs/INDEX.md` 作为唯一导航入口。
-- 用 `DOC_RULES.md` 承载文档规则，避免把文档规则误当成状态记忆。
-- 新增 `docs/15_MEMORY_SYSTEM.md`，区分项目协作记忆和未来产品运行时记忆。
-- 更新 `docs/02_DAILY_TASKS.md` 为 Week 3 Day 1 活跃任务。
-- 更新 `docs/07_IMPLEMENTATION_LOG.md` 记录状态纠偏结果。
-- 更新 `docs/09_NEXT_ACTIONS.md`，记录 Day 1 验证完成，但面试题回答并归档前不推进 Day 2。
+- 更新 `docs/07_IMPLEMENTATION_LOG.md` 记录 `ToolResult` 元数据实现和验证结果。
+- 必要时更新 `docs/06_ARCHITECTURE_DECISIONS.md`，说明为什么以默认字段保持兼容。
+- 更新 `docs/09_NEXT_ACTIONS.md`，Day 3 完成后先生成面试题，不直接推进 Day 4。
+- 必要时更新 `docs/05_LEARNING_NOTES.md` 的 trace / result metadata 笔记。
 
 ### 6. 今日复盘问题
 
-1. 为什么“有文件”不等于“模块已实现”？
-2. 为什么 trace 和 stats 应该在 Tool Runtime 边界设计，而不是随手写 `print`？
-3. 当前 `ToolResult` 还缺哪些元数据？
-4. 输出截断为什么必须让调用方知道内容被截断？
-5. 进入 Week 3 Day 2 前，哪些状态必须确认一致？
+1. 为什么 `trace_id` 和 `tool_call_id` 不是同一个字段？
+2. 为什么新增字段必须有默认值？
+3. `output_truncated` 为什么属于结果元数据，而不是只写进字符串？
+4. 保持 `ToolResult.__str__()` 不变解决了什么兼容问题？
+5. Day 3 还没有真正把 trace 传入 `AgentLoop`，这是否算完成？为什么？
 
 ### 7. 今日完成标准
 
-- README、路线、Next Actions、Daily Tasks 对当前真实状态描述一致。
-- 占位模块仍被明确标记为占位或未接入主链。
-- 基线验证命令全部通过。
-- `docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md` 低于行数上限。
-- 记忆系统文档不复制实时状态，不把 `src/pca/memory/` 宣传为已实现能力。
-- `docs/09_NEXT_ACTIONS.md` 记录 Day 1 验证完成，但在面试题回答并归档前不推进到 Week 3 Day 2。
+- `ToolResult.success(...)` 和 `ToolResult.failure(...)` 旧调用方式继续可用。
+- 新字段能被显式保存和读取。
+- `ToolResult.__str__()` 保持旧 message history 文本兼容。
+- 旧测试和新增测试都通过。
+- 全量测试、两个示例和编译验证通过。
 
 ### 8. 今日面试题
 
-状态：待用户回答，暂不归档。
-
-#### 概念理解
-
-为什么工业级项目里“目录或文件已经存在”不等于“该模块已经实现”？请结合 `src/pca/observability/` 或 `src/pca/context/` 举例说明。
-
-#### 源码追查
-
-请沿着当前工具调用主链说明一次 `run_command` 调用会经过哪些核心文件和函数，最终结果如何回写到 `message history`。
-
-#### 系统设计
-
-Week 3 要加入 trace、stats、输出截断和文件资源边界。你会把这些能力分别放在哪些层？为什么不应该把可观测性简单写成散落的 `print`？
+状态：Day 3 完成后生成。

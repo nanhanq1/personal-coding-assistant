@@ -376,3 +376,37 @@
 
 - 用户回答：不知道。
 - 标准回答：第 2 周完成后，工具系统已经具备了几个基础：`ToolParameter` 和 `Tool.to_schema()` 能表达工具调用契约；`ToolRegistry.list_tool_schemas()` 能统一导出真实注册工具；`read_file`、`write_file`、`edit_file` 和 `run_command` 有默认工具注册表；`edit_file` 有局部编辑和唯一匹配边界；`ToolRegistry.run(...)` 会返回结构化 `ToolResult`；`AgentLoop._tool_result_to_message(...)` 有结果写回边界；Day 7 还补了 `run_command.env` 敏感输出脱敏。仍然缺少的是执行前控制：危险命令分类、危险文件操作分类、权限策略、人工审批流程、拒绝/允许/询问决策、审计日志、trace id、sandbox、checkpoint/rollback，以及把审批结果纳入工具轨迹。
+
+## 第 16 天：2026-06-18
+
+### 面试题 1：为什么工业级项目里“目录或文件已经存在”不等于“该模块已经实现”？请结合 `src/pca/observability/` 或 `src/pca/context/` 举例说明。
+
+- 用户回答：比如完成一个模块需要三个工具：一个用于创建文件或目录，一个用于整体修改文件，还有一个用于局部匹配修改。创建文件之后，还需要完成文件内容写入；测试后如果出现错误，还要定位问题并修改，才能完成模块的完整开发。所以不是文件或目录存在就代表模块已经实现，还要经过评测和修改。
+- 标准回答：目录或文件存在只能说明项目结构已经预留了位置，不代表模块已经接入主链、具备行为、测试覆盖和验收证据。以 `src/pca/observability/` 或 `src/pca/context/` 为例，当前这些目录里的文件主要是占位说明，并没有被 `AgentLoop`、`ToolRegistry` 或工具 runtime 调用，也没有对应单元测试和真实运行链路。因此它们不能算已实现模块。工业级判断应同时看源码行为、调用链接入、测试、示例、文档一致性和失败边界，而不是只看文件是否存在。
+
+### 面试题 2：请沿着当前工具调用主链说明一次 `run_command` 调用会经过哪些核心文件和函数，最终结果如何回写到 `message history`。
+
+- 用户回答：`agent loop -> tool registry .run() -> shell command tool handler -> shell runtime .run() -> stdout stderr time_out returncode -> tool result -> agent loop ._tool_result_to_message() -> message history`。
+- 标准回答：一次 `run_command` 调用先由 LLM 产生 `ToolCall(name="run_command", arguments={...})`。`AgentLoop.run(...)` 读取这个 tool call，把 `name` 和 `arguments` 交给 `ToolRegistry.run(...)`；registry 找到 `ShellCommandTool`，再通过 `Tool.run(...)` 做基础参数校验；`ShellCommandTool` 的 handler 转发到 `ShellRuntime.run(...)`。`ShellRuntime` 负责规范化 `command`、解析 `workspace_root` 和 `cwd`、处理 timeout 与 env、调用 `subprocess.run(...)`，然后返回包含 `stdout`、`stderr`、`returncode`、`timed_out`、`duration_ms` 的 dict。`ToolRegistry.run(...)` 把该 dict 包装为 `ToolResult`，`AgentLoop._tool_result_to_message(...)` 再把内部结构化结果转成 `role="tool"` 的 `Message`，追加到 `message history`，让下一轮 LLM 基于真实执行结果继续决策。
+
+### 面试题 3：Week 3 要加入 trace、stats、输出截断和文件资源边界。你会把这些能力分别放在哪些层？为什么不应该把可观测性简单写成散落的 `print`？
+
+- 用户回答：放在可观测层，不好维护。
+- 标准回答：方向上对，但需要分层更清楚。`trace_id` 和 `AgentEvent` 这类跨调用链字段应放在 core/events 或 observability 边界，负责贯穿一次 Agent 运行；`ToolRegistry` 适合记录工具调用次数、成功/失败、耗时等 stats，因为它是所有工具执行的统一入口；shell 输出截断应放在 `ShellRuntime` 或工具结果包装边界，保证大输出在进入 `ToolResult` 和 message history 前被控制；文件大小限制和二进制检测应放在 `file_tools.py` 的读写入口，因为那里最接近真实文件系统副作用。不能把可观测性写成散落的 `print`，因为 `print` 没有稳定字段、没有 trace id、无法按工具或一次运行聚合、难以测试，也不方便未来接入审计日志、回放、CI 验证或真实监控系统。
+
+## 第 17 天：2026-06-19
+
+### 面试题 1：trace 和普通 log 的区别是什么？为什么 trace 更适合串起一次 Agent 运行？
+
+- 用户回答：trace 是详细记录 agent 的调用链和其中的细节，普通 log 只是记录某个事件的情况，不能连续。因为 trace 可以根据 trace_id 记录连续的事件，所以可以串起来一次 agent。
+- 标准回答：trace 关注一次请求或一次 Agent 运行的完整链路，核心是让多个步骤共享同一个 `trace_id`，从而把用户输入、LLM 响应、工具调用、工具结果和最终回答串成可回放轨迹。普通 log 更偏向记录某个时间点发生的单个事件，除非额外设计关联字段，否则很难稳定还原一次完整调用链。对 Coding Agent 来说，trace 更适合定位是哪一轮、哪一个 tool call、哪一次结果写回导致了后续行为。
+
+### 面试题 2：请说明 `TraceContext.new()` 和 `AgentEvent` 当前分别定义在哪个文件，它们为什么还没有接入 `AgentLoop` 主链？
+
+- 用户回答：`TraceContext.new()` 和 `AgentEvent` 现在都定义在 `src/pca/core/events.py`，不是分别在 `AgentLoop` 和 `Registry`。它们还没接入主链的原因是：Day 2 只做最小数据结构，先证明 API 稳定。
+- 标准回答：`TraceContext.new()` 和 `AgentEvent` 都定义在 `src/pca/core/events.py`。Day 2 只验证最小事件模型能生成和保存 `trace_id`、`event_type`、`payload`，暂不接入 `AgentLoop`、`ToolRegistry` 或 `ToolResult`，是为了把数据结构稳定性和主链行为改动分开。接入主链会影响一次 Agent 运行如何创建 trace、如何传递 trace、如何把工具结果挂到 trace 上，这些属于 Day 3 和 Day 4 的渐进加固范围。
+
+### 面试题 3：如果 Day 3 要把 trace 字段接入 `ToolResult`，你会选择哪些字段？如何保证旧测试和旧 message history 不被破坏？
+
+- 用户回答：选择 `trace_id`、`result`、`output_truncated`、`duration_ms`，保留已有的 `duration_ms/result/error_*`。兼容旧测试的方法是给新字段默认值，并保持 `ToolResult.__str__()` 输出不变，旧的 message history 就不会被破坏。
+- 标准回答：Day 3 最适合在 `ToolResult` 中新增 `trace_id`、`tool_call_id` 和 `output_truncated`，并继续保留已有的 `ok`、`result`、`error_type`、`error_message`、`duration_ms`。`trace_id` 负责关联一次 Agent 运行，`tool_call_id` 负责区分同一个 trace 下的具体工具调用，`output_truncated` 负责告诉调用方输出是否被截断。兼容旧测试和旧 message history 的关键是给新增字段默认值，例如 `None` 或 `False`，并保持 `ToolResult.__str__()` 的成功和失败文本语义不变；这样旧的 `AgentLoop._tool_result_to_message(...)` 仍能得到同样的 `Message.content`。

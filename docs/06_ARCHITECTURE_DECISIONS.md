@@ -1,5 +1,39 @@
 # Architecture Decisions
 
+## ADR-0008：Week 3 Day 2 先在 core 层定义轻量 trace 事件模型
+
+日期：2026-06-18
+
+### 背景
+
+Week 3 的加固目标包含 trace、调用统计、输出截断和资源边界。当前主链已经有 `AgentLoop`、`ToolRegistry`、`ToolResult`、文件工具和 `ShellRuntime`，但还没有一个可在线路中传递的 trace 上下文，也没有可复用的事件数据结构。
+
+如果直接在 `AgentLoop`、`ToolRegistry` 或 `ShellRuntime` 中散落字符串日志，后续很难把同一次用户请求、LLM 决策、工具调用、工具结果和错误恢复串成可回放轨迹。因此需要先定义最小数据结构，再逐步接入各层。
+
+### 决策
+
+新增 `src/pca/core/events.py`：
+
+- `TraceContext(trace_id: str)` 表示一次 Agent 调用链共享的 trace 上下文。
+- `TraceContext.new()` 使用 `uuid4().hex` 生成新的非空 trace id。
+- `AgentEvent(event_type: str, trace_id: str, payload: dict[str, object])` 表示一条轻量事件。
+
+本次只新增数据结构和单元测试，不改 `AgentLoop`、`ToolRegistry`、`ToolResult` 或 observability logger。
+
+### 理由
+
+- `core/events.py` 位于 Agent Loop 和 Tool Runtime 都能引用的低层边界，适合放跨调用链数据结构。
+- 先用轻量 dataclass，避免在 Week 3 Day 2 过早引入 OpenTelemetry SDK、事件流、持久化或复杂继承树。
+- `payload` 先保留为 dict，能承载后续工具名、参数摘要、错误信息、截断标记和统计字段，同时不绑定具体事件类型。
+- 不提前接入主链，可以保持当前 95 个测试和示例兼容，再在 Day 3/Day 4 逐步把 trace 字段接入 `ToolResult` 和 `ToolRegistry`。
+
+### 暂不采用
+
+- 暂不实现 span、parent_id、timestamp、duration 或采样。
+- 暂不把 `Message` 或 `ToolResult` 改成事件流格式。
+- 暂不接入 `src/pca/observability/logger.py`，该目录当前仍是占位。
+- 暂不引入 OpenTelemetry SDK；后续需要外部导出时再评估。
+
 ## ADR-0007：第 2 周 Day 4 在 ToolRegistry 边界返回结构化 ToolResult
 
 日期：2026-06-12
