@@ -8,6 +8,7 @@
 
 - 第 1 周 Day 1 到 Day 7
 - 第 2 周 Day 1 到 Day 7
+- 第 3 周已完成的 Agent Core + Tool Runtime 加固切片
 - 与上述主线直接相关的文档复核、规则治理和工业级边界补强
 
 不纳入“已实现主链架构图”的目录：
@@ -44,7 +45,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-05-26 | Week 1 Day 1 最小 Agent Loop | 建立 `Message`、`ToolCall`、`ScriptedLLM`、`AgentLoop` 和最小示例 | `src/pca/core/messages.py` `src/pca/core/mock_llm.py` `src/pca/core/agent_loop.py` | 只支持脚本化 mock LLM，没有真实模型适配、并发、多工具调度、恢复策略和成本控制 | 有 `message history`、`max_turns`、基础结构校验 | LLM adapter / 控制流成熟度 | 真实 LLM adapter、流式输出、重试、中断恢复、token/cost 统计 |
 | 2026-06-01 | Week 1 Day 2 Tool / ToolRegistry | 建立 `Tool` 与 `ToolRegistry`，让 `AgentLoop` 通过注册表执行工具 | `src/pca/tools/base.py` `src/pca/tools/registry.py` | 注册表还是最小路由层，没有 schema、权限元数据、审计字段和调用策略 | 重复注册、未知工具、空名等基础校验 | 工具系统抽象成熟度 | 参数 schema、权限元数据、可观测字段、并发或批量工具策略 |
-| 2026-06-04 | Week 1 Day 3 文件工具 | 实现 `read_file` / `write_file` 和 `workspace_root` 边界 | `src/pca/tools/file_tools.py` | 只支持文本文件读写，没有二进制检测、文件大小限制、审批、diff 预览和回滚 | 路径必须位于 `workspace_root` 内，空路径/非法类型会失败 | 文件系统安全 / 变更可控性 | 二进制检测、文件大小上限、写前审批、变更预览、checkpoint/rollback |
+| 2026-06-04 | Week 1 Day 3 文件工具 | 实现 `read_file` / `write_file` 和 `workspace_root` 边界 | `src/pca/tools/file_tools.py` | 早期只支持文本文件读写，没有审批、diff 预览和回滚 | 路径必须位于 `workspace_root` 内，空路径/非法类型会失败 | 文件系统安全 / 变更可控性 | 写前审批、变更预览、checkpoint/rollback |
 | 2026-06-06 | Week 1 Day 4 Shell Runtime | 实现 `ShellRuntime` 与 `run_command`，支持 `cwd`、timeout、stdout/stderr/returncode/timed_out | `src/pca/runtime/shell_runtime.py` `src/pca/tools/shell_tools.py` | 仍直接在本机同步执行命令，没有危险命令分类、审批、sandbox、进程树治理和审计 | `workspace_root`、`cwd`、timeout、环境变量基础校验 | 命令执行安全 / runtime 隔离 | 风险分类、审批流、sandbox/docker runtime、进程树清理、审计日志 |
 | 2026-06-06 | 工业级代码审查与加固 | 清理硬编码 API key，补充输入校验、工具错误回写和运行边界 | `src/pca/response_test.py` `src/pca/mini_LLM_01.py` `src/pca/core/*` `src/pca/tools/*` `src/pca/runtime/*` | 这是“最小工业级补强”，不是完整产品级治理；仍缺 secrets 管理、策略系统、trace、审批和隔离执行 | 惰性创建 client、边界校验、工具失败写回 history、密钥扫描测试 | 安全治理 / 凭据管理 / 容错 | Secrets manager、统一配置层、审计链路、审批与策略、生产级日志 |
 | 2026-06-08 | Week 1 Day 5 Loop + Tools 整合 | 新增 `create_coding_tool_registry()`，验证 `write_file -> read_file -> final answer` 闭环 | `src/pca/tools/__init__.py` `tests/test_loop_tools_integration.py` | 仍是脚本化 happy path 集成，没有多工具计划、失败恢复矩阵、上下文裁剪和观察压缩 | 统一默认工具注册表，最小多步链路验证 | 主链集成成熟度 | 规划层、上下文管理、失败恢复策略、更多真实任务回归 |
@@ -57,6 +58,10 @@
 | 2026-06-12 | Week 2 Day 5 schema + `edit_file` + result 整合 | 新增 `AgentLoop._tool_result_to_message(...)`，打通 `edit_file -> read_file -> final answer` | `src/pca/core/agent_loop.py` `tests/test_loop_tools_integration.py` | 结构化结果已接入消费边界，但 tool message 仍是纯文本，没有 JSON 观察、输出截断、敏感信息策略和厂商适配 | 失败不会直接中断 AgentLoop，统一写回 tool message | 结果消费 / 轨迹可恢复性 | JSON tool message、trace 透传、输出截断、敏感字段隐藏、供应商格式适配 |
 | 2026-06-12 ~ 2026-06-13 | Week 2 Day 6 文档复核 | 复核 README、讲解稿、学习笔记与当前代码一致 | `README.md` `docs/11_WEEK2_INTERVIEW_SCRIPT.md` | 当前文档已经能忠实表达已实现主链，但仍未覆盖未来 Permission、Context、MCP、Memory 等成熟架构 | 通过测试、示例和源码复核文档 | 架构表达 / 状态治理 | 更系统的架构文档、实现状态矩阵、模块成熟度看板 |
 | 2026-06-14 | Week 2 Day 7 `run_command.env` 输出脱敏 | 对显式传入的敏感 env 值做 stdout/stderr 脱敏 | `src/pca/runtime/shell_runtime.py` `src/pca/tools/shell_tools.py` | 这是事后清洗，不是执行前控制；不能阻止危险命令，也不处理更复杂泄漏路径 | 敏感 key 识别、stdout/stderr/timeout 输出脱敏 | 敏感信息治理 / 权限系统前置边界 | 执行前审批、风险分类、审计、更多 secret 模式识别、sandbox |
+| 2026-06-20 | Week 3 Day 4 `ToolRegistry` 调用统计 | 新增 `ToolRegistry.get_stats()`，记录工具调用次数、成功数、失败数和累计耗时 | `src/pca/tools/registry.py` `tests/test_tools.py` | 统计仍是进程内内存快照，没有 logger hook、持久化 metrics、并发保护和可视化 | 成功、handler 失败、参数错误、未知工具都计入 stats；`get_stats()` 返回快照 | 可观测性 / metrics 成熟度 | logger hook、并发安全、指标导出、运行历史持久化、CLI/Web UI 展示 |
+| 2026-06-20 | Week 3 Day 5 输出截断 | 新增 `truncate_output(...)`，在 `ToolRegistry` 结果边界截断 shell stdout/stderr 和字符串 payload | `src/pca/tools/base.py` `src/pca/tools/registry.py` `tests/test_tools.py` | 截断仍是固定字符上限，没有 token 预算、尾部保留、原始输出持久化和按工具配置 | 截断文本有可见标记，`ToolResult.output_truncated=True`，未截断输出保持兼容 | 输出控制 / 上下文预算 | 动态 token 预算、head/tail 策略、原始输出审计存储、按工具上限配置 |
+| 2026-06-20 | Week 3 Day 6 文件资源限制 | `ReadFileTool` 读取前拒绝超过 1MiB 的文件和含 NUL 字节的明显二进制文件 | `src/pca/tools/file_tools.py` `tests/test_file_tools.py` | 资源限制仍是固定上限和最小二进制信号，没有动态配置、编码探测、分块读取或二进制专用工具 | 大文件和明显二进制文件会稳定拒绝，并通过 `ToolRegistry.run(...)` 回写失败 `ToolResult` | 文件资源安全 / 上下文预算 | 动态上限、head/tail 分块读取、编码探测、专门二进制工具、审计日志 |
+| 2026-06-20 | Week 3 Day 7 加固验收示例 | 新增观察示例，展示成功读取、资源拒绝和 `ToolRegistry.get_stats()` | `examples/03_observed_tool_run.py` `tests/test_examples.py` | 示例能证明当前最小观测能力，但还没有结构化日志、trace 自动透传、持久化 metrics、权限审计或真实场景验证报告 | 通过示例和测试固定“真实已实现字段”，避免把未接入能力写成已完成 | 验收表达 / 文档真实性 | Week 4 接入权限策略后，再把审批结果、审计日志和 trace 串入主链 |
 | 2026-05-27 | 流程/治理问题：教学规则固化 | 固化教学顺序、中文注释、资料链接、流程图要求 | `AGENTS.md` `docs/CODEX_PROJECT_BRIEF.md` | 规则已明确，但仍依赖人工遵守，没有自动化检查 | 仓库规则入口清晰 | 流程治理 / 规范执行 | 文档 lint、模板化任务单、规则检查脚本 |
 | 2026-06-03 | 流程/治理问题：面试题归档机制 | 新增每日面试题归档文件和格式规则 | `docs/Compilation-of-Interview-Questions.md` | 归档流程已固定，但仍依赖人工同步和门禁判断 | 只有已回答题才能归档，标题和内容格式固定 | 知识沉淀 / 流程门禁 | 自动化归档辅助、状态检查、面试题索引 |
 | 2026-06-12 | 流程/治理问题：未回答题不得归档 | 明确未回答面试题不能占位归档，必须先推送用户回答 | `AGENTS.md` `docs/CODEX_PROJECT_BRIEF.md` `docs/09_NEXT_ACTIONS.md` | 流程更严谨，但仍是人工门禁，没有自动阻断错误推进 | 待答题保留在 `docs/09_NEXT_ACTIONS.md`，不写占位答案 | 流程门禁 / 状态一致性 | 自动状态检查、待办门禁、归档校验脚本 |
@@ -76,10 +81,11 @@ flowchart LR
     G --> H{"Concrete tool"}
     H --> I["read_file / write_file / edit_file"]
     H --> J["run_command / ShellRuntime"]
-    I --> K["ToolResult"]
+    I --> K["file resource guard / truncate_output"]
     J --> K
-    K --> L["AgentLoop._tool_result_to_message(...)"]
-    L --> B
+    K --> L["ToolResult"]
+    L --> M["AgentLoop._tool_result_to_message(...)"]
+    M --> B
     B --> C
 ```
 
@@ -89,6 +95,8 @@ flowchart LR
 - 当前主链仍以 **mock LLM + 本地工具 + 文本 message history** 为中心，不包含真实模型 API、权限系统、RAG、MCP、长期记忆或可观测平台
 - `ToolRegistry` 是“工具事实源 + 执行入口”
 - `ToolResult` 是“工具执行后的结构化结果信封”
+- `truncate_output(...)` 是“工具输出进入 `ToolResult` 和 message history 前的最小截断边界”
+- `ReadFileTool` 的文件资源检查是“文件内容进入文本读取前的最小拒绝边界”
 - `AgentLoop._tool_result_to_message(...)` 是“内部结果到 LLM 可读观察”的序列化边界
 
 ### 与工业级项目相比的差异
@@ -201,7 +209,7 @@ flowchart TD
 
 - `ToolParameter`：定义参数名、JSON 类型、描述和 required
 - `Tool`：包装工具元数据和统一执行入口
-- `ToolRegistry`：负责注册、查找、执行和导出 schema
+- `ToolRegistry`：负责注册、查找、执行、导出 schema 和查询调用统计
 
 ### 高层流程图
 
@@ -214,6 +222,7 @@ flowchart LR
     E --> F["Tool.run(arguments)"]
     F --> G["handler/runtime"]
     G --> H["ToolResult"]
+    E --> I["ToolRegistry.get_stats()"]
 ```
 
 ### 细节图
@@ -234,13 +243,17 @@ flowchart TD
     L --> M{"handler 成功?"}
     M -- "否" --> N["ToolResult.from_exception(...)"]
     M -- "是" --> O["ToolResult.success(...)"]
+    N --> P["_record_stats(..., ok=False)"]
+    O --> Q["_record_stats(..., ok=True)"]
+    P --> R["返回 ToolResult"]
+    Q --> R
 ```
 
 ### 与工业级项目相比的差异
 
 - 当前 schema 仍是接近 JSON Schema 的轻量实现，不是完整规范实现
-- `ToolRegistry` 还没有权限标签、危险级别、幂等性标记、审计钩子和供应商工具定义映射
-- `ToolResult` 虽已统一返回，但 registry 还没有 trace id、工具调用 id、参数摘要脱敏等元数据
+- `ToolRegistry` 已有最小 stats 和输出截断边界，但还没有权限标签、危险级别、幂等性标记、审计钩子和供应商工具定义映射
+- `ToolResult` 虽已统一返回，并支持 `trace_id`、`tool_call_id` 和 `output_truncated`，但 registry 还没有自动生成 trace id、工具调用 id、参数摘要脱敏等元数据
 - 当前工具层重点是“最小结构契约 + 统一入口”，还不是“完整工具平台”
 
 ## 4. `read_file / write_file / edit_file`
@@ -285,7 +298,8 @@ flowchart TD
 
 ### 与工业级项目相比的差异
 
-- 只支持文本文件，不处理二进制、编码探测、大文件分块和文件锁冲突治理
+- `read_file` 只支持小型文本文件，读取前会拒绝超过 1MiB 的文件和含 NUL 字节的明显二进制文件
+- 当前仍不处理完整编码探测、大文件分块、图片/压缩包等二进制资源和文件锁冲突治理
 - `edit_file` 只支持精确单次替换，不支持 patch/diff、冲突合并、预览和撤销
 - 文件变更没有审批、审计、快照和自动 diff 展示
 - `workspace_root` 已经建立基本边界，但还没有“不同目录不同权限”的精细策略
@@ -334,7 +348,7 @@ flowchart TD
 - 仍在宿主机同步执行命令，没有隔离沙箱、容器 runtime 和资源限制
 - 没有危险命令分类、审批、命令 allowlist/denylist 和进程树治理
 - 输出脱敏只覆盖显式 `env` 中一部分敏感 key，不是完整 secret 防泄漏系统
-- 当前返回值足以教学和测试，但还没有命令审计、trace、结构化日志和执行策略
+- 通过 `ToolRegistry` 进入 `ToolResult` 时 stdout/stderr 会被截断，但底层 `ShellRuntime` 仍返回 raw 输出；当前还没有命令审计、trace、结构化日志和执行策略
 
 ## 6. `ToolResult -> tool Message` 序列化边界
 
@@ -371,7 +385,7 @@ flowchart TD
 ### 与工业级项目相比的差异
 
 - 当前序列化目标仍是纯文本 `Message.content`，没有 JSON tool payload 和供应商专用适配
-- `ToolResult` 缺少 trace id、工具调用 id、输出截断信息、权限决策结果和参数摘要
+- `ToolResult` 已支持 trace id、工具调用 id 和输出截断信息，但缺少权限决策结果、参数摘要和结构化序列化协议
 - 当前边界已经清楚，但还没有接入 observability、审计和回放体系
 - 这一步解决了“内部结构化结果如何回到 LLM 轨迹”，但还没有解决“结果如何进入生产级监控平台”
 
@@ -402,7 +416,7 @@ flowchart TD
 当前项目处于：
 
 - 12 周路线里的**第 2 周 Tool System 已收口**
-- 第 3 周 Permission System 即将开始
+- 第 3 周 Agent Core + Tool Runtime 工业级加固进行中
 - 当前代码本质上是一个**教学型、可验证、边界逐步清晰的最小 Personal Coding Assistant Harness**
 
 ### 2. 当前已经具备的稳定骨架
@@ -411,7 +425,10 @@ flowchart TD
 - 确定性 mock LLM：`ScriptedLLM`
 - 最小 `AgentLoop`
 - `Tool` / `ToolParameter` / `ToolRegistry`
-- `read_file` / `write_file` / `edit_file`
+- `ToolRegistry.get_stats()` 和最小工具调用统计
+- `truncate_output(...)` 和 `ToolRegistry` 输出截断边界
+- 带文件大小上限和明显二进制拒绝的 `read_file`
+- `write_file` / `edit_file`
 - `run_command` / `ShellRuntime`
 - `ToolResult`
 - `AgentLoop._tool_result_to_message(...)`

@@ -4,6 +4,10 @@ from typing import Any
 from pca.tools.base import Tool, ToolParameter
 
 
+DEFAULT_MAX_READ_FILE_BYTES = 1024 * 1024
+BINARY_DETECTION_SAMPLE_BYTES = 1024
+
+
 class ReadFileTool(Tool):
     """读取工作区内的文件内容。"""
 
@@ -11,7 +15,7 @@ class ReadFileTool(Tool):
         super().__init__(
             name="read_file",
             description=(
-                "读取工作区内的文件内容；只读取 workspace_root 内的文本文件内容，不修改文件；"
+                "读取工作区内的文件内容；只读取 workspace_root 内的小型文本文件内容，不修改文件；"
                 "适合在编辑前查看真实文件状态，返回文件文本。"
             ),
             handler=self._run,
@@ -34,11 +38,14 @@ class ReadFileTool(Tool):
         """读取工作区内的文件内容。"""
         path = _resolve_workspace_path(arguments)
         # 修改前旧代码：
+        # if path.is_dir():
+        #     raise IsADirectoryError(f"path is a directory: {path}")
         # return path.read_text(encoding="utf-8")
         #
-        # 问题：读取目录时依赖操作系统抛 PermissionError，错误语义不稳定。
+        # 问题：只检查目录，不限制文件大小，也不拒绝明显二进制内容。
         if path.is_dir():
             raise IsADirectoryError(f"path is a directory: {path}")
+        _ensure_readable_text_file(path)
         return path.read_text(encoding="utf-8")
 
 
@@ -198,6 +205,21 @@ def _resolve_workspace_root(arguments: dict[str, Any]) -> Path:
     if not workspace_root.exists() or not workspace_root.is_dir():
         raise ValueError(f"workspace_root must be an existing directory: {raw_workspace_root}")
     return workspace_root
+
+
+def _ensure_readable_text_file(path: Path) -> None:
+    """在读取前检查文件资源边界，避免大文件或二进制内容进入上下文。"""
+    file_size = path.stat().st_size
+    if file_size > DEFAULT_MAX_READ_FILE_BYTES:
+        raise ValueError(
+            "file is too large: "
+            f"{path} ({file_size} bytes > {DEFAULT_MAX_READ_FILE_BYTES} bytes)"
+        )
+
+    with path.open("rb") as file:
+        sample = file.read(BINARY_DETECTION_SAMPLE_BYTES)
+    if b"\x00" in sample:
+        raise ValueError(f"file appears to be binary: {path}")
 
 
 # 向后兼容的函数形式

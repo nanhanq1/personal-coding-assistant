@@ -2,7 +2,10 @@ from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Any
 
-from pca.tools.base import Tool, ToolResult
+from pca.tools.base import Tool, ToolResult, truncate_output
+
+
+TRUNCATABLE_DICT_FIELDS = ("stdout", "stderr")
 
 
 @dataclass
@@ -10,6 +13,7 @@ class ToolRegistry:
     """负责注册、查找和执行工具的统一入口。"""
 
     _tools: dict[str, Tool] = field(default_factory=dict)
+    _stats: dict[str, dict[str, int]] = field(default_factory=dict)
 
     def register(self, tool: Tool) -> None:
         """注册一个工具；同名工具会让调用路由变得不确定，因此直接报错。"""
@@ -53,9 +57,50 @@ class ToolRegistry:
             result = tool.run(arguments)
         except Exception as exc:
             duration_ms = int((perf_counter() - started_at) * 1000)
-            return ToolResult.from_exception(exc, duration_ms=duration_ms)
+            failure = ToolResult.from_exception(exc, duration_ms=duration_ms)
+            self._record_stats(name=name, ok=False, duration_ms=duration_ms)
+            return failure
+        # 修改前旧代码：
+        # return ToolResult.success(result=result, duration_ms=duration_ms)
+        #
+        # 问题：工具输出会原样进入 ToolResult，shell/file 大输出可能撑爆 message history。
+        result, output_truncated = _truncate_tool_result_payload(result)
         duration_ms = int((perf_counter() - started_at) * 1000)
-        return ToolResult.success(result=result, duration_ms=duration_ms)
+        self._record_stats(name=name, ok=True, duration_ms=duration_ms)
+        return ToolResult.success(
+            result=result,
+            duration_ms=duration_ms,
+            output_truncated=output_truncated,
+        )
+
+    def get_stats(self) -> dict[str, dict[str, int]]:
+        """返回工具调用统计快照，避免调用方修改注册表内部状态。"""
+        return {
+            tool_name: stats.copy()
+            for tool_name, stats in self._stats.items()
+        }
+
+    def _record_stats(self, name: str, ok: bool, duration_ms: int) -> None:
+        """在 ToolRegistry 统一入口记录工具调用结果。"""
+        # 修改前旧代码：
+        # ToolRegistry.run(...) 只返回 ToolResult，不记录任何调用统计。
+        #
+        # 问题：上层无法知道每个工具被调用了多少次、失败了多少次。
+        stats = self._stats.setdefault(
+            name,
+            {
+                "calls": 0,
+                "successes": 0,
+                "failures": 0,
+                "total_duration_ms": 0,
+            },
+        )
+        stats["calls"] += 1
+        if ok:
+            stats["successes"] += 1
+        else:
+            stats["failures"] += 1
+        stats["total_duration_ms"] += duration_ms
 
     def exists(self, name: str) -> bool:
         if not isinstance(name, str) or name.strip() == "":
@@ -81,3 +126,22 @@ class ToolRegistry:
 
     def clear(self) -> None:
         self._tools.clear()
+        self._stats.clear()
+
+
+def _truncate_tool_result_payload(result: Any) -> tuple[Any, bool]:
+    """在结构化结果边界截断可进入 message history 的文本输出。"""
+    if isinstance(result, str):
+        return truncate_output(result)
+    if isinstance(result, dict):
+        truncated_payload = result.copy()
+        output_truncated = False
+        for field in TRUNCATABLE_DICT_FIELDS:
+            value = truncated_payload.get(field)
+            if isinstance(value, str):
+                truncated_text, was_truncated = truncate_output(value)
+                truncated_payload[field] = truncated_text
+                output_truncated = output_truncated or was_truncated
+        if output_truncated:
+            return truncated_payload, True
+    return result, False

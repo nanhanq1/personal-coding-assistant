@@ -10,94 +10,94 @@
 - 每 2 周实现后安排 1 周工业级加固；加固周不新增大模块。
 - 文档不能宣称源码没有实现的能力。
 
-## 当前 Sprint：Week 3 - Agent Core + Tool Runtime 工业级加固
+## 当前 Sprint：Week 4 - Permission System
 
 ### 1. 本周主题
 
-修正当前状态漂移，并把 Week 1-2 的 Agent Core + Tool Runtime 主链加固到具备初步 trace、统计、输出截断和资源边界。
+为工具执行增加执行前控制基础：风险分类、策略判断、审批对象、shell gate、文件风险和审计事件。
 
 ### 2. 本周工业级目标
 
-- 文档与源码状态一致。
-- `ToolResult` 支持必要元数据。
-- `ToolRegistry` 能记录调用统计。
-- shell/file 输出支持截断。
-- 文件工具具备文件大小和二进制检测边界。
+- 高风险工具调用在执行前可分类。
+- 权限策略能返回 allow / ask / deny。
+- 审批决策有结构化对象和可审计记录。
+- `run_command` 后续默认经过 permission gate。
+- 危险命令不应直接执行。
 
 ### 3. 核心概念
 
-- trace_id
-- tool_call_id
-- structured log
-- output truncation
-- resource limit
-- registry stats
+- risk level
+- policy decision
+- approval request
+- audit event
+- permission gate
 
 ### 4. 参考项目
 
-- mini-SWE-agent：线性 trajectory 和最小 runtime。
-- OpenHands：event stream 和 runtime 轨迹。
-- LangChain：tracing / callback 抽象。
+- Cline approval：工具执行前的人类审批。
+- OpenHands action security：动作安全边界。
+- MCP tool permission：工具权限风险建模。
 
 ### 5. 代码模块
 
-- `src/pca/core/events.py`
-- `src/pca/observability/logger.py`
-- `src/pca/tools/base.py`
-- `src/pca/tools/registry.py`
-- `src/pca/tools/file_tools.py`
-- `src/pca/runtime/shell_runtime.py`
+- `src/pca/permissions/risk.py`
+- `src/pca/permissions/policy.py`
+- `src/pca/permissions/approval.py`
+- `src/pca/permissions/audit.py`
+- `src/pca/tools/shell_tools.py`
 
 ### 6. 测试任务
 
-- trace id 生成和透传测试。
-- `ToolResult` 兼容性测试。
-- `ToolRegistry` 统计测试。
-- shell 输出截断测试。
-- 文件大小限制和二进制检测测试。
+- safe / ask / deny 风险分类测试。
+- `PermissionPolicy.decide(...)` 测试。
+- 审批通过、拒绝、过期测试。
+- 危险命令不会执行的集成测试。
+- 文件覆盖写入风险测试。
+- audit JSONL 内容测试。
 
 ### 7. 文档任务
 
-- 更新 `README.md` 当前真实状态。
 - 更新 `docs/09_NEXT_ACTIONS.md`。
 - 更新 `docs/07_IMPLEMENTATION_LOG.md`。
-- 新增或更新 ADR。
-- 更新 Week 3 学习笔记。
+- 新增或更新 ADR-0009。
+- 更新权限总链路图。
+- Week 4 完成后生成面试题。
 
 ### 8. 验收标准
 
 ```powershell
-python -m pytest -q
+E:\python\Scripts\pytest.exe -q
 python examples\01_minimal_agent.py
 python examples\02_tool_agent.py
+python examples\03_observed_tool_run.py
 python -m compileall src examples -q
 ```
 
-新增示例：
+后续新增示例：
 
 ```powershell
-python examples\03_observed_tool_run.py
+python examples\04_permission_agent.py
 ```
 
 ### 9. 常见风险
 
-- 把 observability 写成散落的 `print`。
-- 新字段破坏旧测试兼容。
-- 截断后 LLM 不知道内容被截断。
-- 文件大小限制误伤正常小文件。
+- 只做字符串匹配导致大量误判。
+- 把策略硬编码进 runtime，导致后续不可替换。
+- 把执行后脱敏误当成执行前权限控制。
+- 过早接入 shell gate，导致风险分类 API 还没稳定就影响主链。
 
 ### 10. 本周完成后新增能力
 
-一次工具调用可以带 trace、统计和截断信息；文件与命令输出具备基本资源边界。
+工具调用具备执行前控制基础：可以先分类风险，再由策略决定允许、询问或拒绝，并留下审计证据。
 
 ## 当前周每日安排
 
 | Day | 学习目标 | 代码任务 | 测试任务 | 文档任务 | 完成标准 |
 |---|---|---|---|---|---|
-| 1 | 修正文档状态漂移 | 不改源码 | 跑当前基线 | README/Next Actions/日志 | 文档与源码一致 |
-| 2 | trace 数据结构 | `TraceContext`、`AgentEvent` | trace 单测 | ADR 草稿 | 单测通过 |
-| 3 | ToolResult 元数据 | `trace_id/tool_call_id/output_truncated` | 兼容测试 | 架构更新 | 旧/新测试通过 |
-| 4 | Registry 统计 | `get_stats()` | stats 测试 | 学习笔记 | stats 可查询 |
-| 5 | 输出截断 | shell/file result 截断 | 大输出测试 | 安全边界 | 截断可见 |
-| 6 | 文件资源限制 | size/binary 检测 | 文件边界测试 | ADR 完成 | 文件边界通过 |
-| 7 | 加固验收 | 示例脚本 | 全量+示例+编译 | 面试题 | 可进入 Week 4 |
+| 1 | 风险分类 | `RiskLevel`、`RiskAssessment`、`classify_command` | `rm/del/curl/python -c` 分类测试 | 学习笔记 | 分类测试通过 |
+| 2 | 策略判断 | `PermissionPolicy.decide` | allow/ask/deny 测试 | ADR-0009 草稿 | 策略测试通过 |
+| 3 | 审批对象 | `ApprovalRequest`、`ApprovalDecision` | approve/reject/expired 测试 | 流程图 | 审批测试通过 |
+| 4 | 接入 shell | `ShellCommandTool` 或 registry 前置 permission hook | 危险命令不会执行测试 | 更新 ARCHITECTURE | shell gate 通过 |
+| 5 | 文件风险 | classify write/edit overwrite/delete-like paths | 覆盖写入 ask 测试 | 记录文件策略 | 文件风险测试通过 |
+| 6 | 审计事件 | `PermissionAuditEvent` 写 JSONL | audit 内容测试 | 实现日志 | audit 测试通过 |
+| 7 | 验收 | `examples/04_permission_agent.py` | 全量+安全测试 | 面试题 | 示例证明拒绝/审批 |

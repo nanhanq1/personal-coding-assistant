@@ -410,3 +410,92 @@
 
 - 用户回答：选择 `trace_id`、`result`、`output_truncated`、`duration_ms`，保留已有的 `duration_ms/result/error_*`。兼容旧测试的方法是给新字段默认值，并保持 `ToolResult.__str__()` 输出不变，旧的 message history 就不会被破坏。
 - 标准回答：Day 3 最适合在 `ToolResult` 中新增 `trace_id`、`tool_call_id` 和 `output_truncated`，并继续保留已有的 `ok`、`result`、`error_type`、`error_message`、`duration_ms`。`trace_id` 负责关联一次 Agent 运行，`tool_call_id` 负责区分同一个 trace 下的具体工具调用，`output_truncated` 负责告诉调用方输出是否被截断。兼容旧测试和旧 message history 的关键是给新增字段默认值，例如 `None` 或 `False`，并保持 `ToolResult.__str__()` 的成功和失败文本语义不变；这样旧的 `AgentLoop._tool_result_to_message(...)` 仍能得到同样的 `Message.content`。
+
+## 第 18 天：2026-06-19
+
+### 面试题 1：为什么 `trace_id` 和 `tool_call_id` 不是同一个字段？请结合“一次 Agent 运行”和“一次工具调用”的粒度差异回答。
+
+- 用户回答：`trace_id` 标识的是 Agent 一次调用的标识，`tool_call_id` 标识的是工具调用的标识，同时可能对应着某个工具。
+- 标准回答：方向正确。`trace_id` 是一次 Agent 运行或一次用户任务的链路标识，应该贯穿 `user_input -> LLM -> tool call -> tool result -> recovery/final answer`。同一个 trace 里可能有 0 次、1 次或多次工具调用。`tool_call_id` 是其中某一次具体工具调用的标识，用来区分同一个 trace 下多次调用同一个工具、重试同一个工具、或调用不同工具的结果。二者粒度不同：`trace_id` 解决“这属于哪一次任务”，`tool_call_id` 解决“这是这次任务里的哪一次工具调用”。
+
+### 面试题 2：请说明 `ToolResult.__str__()` 当前在什么兼容边界上起作用。为什么 Day 3 新增 `trace_id`、`tool_call_id`、`output_truncated` 后仍然不能改变 `__str__()` 的输出？
+
+- 用户回答：兼容工具的结构化输出结果和工具输出结果作为 LLM 的上下文的边界；因为这几个字段对于上下文影响 LLM 决策的效果甚小几乎没有，这几个字段是作为追踪、恢复、审查和日志来用的。
+- 标准回答：整体正确，但需要把边界说得更精确。`ToolResult.__str__()` 当前是 `ToolResult` 这个内部结构化结果信封到 `AgentLoop._tool_result_to_message(...)` 写回 `message history` 的文本兼容边界。成功时它返回原始结果文本，失败时返回稳定的 `Tool execution failed: ...` 文本。新增 `trace_id`、`tool_call_id`、`output_truncated` 后不能改变 `__str__()`，核心原因是旧测试、旧示例和旧 message history 依赖这个文本语义；如果把元数据直接混进字符串，LLM 上下文会变得不稳定，也会把观测字段和业务观察文本混在一起。元数据应保留在结构化字段中，供 trace、恢复、审计、日志和后续统计使用。
+
+### 面试题 3：如果 Day 5 实现输出截断，你会把“截断后的文本”和 `output_truncated=True` 分别放在哪里？请说明边界情况、方案对比和测试思路。
+
+- 用户回答：截断后的文本和 `output_truncated=True` 放在 `ToolResult` 中。
+- 标准回答：方向接近，但还不够分层。截断动作应该发生在最接近大输出产生的位置，例如 `ShellRuntime` 返回 stdout/stderr 前，或 file tool 读取文件内容进入 `ToolResult` 前；这样可以防止大输出先污染内存、`ToolResult` 和 message history。截断后的文本可以作为 `ToolResult.result` 里的内容保存，例如 shell result 的 `stdout` 或 `stderr` 已经是截断后的文本；`output_truncated=True` 应作为 `ToolResult` 的结构化元数据保存，告诉调用方这不是完整输出。只把提示写进字符串的方案不够好，因为难以测试、统计和审计；只放 bool 不改文本也不够，因为 LLM 仍可能看到过大的上下文。测试上应覆盖：未超过上限时文本不变且 `output_truncated=False`；超过上限时文本被截断且 `output_truncated=True`；stdout 和 stderr 至少一个被截断时总标记为 true；截断后 `ToolResult.__str__()` 仍保持兼容，不额外泄露结构化字段。
+
+## 第 19 天：2026-06-20
+
+### 面试题 1：为什么工具调用统计应该放在 `ToolRegistry.run(...)` 这个统一入口，而不是放在每个具体工具的 handler 里？
+
+- 用户回答：因为工具调用统计是统计每种工具的情况，作为总入口和 registry 同级，并且方便管理。
+- 标准回答：方向正确。更完整地说，stats 统计的是“工具系统运行情况”，不是某个具体工具的业务逻辑。`ToolRegistry.run(...)` 是 `AgentLoop` 面向工具系统的统一入口，所有工具成功、handler 抛错、参数校验失败、未知工具调用都会经过这里或在这里被捕获，因此放在 registry 能保证统计口径统一。如果把统计散落到每个 handler 里，容易漏掉参数校验失败和未知工具，也会让文件工具、shell 工具、未来 MCP 工具都混入重复的观测逻辑。具体工具应该专注真实业务边界，例如读文件、写文件、执行命令；registry 负责路由、结果包装和聚合统计。
+
+### 面试题 2：请沿着当前源码说明一次成功工具调用如何从 `ToolRegistry.run("echo", {"text": "hello"})` 走到 `_record_stats(...)`，并说明失败路径在哪里更新 `failures`。
+
+- 用户回答：不清楚；在 tools.run() 返回结果来判断是否失败。
+- 标准回答：一次成功调用从 `ToolRegistry.run(name, arguments)` 开始。首先记录 `started_at = perf_counter()`；然后检查 `arguments` 必须是 dict；接着通过 `self.get(name)` 找到注册工具；再调用 `tool.run(arguments)`，由 `Tool.run(...)` 做参数校验并进入 handler。如果 handler 成功返回，例如 `"hello"`，registry 计算 `duration_ms`，调用 `self._record_stats(name=name, ok=True, duration_ms=duration_ms)`，这里会把 `calls += 1`、`successes += 1`、`total_duration_ms += duration_ms`，最后返回 `ToolResult.success(...)`。失败路径在 `except Exception as exc:` 中处理：无论是未知工具、参数错误还是 handler 抛错，都会构造 `ToolResult.from_exception(...)`，然后调用 `_record_stats(name=name, ok=False, duration_ms=duration_ms)`，这里会把 `calls += 1`、`failures += 1`。所以不是等外部调用方拿到 `ToolResult` 再判断，而是在 `ToolRegistry.run(...)` 内部根据 try/except 的成功或失败分支同步更新 stats。
+
+### 面试题 3：如果未来要把 stats 暴露给 CLI 或 Web UI，你会如何设计 `get_stats()` 的返回格式、重置策略和权限边界？请同时回答未知工具统计、stats/trace/log 存储边界、并发安全和防外部篡改测试。
+
+- 用户回答：不清楚。
+- 标准回答：可以先保持 `get_stats()` 返回只读快照，例如 `{tool_name: {"calls": int, "successes": int, "failures": int, "total_duration_ms": int}}`，CLI 可以直接表格展示，Web UI 可以再加成功率和平均耗时等派生字段。重置策略不要混进 `get_stats()`，可以单独提供 `reset_stats()` 或按 session 新建 registry，避免“读取统计”产生副作用。权限边界上，stats 不应包含原始参数、文件内容、stdout、stderr 或 secret，只暴露聚合指标；如果未来按项目、用户、session 展示，还需要只允许用户查看自己授权工作区的统计。
+
+  未知工具应该单独统计，而且可以按请求的工具名记录，因为它能暴露 LLM 幻觉、schema 漂移或 adapter 映射错误。stats、trace、log 不应该简单混在一个结构里：stats 是聚合指标，trace 是一次请求的链路，log 是可审计事件记录，它们可以共享 `trace_id` / `tool_name` 等关联字段，但存储和查询方式不同。并发执行时，当前 `_stats` 的普通 dict 自增不是严格线程安全，未来需要锁、单线程事件队列、原子计数器或集中 metrics backend。防外部篡改的测试应覆盖 `stats = registry.get_stats(); stats["echo"]["calls"] = 999; assert registry.get_stats()["echo"]["calls"] == 1`，证明返回的是快照而不是内部可变对象。
+
+## 第 20 天：2026-06-20
+
+### 面试题 1：为什么输出截断不能只靠 LLM 自己“少输出一点”？请分别从工具执行、上下文长度和可测试性角度回答。
+
+- 用户回答：上下文有限制，导致读取的文件长度有限制，并且工具执行的时候需要读取文件内容所以要有长度限制，并且再观测角度，内容太长不利于观测，只需要保留关键信息即可。
+- 标准回答：方向正确。LLM 的提示词只能影响模型“想怎么调用工具”，不能约束工具真实返回多少内容；`run_command` 可能输出几百 KB stdout/stderr，`read_file` 也可能读到很长文件，这些都发生在工具执行结果边界，不能靠模型自觉控制。上下文长度上，大输出会挤占 message history，导致后续用户需求、代码片段、错误信息或安全事件被压掉。可测试性上，必须有明确的 `truncate_output(...)` 行为和 `ToolResult.output_truncated` 元数据，才能写单元测试证明“短输出不变、长输出被截断、LLM 知道内容不完整”。只说“保留关键信息”还不够，因为当前 Day 5 是固定前缀截断，不是语义摘要；语义摘要属于后续 context compression 或观察压缩能力。
+
+### 面试题 2：沿着 `ToolRegistry.run("run_command", ...) -> ShellRuntime.run(...) -> _truncate_tool_result_payload(...) -> ToolResult.success(...)` 说明：大 stdout/stderr 是在哪一层被截断的？`output_truncated=True` 是在哪里设置的？
+
+- 用户回答：工具执行层；ToolRegistry。
+- 标准回答：关键点要更精确：`ShellRuntime.run(...)` 负责真实命令执行、cwd/timeout/env 处理和 stdout/stderr 捕获，它仍返回 raw dict。截断发生在 `ToolRegistry.run(...)` 的成功路径里，也就是 registry 拿到具体工具返回值之后、调用 `ToolResult.success(...)` 之前。具体函数是 `_truncate_tool_result_payload(...)`：它识别 dict 里的 `stdout`、`stderr` 字段并调用 `truncate_output(...)` 分别截断；如果任一字段发生截断，就返回 `output_truncated=True`。随后 `ToolRegistry.run(...)` 把这个布尔值传给 `ToolResult.success(..., output_truncated=output_truncated)`。所以可以说在工具结果包装边界截断，但不能说是在 `ShellRuntime` 本身截断。
+
+### 面试题 3：如果一个命令同时输出 200KB stdout 和 20KB stderr，你会选择分别截断还是合并后截断？请说明方案取舍，并补充如何让 LLM 知道输出不完整、如何保留排障信息、如何测试未截断/截断路径。
+
+- 用户回答：合并之后截断；根据表示也就是提示词；利用一些概要的模型保留关键信息；看输出。
+- 标准回答：这是本次最需要修正的一题。当前实现选择分别截断 stdout 和 stderr，而不是合并后截断。原因是 stdout 和 stderr 语义不同：stdout 通常是正常输出，stderr 通常包含错误、warning、traceback 或诊断信息；如果先合并再截断，200KB stdout 可能把 20KB stderr 中真正重要的错误信息挤掉。分别截断可以保证两个通道都保留各自前缀和截断标记。
+
+  LLM 知道输出不完整有两层机制：第一，截断文本中追加 `[output truncated: kept ...]` 这种可见标记；第二，`ToolResult.output_truncated=True` 作为结构化元数据保留，后续 trace、日志、UI 或观察压缩可以直接读取。排障信息的最小保留方式是 stdout/stderr 各自保留前缀、returncode、timed_out、duration_ms 等结构化字段不变；未来可以升级为 head+tail、按错误行优先保留、保存完整原始输出到审计文件或生成摘要，但 Day 5 只做最小可测截断。测试上要覆盖：短 stdout/stderr 不变且 `output_truncated=False`；大 stdout 或大 stderr 被截断且 `output_truncated=True`；stdout/stderr 同时超限时两个字段都带截断标记；`read_file` 这类字符串 payload 超限时也被截断；旧 `ToolResult.__str__()` 和示例兼容。
+
+## 第 21 天：2026-06-20
+
+### 面试题 1：为什么文件大小限制不能只靠 Day 5 的输出截断解决？请从读取前资源消耗、LLM 上下文和错误语义三个角度回答。
+
+- 用户回答：不清楚。
+- 标准回答：输出截断和文件大小限制解决的是两个不同边界。输出截断发生在工具已经产生结果之后，只能控制写入 `ToolResult` 和 message history 的文本长度；如果 `read_file` 已经把一个超大文件读进内存，再截断就太晚了，读取本身已经消耗了内存、I/O 和时间。LLM 上下文角度，截断能减少最终观察文本，但不能告诉系统“这个资源本来就不适合文本读取”。错误语义角度，大文件应该明确返回“文件太大，拒绝读取”，而不是假装成功并返回一段截断内容；这样 Agent 才能决定换策略，例如请求用户确认、读取片段、用日志工具或跳过该文件。
+
+### 面试题 2：请沿着 `ToolRegistry.run("read_file", ...) -> ReadFileTool._run(...) -> _ensure_readable_text_file(...) -> ToolResult.from_exception(...)` 说明大文件或二进制文件如何被拒绝并回写成结构化失败。
+
+- 用户回答：不清楚。
+- 标准回答：一次 `read_file` 调用从 `ToolRegistry.run("read_file", arguments)` 开始。registry 先检查 `arguments` 是字典，再找到注册的 `ReadFileTool`，调用 `Tool.run(...)` 做 `path` 等基础参数校验。随后进入 `ReadFileTool._run(...)`，先通过 `_resolve_workspace_path(...)` 确认路径仍在 `workspace_root` 内，并拒绝目录。真正读取文本前，`_ensure_readable_text_file(path)` 先用 `path.stat().st_size` 检查文件大小；如果超过 1MiB，就抛出 `ValueError("file is too large...")`。如果大小通过，再用二进制模式读取前 1024 字节；如果样本里有 NUL 字节，就抛出 `ValueError("file appears to be binary...")`。这些异常会被 `ToolRegistry.run(...)` 的 `except` 捕获，并通过 `ToolResult.from_exception(...)` 转成 `ok=False`、`error_type="ValueError"`、`error_message=...` 的结构化失败结果，后续 `AgentLoop._tool_result_to_message(...)` 可以把失败观察写回 message history。
+
+### 面试题 3：如果未来要支持读取超大日志或图片文件，你会如何设计“直接拒绝、分块读取、摘要读取、专门二进制工具”这几种方案？请说明边界情况、方案对比和测试思路。
+
+- 用户回答：不清楚。
+- 标准回答：最保守的默认方案是直接拒绝：普通 `read_file` 只处理小型文本文件，遇到超大文件或明显二进制文件直接失败，优点是安全、简单、可测试，缺点是不能处理大日志和图片。对超大日志，可以新增分块读取或 head/tail 读取工具，例如 `read_file_chunk(path, offset, max_bytes)` 或 `read_file_tail(path, lines)`，让 Agent 有边界地查看部分内容；测试要覆盖 offset 越界、块大小上限、UTF-8 边界和不会突破 `workspace_root`。摘要读取适合日志、测试报告、长 markdown 等文本资源，可以先读取受限片段或流式扫描后生成结构化摘要；测试要覆盖摘要不会吞掉关键错误行，并保留“摘要不是全文”的元数据。图片、压缩包、PDF 等二进制资源不应该塞进文本 `read_file`，应有专门二进制工具，例如读取元数据、提取文本、生成预览或交给视觉/文档解析模块；测试要覆盖 MIME/魔数识别、大小限制、不可解析文件失败和敏感路径边界。总体原则是：默认文本读取要窄，特殊资源通过专门工具扩展，而不是让 `read_file` 变成万能入口。
+
+## 第 22 天：2026-06-20
+
+### 面试题 1：Day 7 为什么只新增 `examples/03_observed_tool_run.py` 和验收测试，而不继续新增 Permission System？
+
+- 用户回答：Day 7 不继续做 Permission System，是因为 Day 7 是 Week 3 的加固验收日，目标是确认 Tool Runtime 已经完成的 trace 数据结构、ToolResult 元数据、stats、输出截断、文件资源限制和示例验证是否真实可用。Permission System 是 Week 4 的新模块，如果提前做，会把新模块和本周验收混在一起，导致边界不清。
+- 标准回答：正确。Day 7 的职责是验收 Week 3 的 Agent Core + Tool Runtime 加固结果，不是开启新模块。`examples/03_observed_tool_run.py` 的作用是用一个可运行示例证明当前真实能力：成功读取、资源拒绝、结构化 `ToolResult` 和 `ToolRegistry.get_stats()`。Permission System 属于 Week 4 的执行前控制，如果在 Day 7 提前接入，会把“本周加固验收”和“下周新能力实现”混在一起，导致文档、测试和架构边界不清，也容易把尚未实现的权限审批误说成已完成能力。
+
+### 面试题 2：从 `examples/03_observed_tool_run.py` 开始，说明成功读取和二进制拒绝分别经过哪些函数，最后如何进入 `ToolResult` 和 `ToolRegistry.get_stats()`。
+
+- 用户回答：调用链是：`examples/03_observed_tool_run.py -> create_coding_tool_registry() -> ToolRegistry.run("read_file", ...) -> ToolRegistry.get("read_file") -> Tool.run(arguments) -> ToolParameter.validate(arguments) -> ReadFileTool._run(arguments) -> _resolve_workspace_path(arguments) -> _ensure_readable_text_file(path)`。成功读取时，`_ensure_readable_text_file(path)` 通过检查，然后 `path.read_text(...)` 返回文本，`ToolRegistry.run(...)` 把结果包装成 `ToolResult.success(...)`，并记录 stats 成功次数。二进制拒绝时，`_ensure_readable_text_file(path)` 发现文件采样中有 NUL 字节，抛出 `ValueError`。`ToolRegistry.run(...)` 捕获异常，把它转换成 `ToolResult.from_exception(...)`，并记录 stats 失败次数。最后 `registry.get_stats()` 返回 `read_file` 的 `calls=2`、`successes=1`、`failures=1`。
+- 标准回答：正确。补充一点：成功路径中 `ToolRegistry.run(...)` 会在工具返回文本后调用 `_truncate_tool_result_payload(...)`，当前短文本不会触发截断，因此 `output_truncated=False`，随后返回 `ToolResult.success(...)` 并调用 `_record_stats(name="read_file", ok=True, ...)`。失败路径中，二进制检测发生在真正 `read_text(...)` 之前，异常被 registry 的 `except` 捕获，转换成 `ok=False`、`error_type="ValueError"`、`error_message=...` 的结构化失败，并通过 `_record_stats(..., ok=False, ...)` 记录一次失败。`get_stats()` 返回的是统计快照，不暴露内部 `_stats` 可变对象。
+
+### 面试题 3：如果要把当前 stats 升级成工业级 observability，你会如何设计 logger hook、trace_id 透传、持久化 metrics 和查询接口？请说明边界情况、方案对比和测试方法。
+
+- 用户回答：在一次 Agent run 开始时创建 `trace_id`，并传给 `AgentLoop -> ToolRegistry.run(...) -> ToolResult`，这样一次任务里的 LLM 调用、工具调用、工具结果能串起来。在 `ToolRegistry.run(...)` 前后加 logger hook，记录结构化 JSON 日志，包括 `trace_id`、`tool_name`、参数摘要、成功/失败、错误类型、耗时、是否截断。stats 不只放在内存里，而是持久化到文件、SQLite 或 metrics backend，避免进程退出后数据丢失。提供查询接口，比如按 `trace_id` 查完整链路，按 `tool_name` 查调用次数、成功率、失败率、平均耗时、P99。边界情况包括：工具抛异常、参数校验失败、未知工具、输出被截断、敏感参数脱敏、并发调用 stats 是否线程安全。测试方法包括：单测 logger 字段，集成测试 `trace_id` 是否全链路一致，安全测试日志不泄漏 token，压力测试并发 stats 不丢数据。
+- 标准回答：正确。工业级 observability 不能只靠当前内存 stats。更完整的设计是：`AgentLoop.run(...)` 创建或接收 `TraceContext`，把 `trace_id` 传入每次工具调用；`ToolRegistry.run(...)` 在调用前后触发 logger hook，记录结构化事件；`ToolResult` 保存 `trace_id`、`tool_call_id`、`output_truncated` 等元数据；metrics 层把聚合指标写入可持久化后端；查询层支持按 trace、tool、session 或时间窗口检索。方案取舍上，内存 stats 简单但不可恢复，JSONL 易审计但查询弱，SQLite 查询方便但要设计 schema，OpenTelemetry 更标准但接入成本更高。测试必须覆盖成功、失败、未知工具、参数错误、截断、脱敏、并发和进程重启后的可查询性。

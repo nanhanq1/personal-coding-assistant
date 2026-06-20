@@ -12,16 +12,51 @@ JSON_TYPE_TO_PYTHON_TYPES: dict[str, tuple[type[Any], ...]] = {
     "array": (list,),
 }
 
+DEFAULT_MAX_OUTPUT_CHARS = 4000
+
+
+def truncate_output(
+    text: str,
+    max_chars: int = DEFAULT_MAX_OUTPUT_CHARS,
+) -> tuple[str, bool]:
+    """截断过长工具输出，并返回是否发生截断。"""
+    # 修改前旧代码：无统一截断函数，工具输出会原样进入 ToolResult 和 message history。
+    #
+    # 问题：shell stdout/stderr 或文件内容过大时，会撑爆后续 LLM 上下文。
+    if not isinstance(text, str):
+        raise TypeError("output text must be a string")
+    if not isinstance(max_chars, int) or isinstance(max_chars, bool):
+        raise TypeError("max_chars must be an integer")
+    if max_chars <= 0:
+        raise ValueError("max_chars must be greater than 0")
+    if len(text) <= max_chars:
+        return text, False
+
+    notice = f"\n[output truncated: kept {max_chars} of {len(text)} chars]"
+    return text[:max_chars] + notice, True
+
 
 @dataclass(frozen=True)
 class ToolResult:
     """一次工具执行的结构化结果。"""
 
+    # 修改前旧代码：
+    # ok: bool
+    # result: Any = None
+    # error_type: str | None = None
+    # error_message: str | None = None
+    # duration_ms: int = 0
+    #
+    # 问题：结果信封只能表达成功/失败内容和耗时，无法把一次 Agent
+    # 运行、一次工具调用和输出截断状态稳定挂到同一个结果对象上。
     ok: bool
     result: Any = None
     error_type: str | None = None
     error_message: str | None = None
     duration_ms: int = 0
+    trace_id: str | None = None
+    tool_call_id: str | None = None
+    output_truncated: bool = False
 
     def __post_init__(self) -> None:
         """校验结果信封自身，避免把含糊状态写回 Agent 轨迹。"""
@@ -31,6 +66,16 @@ class ToolResult:
             raise TypeError("tool result duration_ms must be an integer")
         if self.duration_ms < 0:
             raise ValueError("tool result duration_ms must be non-negative")
+        if self.trace_id is not None and (
+            not isinstance(self.trace_id, str) or self.trace_id.strip() == ""
+        ):
+            raise ValueError("tool result trace_id must be a non-empty string")
+        if self.tool_call_id is not None and (
+            not isinstance(self.tool_call_id, str) or self.tool_call_id.strip() == ""
+        ):
+            raise ValueError("tool result tool_call_id must be a non-empty string")
+        if not isinstance(self.output_truncated, bool):
+            raise TypeError("tool result output_truncated must be a boolean")
         if self.ok:
             if self.error_type is not None or self.error_message is not None:
                 raise ValueError("successful tool result cannot contain error fields")
@@ -41,9 +86,24 @@ class ToolResult:
                 raise TypeError("failed tool result error_message must be a string")
 
     @classmethod
-    def success(cls, result: Any, duration_ms: int) -> "ToolResult":
+    def success(
+        cls,
+        result: Any,
+        duration_ms: int,
+        *,
+        trace_id: str | None = None,
+        tool_call_id: str | None = None,
+        output_truncated: bool = False,
+    ) -> "ToolResult":
         """构造成功结果。"""
-        return cls(ok=True, result=result, duration_ms=duration_ms)
+        return cls(
+            ok=True,
+            result=result,
+            duration_ms=duration_ms,
+            trace_id=trace_id,
+            tool_call_id=tool_call_id,
+            output_truncated=output_truncated,
+        )
 
     @classmethod
     def failure(
@@ -51,6 +111,10 @@ class ToolResult:
         error_type: str,
         error_message: str,
         duration_ms: int,
+        *,
+        trace_id: str | None = None,
+        tool_call_id: str | None = None,
+        output_truncated: bool = False,
     ) -> "ToolResult":
         """构造失败结果。"""
         return cls(
@@ -59,15 +123,29 @@ class ToolResult:
             error_type=error_type,
             error_message=error_message,
             duration_ms=duration_ms,
+            trace_id=trace_id,
+            tool_call_id=tool_call_id,
+            output_truncated=output_truncated,
         )
 
     @classmethod
-    def from_exception(cls, exc: Exception, duration_ms: int) -> "ToolResult":
+    def from_exception(
+        cls,
+        exc: Exception,
+        duration_ms: int,
+        *,
+        trace_id: str | None = None,
+        tool_call_id: str | None = None,
+        output_truncated: bool = False,
+    ) -> "ToolResult":
         """把异常转换成结构化失败结果。"""
         return cls.failure(
             error_type=type(exc).__name__,
             error_message=str(exc),
             duration_ms=duration_ms,
+            trace_id=trace_id,
+            tool_call_id=tool_call_id,
+            output_truncated=output_truncated,
         )
 
     def __str__(self) -> str:
@@ -85,6 +163,9 @@ class ToolResult:
                 and self.error_type == other.error_type
                 and self.error_message == other.error_message
                 and self.duration_ms == other.duration_ms
+                and self.trace_id == other.trace_id
+                and self.tool_call_id == other.tool_call_id
+                and self.output_truncated == other.output_truncated
             )
         return self.ok and self.result == other
 

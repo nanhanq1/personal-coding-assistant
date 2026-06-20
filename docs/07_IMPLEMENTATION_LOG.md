@@ -1,136 +1,96 @@
 # Implementation Log
 
-## 2026-06-15
+## 2026-06-20
 
-### 文档体系瘦身与状态源收敛
+### Week 3 Day 7 面试题归档与 Week 4 Day 1 交接
 
 ### 本次完成
 
-- 将 `docs/09_NEXT_ACTIONS.md` 收敛为当前状态、能力边界和下一步的唯一权威源。
-- 把 2026-06-15 早前实现日志归档到 `docs/archive/implementation_log/2026-06-15.md`。
-- 删除根目录纯导航文件，保留 `docs/INDEX.md` 作为统一文档索引。
-- 用根目录 `DOC_RULES.md` 承载文档写入和反漂移规则，不复制当前状态。
-- 精简 `README.md`、`docs/00_PROJECT_CONTEXT.md`、`docs/01_LEARNING_ROADMAP.md` 中的状态重复内容。
-
-### 架构决策
-
-- 当前状态、测试基线、阻塞项只维护在 `docs/09_NEXT_ACTIONS.md`。
-- README、路线和项目背景只链接权威状态源，不再复制测试数字和完整能力清单。
+- 评审用户 Week 3 Day 7 三道面试题回答。
+- 将用户原始回答和标准补充答案追加到 `docs/Compilation-of-Interview-Questions.md` 的第 22 天记录。
+- 确认 Day 7 面试题已回答并归档，Week 3 Agent Core + Tool Runtime 加固验收可以收口。
+- 将活跃任务推进到 Week 4 Day 1：Permission System 风险分类。
+- 更新 `docs/09_NEXT_ACTIONS.md`，下一步聚焦 `RiskLevel`、`RiskAssessment` 和 `classify_command(...)`，暂不接入 `ShellRuntime` 或 `ToolRegistry`。
 
 ### 验证
 
 - 本次只修改 Markdown 文档，未修改业务源码。
-- 已检查活跃文件行数，`docs/07_IMPLEMENTATION_LOG.md` 与 `docs/09_NEXT_ACTIONS.md` 均低于 `docs/INDEX.md` 规定上限。
-- 已检查根目录纯导航文件引用，活跃文档不再依赖被删除的入口文件。
+- Day 7 面试题已回答并归档，可以进入 Week 4 Day 1。
 
 ### 下一步
 
-- 仍需用户回答 Week 3 Day 1 面试题。
-- 回答并归档后，进入 Week 3 Day 2 trace 数据结构设计与实现。
+- 开始 Week 4 Day 1：风险分类。
 
-## 2026-06-16
-
-### 记忆系统边界优化
+### Week 3 Day 7 加固验收
 
 ### 本次完成
 
-- 新增 `docs/15_MEMORY_SYSTEM.md`，把项目协作记忆和未来产品运行时记忆分开定义。
-- 明确 `src/pca/memory/` 当前仍是占位模块，未接入 Agent 主链。
-- 在 `docs/INDEX.md` 和 `DOC_RULES.md` 中登记记忆系统文档，避免重新引入根目录 `MEMORY.md` 状态源。
-- 更新 `docs/09_NEXT_ACTIONS.md` 与 `docs/02_DAILY_TASKS.md`，记录本次文档边界调整。
+- 按 TDD 新增 `tests/test_examples.py::test_observed_tool_run_example_reports_real_read_file_stats`，先确认 RED：`examples/03_observed_tool_run.py` 不存在导致测试失败。
+- 新增 `examples/03_observed_tool_run.py`，用 `create_coding_tool_registry()` 展示一次成功 `read_file`、一次明显二进制文件拒绝，以及 `ToolRegistry.get_stats()` 的真实统计。
+- 示例输出只展示当前已实现字段：`ok/result/error_type/error_message/duration_ms/trace_id/tool_call_id/output_truncated/stats`；其中 `trace_id` 和 `tool_call_id` 仍为 `null`，不夸大为已自动透传。
+- 对照 9 个工业级维度复盘 Week 3：可观测性、健壮性、安全性、性能、可测试性、接口清晰性已具备最小证据；权限审批、结构化日志、trace 自动透传、持久化 metrics、sandbox、真实场景验证仍未达工业级。
+- 生成 Day 7 面试题，等待用户回答后才能归档并进入 Week 4 Permission System。
+
+### 验证
+
+- `E:\python\Scripts\pytest.exe tests\test_examples.py::test_observed_tool_run_example_reports_real_read_file_stats -q`：先 RED，最终通过：`1 passed`。
+- `python examples\03_observed_tool_run.py`：通过，输出成功读取、二进制拒绝和 `read_file` stats。
+- `E:\python\Scripts\pytest.exe -q`：`110 passed, 1 skipped`。
+- `python examples\01_minimal_agent.py`：通过。
+- `python examples\02_tool_agent.py`：通过。
+- `python examples\03_observed_tool_run.py`：通过。
+- `python -m compileall src examples -q`：通过。
+
+### 下一步
+
+- 等待用户回答 Day 7 面试题。
+- 回答评审并归档到 `docs/Compilation-of-Interview-Questions.md` 后，再进入 Week 4 Permission System。
+
+### Week 3 Day 6 面试题归档与 Day 7 交接
+
+### 本次完成
+
+- 评审用户 Week 3 Day 6 三道面试题回答。
+- 将用户原始回答和标准补充答案追加到 `docs/Compilation-of-Interview-Questions.md` 的第 21 天记录。
+- 将活跃任务推进到 Week 3 Day 7：加固验收。
+- 更新 `docs/09_NEXT_ACTIONS.md`，下一步聚焦 `examples/03_observed_tool_run.py`、Week 3 9 维复盘、全量验证和放行判断。
 
 ### 验证
 
 - 本次只修改 Markdown 文档，未修改业务源码。
-- 记忆系统文档不复制实时测试数字或下一步状态。
+- Day 6 面试题已回答并归档，可以进入 Day 7。
 
-## 2026-06-18
+### 下一步
 
-### Week 3 Day 1 基线复核
+- 开始 Week 3 Day 7：加固验收。
+
+### Week 3 Day 6 文件资源限制
 
 ### 本次完成
 
-- 读取 `docs/15_MEMORY_SYSTEM.md`，确认项目协作记忆和未来产品运行时记忆的边界。
-- 复核 Week 3 Day 1 当前状态：代码与文档验证已完成，仍阻塞在面试题回答与归档。
-- 复核 `run_command` 当前主链，确认后续 Day 2 之前不新增源码能力。
+- 按 TDD 新增 `tests/test_file_tools.py` 文件资源限制测试，覆盖超过 1MiB 的大文件、含 NUL 字节的明显二进制文件，以及 `ToolRegistry.run(...)` 的结构化失败回写。
+- 确认 RED：当前 `ReadFileTool` 会读取 1MiB+ 文本文件，也会把含 NUL 字节的内容当作文本返回。
+- 在 `src/pca/tools/file_tools.py` 新增 `DEFAULT_MAX_READ_FILE_BYTES = 1024 * 1024` 和 `BINARY_DETECTION_SAMPLE_BYTES = 1024`。
+- 在 `ReadFileTool._run(...)` 读取前调用 `_ensure_readable_text_file(path)`，先用 `Path.stat().st_size` 检查文件大小，再用二进制模式采样前 1024 字节检测 NUL 字节。
+- 保持 `workspace_root` 路径边界、目录拒绝、小文本读取、`write_file` 和 `edit_file` 既有行为兼容。
+- 更新工具描述，明确 `read_file` 只读取工作区内的小型文本文件。
+- 新增 ADR-0012，记录文件资源限制放在 `ReadFileTool` 读取前边界的原因。
+- 更新 Week 3 学习笔记、资料库、已实现架构差距说明和下一步门禁。
 
 ### 验证
 
-- `python -m pytest -q`：93 passed, 1 skipped。
+- `E:\python\Scripts\pytest.exe tests\test_file_tools.py -q`：先出现预期 RED，最终通过：`36 passed, 1 skipped`。
+- `E:\python\Scripts\pytest.exe tests\test_tools.py -q`：`32 passed`。
+- `E:\python\Scripts\pytest.exe -q`：`109 passed, 1 skipped`。
 - `python examples\01_minimal_agent.py`：通过。
 - `python examples\02_tool_agent.py`：通过。
 - `python -m compileall src examples -q`：通过。
 
 ### 下一步
 
-- 用户回答 Week 3 Day 1 三道面试题。
-- 回答归档后，进入 Week 3 Day 2 trace 数据结构设计与实现。
+- Week 3 Day 6 代码、测试和文档已完成。
+- 等待用户回答 Day 6 面试题；回答归档到 `docs/Compilation-of-Interview-Questions.md` 后，才能进入 Week 3 Day 7：加固验收。
 
-## 2026-06-18
+### 活跃日志归档
 
-### Week 3 Day 1 面试题归档与 Day 2 启动
-
-### 本次完成
-
-- 评审用户 Week 3 Day 1 三道面试题回答。
-- 将用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md` 的第 16 天记录。
-- 将活跃任务推进到 Week 3 Day 2：trace 数据结构。
-- 更新 `docs/09_NEXT_ACTIONS.md`，下一步聚焦 `TraceContext` 和 `AgentEvent`。
-
-### 验证
-
-- 本次只修改 Markdown 文档，未修改业务源码。
-- Day 1 面试题已回答并归档，可以进入 Day 2。
-- `python -m pytest -q` 在当前 shell 使用的解释器中缺少 pytest；改用 `E:\python\Scripts\pytest.exe -q` 后通过：93 passed, 1 skipped。
-- `python examples\01_minimal_agent.py`：通过。
-- `python examples\02_tool_agent.py`：通过。
-- `python -m compileall src examples -q`：通过。
-
-### 下一步
-
-- 按 TDD 开始 Week 3 Day 2：先写 `tests/test_events.py` 的失败测试，再实现 `src/pca/core/events.py`。
-
-## 2026-06-18
-
-### Week 3 Day 2 trace 数据结构
-
-### 本次完成
-
-- 按 TDD 新增 `tests/test_events.py`，先验证 `TraceContext.new()` 和 `AgentEvent` 的期望 API。
-- 确认 RED：新测试因 `pca.core.events` 模块缺失而失败。
-- 新增 `src/pca/core/events.py`，实现轻量 `TraceContext` 和 `AgentEvent`。
-- 新增 ADR-0008，记录 trace 事件模型先放在 core 层且暂不接入主链。
-- 更新 Week 3 学习笔记，标明 trace 数据结构已实现但尚未接入 `AgentLoop`、`ToolResult` 或 `ToolRegistry`。
-
-### 验证
-
-- `E:\python\Scripts\pytest.exe tests\test_events.py -q`：先失败于 `ModuleNotFoundError: No module named 'pca.core.events'`，实现后通过：2 passed。
-- `E:\python\Scripts\pytest.exe -q`：95 passed, 1 skipped。
-- `python examples\01_minimal_agent.py`：通过。
-- `python examples\02_tool_agent.py`：通过。
-- `python -m compileall src examples -q`：通过。
-
-### 下一步
-
-- 用户回答 Week 3 Day 2 三道面试题。
-- 回答归档后，进入 Week 3 Day 3：`ToolResult` 元数据。
-
-## 2026-06-19
-
-### Week 3 Day 2 面试题归档与 Day 3 启动
-
-### 本次完成
-
-- 评审用户 Week 3 Day 2 三道面试题回答。
-- 将用户回答和标准回答追加到 `docs/Compilation-of-Interview-Questions.md` 的第 17 天记录。
-- 将活跃任务推进到 Week 3 Day 3：`ToolResult` 元数据。
-- 更新 `docs/09_NEXT_ACTIONS.md`，下一步聚焦 `trace_id`、`tool_call_id`、`output_truncated` 的兼容接入。
-
-### 验证
-
-- 本次只修改 Markdown 文档，未修改业务源码。
-- Day 2 面试题已回答并归档，可以进入 Day 3。
-
-### 下一步
-
-- 按 TDD 开始 Week 3 Day 3：先写 `ToolResult` 兼容性和新元数据测试，再实现 `src/pca/tools/base.py`。
+- Week 3 Day 1-Day 5 和记忆系统边界优化记录已归档到 `docs/archive/implementation_log/2026-06-20-week3-day1-day5.md`。

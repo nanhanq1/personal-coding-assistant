@@ -1,5 +1,141 @@
 # Architecture Decisions
 
+## ADR-0012：Week 3 Day 6 在 ReadFileTool 读取前执行文件资源限制
+
+日期：2026-06-20
+
+### 背景
+
+Week 3 Day 5 已经在 `ToolRegistry` 结果边界实现输出截断，可以防止 shell stdout/stderr 或字符串 payload 过长地写入 `ToolResult` 和 message history。但输出截断发生在工具已经产生结果之后，不能阻止 `read_file` 先把超大文件或明显二进制文件读入内存，也不能给 Agent 一个清晰的“这个资源不适合文本读取”的错误语义。
+
+文件工具当前已经负责 `workspace_root` 路径边界、目录拒绝和文本读取，因此文件大小上限和二进制检测也应该放在文件工具的读取前边界。
+
+### 决策
+
+- 在 `src/pca/tools/file_tools.py` 中新增 `DEFAULT_MAX_READ_FILE_BYTES = 1024 * 1024`。
+- `ReadFileTool._run(...)` 在 `path.read_text(...)` 前调用 `_ensure_readable_text_file(path)`。
+- `_ensure_readable_text_file(...)` 使用 `path.stat().st_size` 检查文件大小，超过 1MiB 时抛出稳定 `ValueError`。
+- `_ensure_readable_text_file(...)` 读取前 1024 字节，发现 NUL 字节时抛出稳定 `ValueError`，作为最小二进制检测。
+- 失败仍由 `ToolRegistry.run(...)` 捕获并转换为失败 `ToolResult`，保持 AgentLoop 错误回写兼容。
+- `write_file` 和 `edit_file` 本次不改变成功路径。
+
+### 理由
+
+- 文件大小和二进制判断最接近真实文件系统资源，放在 `ReadFileTool` 能在读取前拒绝不适合文本工具处理的资源。
+- `ToolRegistry` 适合做统一路由、统计、截断和结果包装，但不应该理解每种工具的文件资源语义。
+- Day 5 的输出截断解决“工具结果太长”，Day 6 的资源限制解决“这个文件不应该被文本读取”，两者是不同边界。
+- NUL 字节检测不是完整文件类型识别，但足以覆盖最明显的二进制误读风险，符合当前最小可测加固目标。
+
+### 暂不采用
+
+- 暂不实现按项目或按工具动态配置文件大小上限。
+- 暂不实现完整 MIME 类型识别、编码探测、图片/压缩包解析或二进制专用工具。
+- 暂不实现大文件分块读取、head/tail 读取、日志摘要或语义压缩。
+- 暂不把文件拒绝事件写入持久化审计日志；后续 observability 模块再统一接入。
+
+## ADR-0011：Week 3 Day 5 在 ToolRegistry 结果边界执行输出截断
+
+日期：2026-06-20
+
+### 背景
+
+Week 3 Day 5 要解决工具输出撑爆上下文的问题。当前 shell runtime 会返回完整 `stdout`、`stderr`、`returncode` 和 `timed_out`，文件工具会直接返回文件文本；这些原始结果经过 `ToolRegistry.run(...)` 包装成 `ToolResult` 后，会由 `AgentLoop._tool_result_to_message(...)` 写回 message history。
+
+如果大输出不在进入 `ToolResult` 前处理，LLM 看到的 tool observation 可能过长，后续上下文压缩、trace、审计和错误恢复都会受到影响。
+
+### 决策
+
+- 在 `src/pca/tools/base.py` 新增 `truncate_output(text, max_chars=4000)`。
+- 在 `src/pca/tools/registry.py` 的成功路径调用 `_truncate_tool_result_payload(...)`。
+- 对 shell 返回 dict 中的 `stdout`、`stderr` 分别截断。
+- 对 `read_file` 这类字符串 payload 截断。
+- 发生截断时设置 `ToolResult.output_truncated=True`。
+- 截断文本追加 `[output truncated: kept ...]` 标记，让 LLM 和测试都能看见输出不完整。
+
+### 理由
+
+- `ToolRegistry.run(...)` 是工具结果进入 `ToolResult` 和 message history 的统一边界，能同时覆盖 shell 和文件工具。
+- 底层 `ShellRuntime` 保持 raw stdout/stderr，便于低层 runtime 测试、排查和后续 sandbox/runtime 演进。
+- `output_truncated` 用结构化字段表达截断状态，比只在自然语言字符串中写“已截断”更可测试、可统计、可审计。
+- stdout 和 stderr 分别截断，避免一个通道的大输出挤掉另一个通道的错误信息。
+
+### 暂不采用
+
+- 暂不实现动态 token 预算或按模型窗口自动计算截断上限。
+- 暂不保留尾部片段；当前只保留前缀和可见截断说明。
+- 暂不把完整原始输出写入文件、数据库或长期 memory。
+- 暂不在 `ShellRuntime` 直接返回 `ToolResult`。
+- 暂不实现文件大小上限和二进制检测；这些留给 Week 3 Day 6。
+
+## ADR-0010：Week 3 Day 4 在 ToolRegistry 统一记录工具调用统计
+
+日期：2026-06-20
+
+### 背景
+
+Week 3 的工业级加固目标要求工具链路具备初步可观测性。Day 2 已有轻量 `TraceContext` / `AgentEvent` 数据结构，Day 3 已让 `ToolResult` 能携带 trace 元数据，但系统仍无法回答最基础的运行问题：某个工具被调用了多少次、成功多少次、失败多少次、累计耗时是多少。
+
+如果把统计逻辑写进具体文件工具、shell 工具或未来 MCP 工具中，统计口径会分散，未知工具、参数错误和 handler 异常也容易漏记。
+
+### 决策
+
+在 `src/pca/tools/registry.py` 的 `ToolRegistry` 中新增最小 stats：
+
+- 内部 `_stats: dict[str, dict[str, int]]` 保存每个工具的 `calls`、`successes`、`failures` 和 `total_duration_ms`。
+- `ToolRegistry.run(...)` 在成功和失败路径统一调用 `_record_stats(...)`。
+- handler 抛错、参数校验失败和未知工具调用都计入失败统计。
+- 未知工具按请求的工具名记录 stats，便于后续发现 LLM 生成了不存在的 tool name。
+- `get_stats()` 返回统计快照，不暴露内部可变对象。
+- `clear()` 同时清空注册工具和统计状态。
+
+### 理由
+
+- `ToolRegistry.run(...)` 是 `AgentLoop` 面向工具系统的统一入口，能覆盖成功、失败、未知工具和参数错误。
+- 统计属于聚合指标，不应该污染具体工具的业务逻辑。
+- 返回快照可以避免外部调用方篡改内部统计，保持接口边界清晰。
+- 当前只记录最小整数指标，避免过早引入 metrics SDK、持久化或复杂 logger hook。
+
+### 暂不采用
+
+- 暂不实现 logger hook 或 OpenTelemetry exporter。
+- 暂不把 stats 写入文件、数据库或长期 memory。
+- 暂不记录参数内容，避免提前引入隐私和脱敏边界。
+- 暂不把 stats 和 trace 合并；stats 是聚合指标，trace 是单次调用链路。
+
+## ADR-0009：Week 3 Day 3 以默认字段扩展 ToolResult 元数据
+
+日期：2026-06-19
+
+### 背景
+
+Week 3 Day 2 已经新增 `TraceContext` 和 `AgentEvent`，但工具执行结果仍只能表达成功/失败内容和耗时。后续要把一次 Agent 运行、一次工具调用和输出截断状态串成可观测轨迹，需要先让 `ToolResult` 能稳定保存这些元数据。
+
+同时，`ToolResult.__str__()` 已被 `AgentLoop` 用于写回 message history。如果新增字段改变字符串输出，就会破坏旧示例、旧测试和未来 LLM 看到的工具结果文本。
+
+### 决策
+
+扩展 `src/pca/tools/base.py` 的 `ToolResult`：
+
+- `trace_id: str | None = None`，用于标识一次 Agent 运行或调用链。
+- `tool_call_id: str | None = None`，用于标识一次具体工具调用。
+- `output_truncated: bool = False`，用于标识工具输出是否被截断。
+- `ToolResult.success(...)`、`ToolResult.failure(...)` 和 `ToolResult.from_exception(...)` 支持这些可选关键字参数。
+- 保持旧调用方式兼容，保持 `ToolResult.__str__()` 输出不变。
+
+### 理由
+
+- 默认值让旧测试、旧示例和旧调用方式不需要同步修改。
+- 把截断状态作为结构化字段保存，比只把“已截断”写进字符串更利于测试、统计和后续审计。
+- `trace_id` 和 `tool_call_id` 分开保存，避免把“一次任务链路”和“一次工具调用”混成同一个粒度。
+- Day 3 只扩展结果信封，不要求 `AgentLoop` 自动创建或传入 trace，降低主链改动风险。
+
+### 暂不采用
+
+- 暂不在 `AgentLoop` 中自动生成 `TraceContext`。
+- 暂不在 `ToolRegistry.run(...)` 中自动生成 `tool_call_id` 或统计调用次数。
+- 暂不实现实际输出截断；Day 5 再把 shell/file 输出截断接入具体边界。
+- 暂不改变 message history 为 JSON 或事件流格式。
+
 ## ADR-0008：Week 3 Day 2 先在 core 层定义轻量 trace 事件模型
 
 日期：2026-06-18

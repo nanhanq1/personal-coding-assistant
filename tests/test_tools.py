@@ -1,7 +1,9 @@
 """测试工具注册表功能"""
+import sys
 from typing import Any
 
 import pytest
+from pca.tools import base as tool_base
 from pca.tools import create_coding_tool_registry
 from pca.tools.base import Tool, ToolParameter, ToolResult
 from pca.tools.registry import ToolRegistry
@@ -284,6 +286,9 @@ def test_tool_result_success_carries_result_and_duration():
     assert result.error_type is None
     assert result.error_message is None
     assert result.duration_ms == 12
+    assert result.trace_id is None
+    assert result.tool_call_id is None
+    assert result.output_truncated is False
 
 
 def test_tool_result_failure_carries_error_and_duration():
@@ -299,6 +304,38 @@ def test_tool_result_failure_carries_error_and_duration():
     assert result.error_type == "ValueError"
     assert result.error_message == "bad argument"
     assert result.duration_ms == 3
+    assert result.trace_id is None
+    assert result.tool_call_id is None
+    assert result.output_truncated is False
+
+
+def test_tool_result_old_factories_keep_text_compatibility():
+    """测试旧的 success/failure 构造方式不改变 message history 文本。"""
+    success = ToolResult.success(result="ok", duration_ms=12)
+    failure = ToolResult.failure(
+        error_type="ValueError",
+        error_message="bad argument",
+        duration_ms=3,
+    )
+
+    assert str(success) == "ok"
+    assert str(failure) == "Tool execution failed: ValueError: bad argument"
+
+
+def test_tool_result_carries_trace_metadata_without_changing_text_output():
+    """测试 ToolResult 可以携带 trace 元数据，但字符串输出保持兼容。"""
+    result = ToolResult.success(
+        result="done",
+        duration_ms=5,
+        trace_id="trace-1",
+        tool_call_id="tool-call-1",
+        output_truncated=True,
+    )
+
+    assert result.trace_id == "trace-1"
+    assert result.tool_call_id == "tool-call-1"
+    assert result.output_truncated is True
+    assert str(result) == "done"
 
 
 def test_tool_registry_run_returns_structured_success_result():
@@ -367,6 +404,179 @@ def test_tool_registry_run_returns_structured_failure_for_bad_arguments():
     assert result.error_type == "ValueError"
     assert "Missing required argument: path" in result.error_message
     assert result.duration_ms >= 0
+
+
+def test_tool_registry_stats_records_successful_calls():
+    """测试成功调用会更新 ToolRegistry 的工具统计。"""
+    registry = ToolRegistry()
+    registry.register(
+        Tool(
+            name="echo",
+            description="回显",
+            handler=lambda arguments: arguments["text"],
+            parameters=(ToolParameter(name="text", type="string", description="文本"),),
+        )
+    )
+
+    result = registry.run("echo", {"text": "hello"})
+
+    stats = registry.get_stats()
+    assert result.ok is True
+    assert stats["echo"]["calls"] == 1
+    assert stats["echo"]["successes"] == 1
+    assert stats["echo"]["failures"] == 0
+    assert stats["echo"]["total_duration_ms"] >= result.duration_ms
+
+
+def test_tool_registry_stats_records_handler_failures():
+    """测试 handler 抛异常时也会更新 ToolRegistry 的工具统计。"""
+
+    def handler(arguments: dict[str, Any]) -> str:
+        raise RuntimeError("boom")
+
+    registry = ToolRegistry()
+    registry.register(Tool(name="explode", description="失败工具", handler=handler))
+
+    result = registry.run("explode", {})
+
+    stats = registry.get_stats()
+    assert result.ok is False
+    assert stats["explode"]["calls"] == 1
+    assert stats["explode"]["successes"] == 0
+    assert stats["explode"]["failures"] == 1
+    assert stats["explode"]["total_duration_ms"] >= result.duration_ms
+
+
+def test_tool_registry_stats_records_argument_failures_without_calling_handler():
+    """测试参数校验失败会记录失败统计，同时不会进入 handler。"""
+    called = False
+
+    def handler(arguments: dict[str, Any]) -> str:
+        nonlocal called
+        called = True
+        return "ok"
+
+    registry = ToolRegistry()
+    registry.register(
+        Tool(
+            name="write_file",
+            description="写入文件",
+            handler=handler,
+            parameters=(ToolParameter(name="path", type="string", description="文件路径"),),
+        )
+    )
+
+    result = registry.run("write_file", {})
+
+    stats = registry.get_stats()
+    assert called is False
+    assert result.ok is False
+    assert stats["write_file"]["calls"] == 1
+    assert stats["write_file"]["successes"] == 0
+    assert stats["write_file"]["failures"] == 1
+    assert stats["write_file"]["total_duration_ms"] >= result.duration_ms
+
+
+def test_tool_registry_stats_records_unknown_tool_failures():
+    """测试未知工具调用会按请求的工具名记录失败统计。"""
+    registry = ToolRegistry()
+
+    result = registry.run("missing_tool", {})
+
+    stats = registry.get_stats()
+    assert result.ok is False
+    assert result.error_type == "KeyError"
+    assert stats["missing_tool"]["calls"] == 1
+    assert stats["missing_tool"]["successes"] == 0
+    assert stats["missing_tool"]["failures"] == 1
+    assert stats["missing_tool"]["total_duration_ms"] >= result.duration_ms
+
+
+def test_tool_registry_get_stats_returns_snapshot():
+    """测试 get_stats 返回快照，外部修改不会污染注册表内部统计。"""
+    registry = ToolRegistry()
+    registry.register(Tool(name="echo", description="回显", handler=lambda arguments: "ok"))
+    registry.run("echo", {})
+
+    stats = registry.get_stats()
+    stats["echo"]["calls"] = 999
+
+    assert registry.get_stats()["echo"]["calls"] == 1
+
+
+def test_truncate_output_keeps_short_text_unchanged():
+    """测试未超过上限的输出保持原文，不误报截断。"""
+    text, was_truncated = tool_base.truncate_output("small output", max_chars=20)
+
+    assert text == "small output"
+    assert was_truncated is False
+
+
+def test_truncate_output_marks_large_text_with_visible_notice():
+    """测试超长输出会保留前缀，并追加可见截断说明。"""
+    text, was_truncated = tool_base.truncate_output("abcdef", max_chars=3)
+
+    assert text.startswith("abc")
+    assert "def" not in text
+    assert "[output truncated:" in text
+    assert "kept 3 of 6 chars" in text
+    assert was_truncated is True
+
+
+def test_tool_registry_truncates_large_shell_stdout_and_stderr(tmp_path):
+    """测试 shell 大 stdout/stderr 会在 ToolResult 边界截断并设置元数据。"""
+    registry = create_coding_tool_registry()
+
+    result = registry.run(
+        "run_command",
+        {
+            "command": [
+                sys.executable,
+                "-c",
+                (
+                    "import sys; "
+                    "sys.stdout.write('O' * 5000); "
+                    "sys.stderr.write('E' * 5000)"
+                ),
+            ],
+            "cwd": ".",
+            "workspace_root": str(tmp_path),
+            "timeout_seconds": 5,
+        },
+    )
+
+    stdout = result.result["stdout"]
+    stderr = result.result["stderr"]
+
+    assert result.ok is True
+    assert result.output_truncated is True
+    assert stdout.startswith("O" * 100)
+    assert stderr.startswith("E" * 100)
+    assert "kept 4000 of 5000 chars" in stdout
+    assert "kept 4000 of 5000 chars" in stderr
+    assert len(stdout) < 5000
+    assert len(stderr) < 5000
+
+
+def test_tool_registry_truncates_large_read_file_result(tmp_path):
+    """测试大文件内容作为字符串 payload 返回时也会被 ToolResult 边界截断。"""
+    large_file = tmp_path / "large.txt"
+    large_file.write_text("F" * 5000, encoding="utf-8")
+    registry = create_coding_tool_registry()
+
+    result = registry.run(
+        "read_file",
+        {
+            "path": "large.txt",
+            "workspace_root": str(tmp_path),
+        },
+    )
+
+    assert result.ok is True
+    assert result.output_truncated is True
+    assert result.result.startswith("F" * 100)
+    assert "kept 4000 of 5000 chars" in result.result
+    assert len(result.result) < 5000
 
 
 def test_builtin_coding_tools_export_parameter_schemas():

@@ -53,3 +53,29 @@ def test_tool_schema_example_exports_default_coding_tool_schemas():
         "array",
     ]
     assert "stdout" in schemas_by_name["run_command"]["description"]
+
+
+def test_observed_tool_run_example_reports_real_read_file_stats():
+    """测试 Day 7 示例能展示成功读取、资源拒绝和工具统计。"""
+    repo_root = Path(__file__).resolve().parents[1]
+
+    completed = subprocess.run(
+        [sys.executable, "examples/03_observed_tool_run.py"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+
+    report = json.loads(completed.stdout)
+
+    assert report["successful_read"]["ok"] is True
+    assert report["successful_read"]["result"] == "hello from observed tool run"
+    assert report["successful_read"]["output_truncated"] is False
+    assert report["binary_rejection"]["ok"] is False
+    assert report["binary_rejection"]["error_type"] == "ValueError"
+    assert "file appears to be binary" in report["binary_rejection"]["error_message"]
+    assert report["stats"]["read_file"]["calls"] == 2
+    assert report["stats"]["read_file"]["successes"] == 1
+    assert report["stats"]["read_file"]["failures"] == 1

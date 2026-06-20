@@ -37,6 +37,24 @@ class TestReadFileTool:
         with pytest.raises(IsADirectoryError, match="path is a directory"):
             tool.run({"path": "folder", "workspace_root": str(tmp_path)})
 
+    def test_rejects_file_larger_than_read_limit(self, tmp_path):
+        """测试 read_file 在读取前拒绝超过资源上限的文件。"""
+        tool = ReadFileTool()
+        large_file = tmp_path / "large.txt"
+        large_file.write_bytes(b"A" * (1024 * 1024 + 1))
+
+        with pytest.raises(ValueError, match="file is too large"):
+            tool.run({"path": "large.txt", "workspace_root": str(tmp_path)})
+
+    def test_rejects_obvious_binary_file(self, tmp_path):
+        """测试 read_file 拒绝明显二进制文件，避免不可控字节进入 LLM 上下文。"""
+        tool = ReadFileTool()
+        binary_file = tmp_path / "binary.bin"
+        binary_file.write_bytes(b"text-prefix\x00binary-suffix")
+
+        with pytest.raises(ValueError, match="file appears to be binary"):
+            tool.run({"path": "binary.bin", "workspace_root": str(tmp_path)})
+
     def test_rejects_blank_path(self, tmp_path):
         """测试空路径会被拒绝"""
         tool = ReadFileTool()
@@ -297,6 +315,22 @@ class TestToolRegistryIntegration:
         assert "read_file" in tools
         assert "write_file" in tools
         assert len(tools) == 2
+
+    def test_registry_returns_structured_failure_for_binary_read_file(self, tmp_path):
+        """测试二进制拒绝能通过 ToolRegistry.run(...) 变成结构化失败结果。"""
+        registry = create_coding_tool_registry()
+        binary_file = tmp_path / "binary.bin"
+        binary_file.write_bytes(b"\x00not-text")
+
+        result = registry.run(
+            "read_file",
+            {"path": "binary.bin", "workspace_root": str(tmp_path)},
+        )
+
+        assert result.ok is False
+        assert result.result is None
+        assert result.error_type == "ValueError"
+        assert "file appears to be binary" in result.error_message
 
 
 class TestPathResolution:

@@ -2,47 +2,45 @@
 
 本文件只保留当前活跃任务。历史任务归档在 `docs/archive/daily_tasks/`。完整 24 周每日计划见 `docs/14_24_WEEK_PLAN.md`。
 
-## 2026-06-19
+## 2026-06-20
 
-日期：2026-06-19
-当前阶段：Week 3 Day 3
-当前模块：ToolResult 元数据
+日期：2026-06-20
+当前阶段：Week 4 Day 1
+当前模块：Permission System - 风险分类
 预计用时：1-2 小时
 执行状态：待开始。
 
 ### 1. 今日学习目标
 
-- 理解 `ToolResult` 为什么是工具执行结果的统一信封。
-- 在不破坏旧测试和旧 message history 的前提下，为 `ToolResult` 增加 trace 元数据。
-- 区分 `trace_id`、`tool_call_id` 和 `output_truncated` 的职责。
-- 学会用兼容性测试约束数据模型演进。
+- 理解 Permission System 解决的是工具执行前控制，不是执行后脱敏或错误包装。
+- 建立最小风险等级模型，用于区分安全、需要询问、直接拒绝的命令。
+- 明确风险分类和真正拦截执行之间的边界。
 
-### 2. 今日代码任务
+### 2. 今日前置知识
+
+- `ShellCommandTool` / `ShellRuntime.run(...)` 当前会直接执行命令。
+- `ToolRegistry.run(...)` 当前只负责路由、结果包装、输出截断和 stats。
+- Week 3 的 stats、trace 字段和资源限制仍不是权限系统。
+
+### 3. 今日代码任务
 
 更新：
 
-- `src/pca/tools/base.py`
-- `tests/test_tools.py`
+- `src/pca/permissions/risk.py`
+- `tests/test_permissions_risk.py`
 
-建议新增字段：
+建议新增能力：
 
-- `ToolResult.trace_id: str | None = None`
-- `ToolResult.tool_call_id: str | None = None`
-- `ToolResult.output_truncated: bool = False`
-
-### 3. 今日阅读任务
-
-- `docs/03_WEEKLY_SPRINTS.md` 的 Week 3 Day 3 行。
-- `docs/14_24_WEEK_PLAN.md` 的 Week 3 Day 3 行。
-- LangSmith Observability concepts：https://docs.langchain.com/langsmith/observability-concepts
-- LangChain Academy：https://academy.langchain.com/
+- `RiskLevel`：例如 `SAFE`、`ASK`、`DENY`。
+- `RiskAssessment`：保存风险等级、原因和匹配到的规则。
+- `classify_command(command)`：先做最小命令风险分类，不接入执行链。
 
 ### 4. 今日测试任务
 
-先写失败测试，再实现，建议从兼容性测试开始：
+先写失败测试，再实现：
 
 ```powershell
-E:\python\Scripts\pytest.exe tests\test_tools.py -q
+E:\python\Scripts\pytest.exe tests\test_permissions_risk.py -q
 ```
 
 完成后再跑：
@@ -51,32 +49,36 @@ E:\python\Scripts\pytest.exe tests\test_tools.py -q
 E:\python\Scripts\pytest.exe -q
 python examples\01_minimal_agent.py
 python examples\02_tool_agent.py
+python examples\03_observed_tool_run.py
 python -m compileall src examples -q
 ```
 
-### 5. 今日文档任务
+### 5. 今日阅读任务
 
-- 更新 `docs/07_IMPLEMENTATION_LOG.md` 记录 `ToolResult` 元数据实现和验证结果。
-- 必要时更新 `docs/06_ARCHITECTURE_DECISIONS.md`，说明为什么以默认字段保持兼容。
-- 更新 `docs/09_NEXT_ACTIONS.md`，Day 3 完成后先生成面试题，不直接推进 Day 4。
-- 必要时更新 `docs/05_LEARNING_NOTES.md` 的 trace / result metadata 笔记。
+- `docs/14_24_WEEK_PLAN.md` 的 Week 4。
+- Cline approval / OpenHands action security 的权限模型，只学习分类思路，不直接照搬实现。
 
-### 6. 今日复盘问题
+### 6. 今日文档任务
 
-1. 为什么 `trace_id` 和 `tool_call_id` 不是同一个字段？
-2. 为什么新增字段必须有默认值？
-3. `output_truncated` 为什么属于结果元数据，而不是只写进字符串？
-4. 保持 `ToolResult.__str__()` 不变解决了什么兼容问题？
-5. Day 3 还没有真正把 trace 传入 `AgentLoop`，这是否算完成？为什么？
+- 更新 `docs/07_IMPLEMENTATION_LOG.md` 记录 Day 7 面试归档和 Day 1 启动。
+- 更新 `docs/09_NEXT_ACTIONS.md`，把下一步指向 Week 4 Day 1。
+- 如产生架构选择，更新 `docs/06_ARCHITECTURE_DECISIONS.md`。
 
-### 7. 今日完成标准
+### 7. 今日复盘问题
 
-- `ToolResult.success(...)` 和 `ToolResult.failure(...)` 旧调用方式继续可用。
-- 新字段能被显式保存和读取。
-- `ToolResult.__str__()` 保持旧 message history 文本兼容。
-- 旧测试和新增测试都通过。
-- 全量测试、两个示例和编译验证通过。
+1. 风险分类和权限拦截有什么区别？
+2. 为什么 Day 1 只做 `classify_command(...)`，不立刻阻止 `run_command`？
+3. 字符串规则分类有哪些误判风险？
+4. 哪些命令应该直接 `DENY`，哪些应该 `ASK`？
+5. 风险分类结果未来如何进入 `PermissionPolicy.decide(...)`？
 
-### 8. 今日面试题
+### 8. 今日完成标准
 
-状态：Day 3 完成后生成。
+- 风险分类模型有单元测试覆盖。
+- `risk.py` 不再是占位模块。
+- 当前实现不提前接入 `ShellRuntime` 或 `ToolRegistry`。
+- 全量测试、三个示例和编译验证通过。
+
+### 9. 今日面试题
+
+状态：Day 1 完成后生成。

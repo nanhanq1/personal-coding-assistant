@@ -118,6 +118,31 @@
 - OpenAI Agents SDK Tools 文档：https://openai.github.io/openai-agents-python/tools/
 - 建议阅读顺序：先看 `subprocess.run(..., env=...)` 如何把环境变量传给子进程，再看 `os.environ` 理解环境变量的进程边界，最后用 OWASP 信息暴露说明理解为什么工具输出不能把 secret 原样写回 Agent 轨迹。
 
+### Week 3 Day 4 ToolRegistry 调用统计资料
+
+- pytest assertion 官方文档：https://docs.pytest.org/en/stable/how-to/assert.html
+- Python `time.perf_counter()` 官方文档：https://docs.python.org/3/library/time.html
+- OpenTelemetry Traces 概念文档：https://opentelemetry.io/docs/concepts/signals/traces/
+- mini-SWE-agent GitHub：https://github.com/SWE-agent/mini-swe-agent
+- 建议阅读顺序：先用 pytest assertion 理解如何写 stats 行为测试，再复习 `perf_counter()` 为什么适合测量工具耗时，然后看 OpenTelemetry trace 文档区分“单次链路”和“聚合统计”，最后对照 mini-SWE-agent 的运行轨迹理解为什么工具调用历史需要可观察。
+
+### Week 3 Day 5 输出截断资料
+
+- Python `subprocess.run` 输出捕获文档：https://docs.python.org/3/library/subprocess.html#subprocess.run
+- pytest `tmp_path` 官方文档：https://docs.pytest.org/en/stable/how-to/tmp_path.html
+- OpenHands GitHub：https://github.com/OpenHands/OpenHands
+- OpenHands Docs：https://docs.openhands.dev/overview/introduction
+- 建议阅读顺序：先复习 `subprocess.run(..., capture_output=True, text=True)` 如何产生 stdout/stderr，再用 pytest `tmp_path` 构造隔离的大文件输出测试，然后对照 OpenHands 的 agent/runtime 项目结构理解为什么工具 observation 不能无限写回轨迹。
+
+### Week 3 Day 6 文件资源限制资料
+
+- Python `Path.stat()` 官方文档：https://docs.python.org/3/library/pathlib.html#pathlib.Path.stat
+- Python 文件读写模式官方教程：https://docs.python.org/3/tutorial/inputoutput.html#reading-and-writing-files
+- pytest `tmp_path` 官方文档：https://docs.pytest.org/en/stable/how-to/tmp_path.html
+- OpenHands GitHub：https://github.com/OpenHands/OpenHands
+- OpenHands Docs：https://docs.openhands.dev/overview/introduction
+- 建议阅读顺序：先看 `Path.stat().st_size` 如何在读取前获得文件大小，再看二进制模式 `open("rb")` 如何采样字节，最后对照 OpenHands 的 runtime/workspace 设计理解为什么真实 Agent 需要在工具边界设置资源限制。
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |
@@ -133,6 +158,9 @@
 | `apply patch algorithm context lines` | 理解 patch 工具为什么需要上下文 |
 | `Python subprocess timeout cwd stdout stderr tutorial` | 学习命令执行输入输出和超时 |
 | `shell command sandbox workspace root safety` | 学习 shell runtime 安全边界 |
+| `python metrics counters success failure duration tutorial` | 学习调用统计的最小指标设计 |
+| `agent tool output truncation stdout stderr observation` | 学习工具输出截断和 observation 预算 |
+| `coding agent file size limit binary detection` | 学习文件工具读取前资源限制 |
 
 ## 长期资料池
 
