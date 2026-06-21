@@ -16,11 +16,11 @@ Personal Coding Assistant
 
 实现一个可放入作品集和面试讲解的 Personal Coding Assistant，具备代码库理解、任务规划、工具调用、Agent Loop、上下文工程、权限控制、MCP、状态机、长期记忆、安全运行、评估体系和可观测性。
 
-## 当前阶段
+## 当前状态入口
 
-- 当前阶段：24 周工业级路线，Week 3
-- 当前主题：Agent Core + Tool Runtime 工业级加固
-- 实时状态、阻塞项和下一步见 `docs/09_NEXT_ACTIONS.md`
+本文件只保存长期项目背景，不维护当前周次、当前主题、测试基线或阻塞项。
+
+实时状态、阻塞项和下一步只看 `docs/09_NEXT_ACTIONS.md`。
 
 ## 当前原则
 

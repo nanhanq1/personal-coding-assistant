@@ -16,6 +16,18 @@
 | 项目协作记忆 | `AGENTS.md`、`docs/09_NEXT_ACTIONS.md`、`docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` | 帮 AI 和用户恢复项目上下文 | 已使用 |
 | 产品运行时记忆 | `src/pca/memory/` | 未来让 Agent 记住用户偏好、任务状态、项目知识和学习进度 | 占位，未接入主链 |
 
+## 项目记忆文件清单
+
+| 文件 | 记忆职责 | 写入边界 |
+|---|---|---|
+| `AGENTS.md` | 核心执行规则、启动读取顺序、教学约束 | 不记录当前进度 |
+| `docs/INDEX.md` | 文档导航和按需读取入口 | 不记录当前进度 |
+| `docs/09_NEXT_ACTIONS.md` | 当前状态、能力边界、阻塞项、下一步和用户下次指令 | 唯一实时状态源 |
+| `docs/02_DAILY_TASKS.md` | 当前活跃日任务、学习目标、测试任务、复盘问题、面试题状态 | 不保存历史任务 |
+| `docs/07_IMPLEMENTATION_LOG.md` | 已完成工作的证据、验证命令、交接记录 | 不作为下一步入口 |
+| `DOC_RULES.md` | 文档写入、归档、反漂移检查规则 | 不保存项目进度 |
+| `docs/15_MEMORY_SYSTEM.md` | 本清单和两套记忆边界 | 不保存实时状态 |
+
 ## 项目协作记忆分层
 
 | 信息类型 | 权威位置 | 更新时机 | 不应重复到 |
@@ -41,6 +53,12 @@ flowchart TD
     G --> H["更新 Daily/Log/Next Actions"]
 ```
 
+流程规则：
+
+- 启动读取顺序以 `AGENTS.md` 为准，本图只表达职责流。
+- 当前周次、测试数字、阻塞项和下一步只从 `docs/09_NEXT_ACTIONS.md` 读取。
+- 完成工作后先判断是否真的改变了活跃任务；若改变，再同步 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md`、`docs/09_NEXT_ACTIONS.md`。
+
 ## 产品运行时记忆边界
 
 `src/pca/memory/` 未来只负责产品能力，不负责当前项目文档路由。当前文件均为占位或规划模块：
@@ -61,3 +79,4 @@ flowchart TD
 - 不把 `src/pca/memory/` 写成已实现能力，除非有源码、测试和主链接入证据。
 - 未回答面试题只放在 `docs/09_NEXT_ACTIONS.md` 和 `docs/02_DAILY_TASKS.md`。
 - 历史内容超过活跃文档上限时，移入 `docs/archive/`，不要继续扩写活跃文件。
+- 文档优化时优先减少重复状态；除 `docs/09_NEXT_ACTIONS.md` 外，其他文件只保留稳定规则、背景或证据。

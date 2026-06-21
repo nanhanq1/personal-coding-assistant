@@ -16,6 +16,20 @@
 | 已实现能力和差距 | `docs/12_IMPLEMENTED_ARCHITECTURE_AND_INDUSTRIAL_GAPS.md` | 只写能从当前源码或测试证明的能力 |
 | 记忆系统边界 | `docs/15_MEMORY_SYSTEM.md` | 只定义项目协作记忆和未来运行时记忆边界，不保存实时状态 |
 
+## 项目记忆文件
+
+这些文件共同构成项目协作记忆，但只有一个文件能保存实时状态：
+
+| 文件 | 角色 | 是否保存实时状态 |
+|---|---|---|
+| `AGENTS.md` | 会话执行规则和启动读取顺序 | 否 |
+| `docs/INDEX.md` | 文档导航入口 | 否 |
+| `docs/09_NEXT_ACTIONS.md` | 当前状态、阻塞项、测试基线、下一步 | 是 |
+| `docs/02_DAILY_TASKS.md` | 当前活跃日任务、复盘问题、待生成或待回答面试题 | 只保存当日任务状态 |
+| `docs/07_IMPLEMENTATION_LOG.md` | 已完成工作的验证证据和交接记录 | 否 |
+| `DOC_RULES.md` | 文档写入、归档和反漂移规则 | 否 |
+| `docs/15_MEMORY_SYSTEM.md` | 项目协作记忆与未来运行时记忆边界 | 否 |
+
 ## 写入规则
 
 - 启动读取顺序只维护在 `AGENTS.md`，其他文档不要复制一份。
@@ -39,7 +53,13 @@
 修改文档后至少检查：
 
 ```powershell
-Select-String -Path docs\09_NEXT_ACTIONS.md -Pattern "Week 3 Day 2 已开始" -SimpleMatch
-Select-String -Path docs\09_NEXT_ACTIONS.md -Pattern "面试题尚未回答|不能推进 Day 2" -SimpleMatch
-Select-String -Path README.md,docs\00_PROJECT_CONTEXT.md,docs\01_LEARNING_ROADMAP.md -Pattern "passed|skipped" -SimpleMatch
+Select-String -Path README.md,docs\00_PROJECT_CONTEXT.md,docs\01_LEARNING_ROADMAP.md -Pattern "当前阶段：|当前主题：|阻塞项：|passed|skipped"
+Select-String -Path docs\09_NEXT_ACTIONS.md,docs\02_DAILY_TASKS.md -Pattern "Week 3 Day 2|不能推进 Day 2|面试题尚未回答"
+Select-String -Path AGENTS.md,docs\INDEX.md,DOC_RULES.md,docs\15_MEMORY_SYSTEM.md -Pattern "启动读取顺序|实时状态|当前状态"
 ```
+
+判断标准：
+
+- `README.md`、`docs/00_PROJECT_CONTEXT.md`、`docs/01_LEARNING_ROADMAP.md` 不应保存当前测试数字或阻塞项。
+- 旧周次、旧 Day 门禁只能出现在实现日志或归档文件中，不能出现在当前状态入口和活跃任务。
+- `AGENTS.md` 可以定义启动读取顺序；其他文件只能引用它，不能复制一套新的启动规则。
