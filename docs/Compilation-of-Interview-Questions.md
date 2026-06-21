@@ -499,3 +499,22 @@
 
 - 用户回答：在一次 Agent run 开始时创建 `trace_id`，并传给 `AgentLoop -> ToolRegistry.run(...) -> ToolResult`，这样一次任务里的 LLM 调用、工具调用、工具结果能串起来。在 `ToolRegistry.run(...)` 前后加 logger hook，记录结构化 JSON 日志，包括 `trace_id`、`tool_name`、参数摘要、成功/失败、错误类型、耗时、是否截断。stats 不只放在内存里，而是持久化到文件、SQLite 或 metrics backend，避免进程退出后数据丢失。提供查询接口，比如按 `trace_id` 查完整链路，按 `tool_name` 查调用次数、成功率、失败率、平均耗时、P99。边界情况包括：工具抛异常、参数校验失败、未知工具、输出被截断、敏感参数脱敏、并发调用 stats 是否线程安全。测试方法包括：单测 logger 字段，集成测试 `trace_id` 是否全链路一致，安全测试日志不泄漏 token，压力测试并发 stats 不丢数据。
 - 标准回答：正确。工业级 observability 不能只靠当前内存 stats。更完整的设计是：`AgentLoop.run(...)` 创建或接收 `TraceContext`，把 `trace_id` 传入每次工具调用；`ToolRegistry.run(...)` 在调用前后触发 logger hook，记录结构化事件；`ToolResult` 保存 `trace_id`、`tool_call_id`、`output_truncated` 等元数据；metrics 层把聚合指标写入可持久化后端；查询层支持按 trace、tool、session 或时间窗口检索。方案取舍上，内存 stats 简单但不可恢复，JSONL 易审计但查询弱，SQLite 查询方便但要设计 schema，OpenTelemetry 更标准但接入成本更高。测试必须覆盖成功、失败、未知工具、参数错误、截断、脱敏、并发和进程重启后的可查询性。
+
+## 第 23 天：2026-06-21
+
+### 面试题 1：风险分类和权限拦截有什么区别？为什么 `classify_command(...)` 不应该直接执行或阻止命令？
+
+- 用户回答：风险分类是根据命令的风险进行评估，来影响后续的执行流程。权限拦截是根据当前 LLM 的决策给出的操作来进行拦截，比如删除系统文件，风险分类给出 deny，但是具体的操作是由权限拦截进行；`classify_command` 只是进行命令的分类，秉持着单一原则。
+- 标准回答：方向正确。风险分类回答的是“这条命令看起来属于什么风险等级”，输出是 `RiskAssessment(level, reason, matched_rule)`；权限拦截回答的是“这一次工具调用是否允许继续执行”，输出通常是 allow / ask / deny 这样的策略决策，并可能触发人工审批或直接拒绝。`classify_command(...)` 不应该执行命令，也不应该直接阻止命令，因为它的职责是纯分类：不依赖运行时环境、不产生副作用、容易单元测试、可被后续 `PermissionPolicy.decide(...)`、审批对象、审计日志和 shell gate 复用。真正的拦截应放在执行前 gate 中，由策略结合风险等级、工具类型、用户设置和审批结果做最终决策。
+
+### 面试题 2：请按调用链解释 `classify_command("python -c \"print(1)\"")` 如何得到 `RiskLevel.ASK`，并指出 `reason` 和 `matched_rule` 的作用。
+
+- 用户回答：不知道，请直接给出答案。
+- 标准回答：调用从 `classify_command(command)` 开始。输入是字符串 `"python -c \"print(1)\""`，先进入 `_normalize_command(...)`：因为 command 是非空字符串，所以用 `shlex.split(command, posix=False)` 尝试切分成命令片段，例如 `("python", "-c", "\"print(1)\"")`。随后 `classify_command(...)` 构造 `lowered_parts` 和 `lowered_text`，先调用 `_match_deny_rules(...)`；这条命令不是 `rm -rf`、`del /s /q`、`Remove-Item -Recurse/-Force` 或 `format`，所以不会得到 `DENY`。接着进入 `_match_ask_rules(...)`，其中 `_uses_inline_code(lowered_parts)` 会看到可执行文件是 `python`，并且参数中包含 `-c`，于是返回 `RiskAssessment(level=RiskLevel.ASK, reason="Inline code execution can run arbitrary logic.", matched_rule="inline_code")`。`reason` 给人和后续 UI 解释为什么要询问；`matched_rule` 给测试、审计和调试使用，说明具体命中了哪条规则。
+
+### 面试题 3：如果未来要把风险分类接入 `run_command`，你会把 gate 放在 `ShellRuntime`、`ShellCommandTool` 还是 `ToolRegistry`？请比较方案，并说明边界情况、误判处理、审计记录和测试策略。
+
+- 用户回答：`ShellRuntime`，有利于结果的回显和统计。
+- 标准回答：这个答案需要修正。`ShellRuntime` 是真实执行命令的底层 runtime，放 gate 的优点是可以作为最后防线，保护所有直接调用 runtime 的路径；但它太低层，不适合做人类审批、工具级策略、LLM tool call 上下文、审计事件和 UI 交互，也不应该承担 `ToolRegistry` 的统计和结果包装职责。`ShellCommandTool` 是 shell 专属 gate 的简单位置，能在调用 runtime 前分类并阻止危险命令，适合 Day 4 最小接入；缺点是只覆盖 shell 工具，未来文件写入、MCP 工具等还要重复实现。`ToolRegistry` 的执行前 hook 更适合作为长期方案，因为所有工具调用都经过 registry，能统一记录 allow / ask / deny、工具名、参数摘要、trace_id、审批结果和 stats；缺点是 registry 需要可插拔 policy，不能把 shell 专属规则硬编码进去。
+
+  更稳的设计是：短期把 shell gate 放在 `ShellCommandTool` 或 `ToolRegistry` 的执行前边界；长期在 `ToolRegistry.run(...)` 增加通用 permission hook，让不同工具提供自己的 risk classifier；`ShellRuntime` 保留少量不可绕过的低层安全校验，例如 workspace、cwd、timeout，必要时作为最后防线。误判处理上，`ASK` 交给用户确认，`DENY` 默认拒绝但允许未来通过显式高级策略覆盖，`SAFE` 也要保留审计记录。审计记录至少包含 tool name、command 摘要、risk level、matched_rule、decision、reason、trace_id、时间和是否执行。测试策略包括：危险命令不会进入 runtime；`ASK` 生成审批请求；审批拒绝时不执行；审批通过时才执行；未知或解析失败命令默认偏保守；审计日志不泄漏敏感环境变量。

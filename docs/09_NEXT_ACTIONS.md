@@ -4,35 +4,35 @@
 
 ## 当前状态
 
-- 路线阶段：24 周工业级路线，Week 4 Day 1 待开始。
-- 当前主题：Permission System - 风险分类。
-- 真实已完成：Week 1 Agent Loop、Week 2 Tool Runtime 基线、Week 3 Agent Core + Tool Runtime 加固验收与 Day 7 面试题归档。
-- 最新测试：2026-06-20 复核，`E:\python\Scripts\pytest.exe -q` 为 `110 passed, 1 skipped`；默认 `python -m pytest -q` 缺少 pytest。
-- 最新示例：2026-06-20 复核，`examples\01_minimal_agent.py`、`examples\02_tool_agent.py`、`examples\03_observed_tool_run.py` 均通过。
-- 最新编译验证：2026-06-20 复核，`python -m compileall src examples -q` 通过。
-- 阻塞项：无；Week 4 Day 1 尚未实现。
-- 最新文档维护：2026-06-21 优化项目协作记忆文件；Day 7 面试题已归档到 `docs/Compilation-of-Interview-Questions.md` 第 22 天；活跃任务保持 Week 4 Day 1。
+- 路线阶段：24 周工业级路线，Week 4 Day 2 待开始。
+- 当前主题：Permission System - 策略判断。
+- 真实已完成：Week 1 Agent Loop、Week 2 Tool Runtime 基线、Week 3 Agent Core + Tool Runtime 加固验收与 Day 7 面试题归档、Week 4 Day 1 风险分类实现与面试题归档。
+- 最新测试：2026-06-21，`E:\python\Scripts\pytest.exe -q` 为 `117 passed, 1 skipped`；默认 `python -m pytest -q` 缺少 pytest。
+- 最新示例：2026-06-21，`examples\01_minimal_agent.py`、`examples\02_tool_agent.py`、`examples\03_observed_tool_run.py` 均通过。
+- 最新编译验证：2026-06-21，`python -m compileall src examples -q` 通过。
+- 阻塞项：无；Week 4 Day 2 尚未实现。
+- 最新文档维护：2026-06-21 归档 Week 4 Day 1 面试题到 `docs/Compilation-of-Interview-Questions.md` 第 23 天，并推进活跃任务到 Week 4 Day 2。
 
 ## 当前能力边界
 
-已实现：`Message`、`ToolCall`、`TraceContext`、`AgentEvent`、`ScriptedLLM`、`AgentLoop`、`Tool`、`ToolParameter`、`ToolRegistry`、`ToolRegistry.get_stats()`、工具调用 `calls/successes/failures/total_duration_ms` 统计、`ToolResult`、`ToolResult.trace_id`、`ToolResult.tool_call_id`、`ToolResult.output_truncated`、`truncate_output(...)`、shell stdout/stderr 截断、字符串 payload 截断、`read_file` 文件大小上限、`read_file` 明显二进制拒绝、`write_file`、`edit_file`、`run_command` / `ShellRuntime`、`workspace_root`、timeout、基础参数校验、`run_command.env` 敏感输出脱敏。
+已实现：`Message`、`ToolCall`、`TraceContext`、`AgentEvent`、`ScriptedLLM`、`AgentLoop`、`Tool`、`ToolParameter`、`ToolRegistry`、`ToolRegistry.get_stats()`、工具调用 `calls/successes/failures/total_duration_ms` 统计、`ToolResult`、`ToolResult.trace_id`、`ToolResult.tool_call_id`、`ToolResult.output_truncated`、`truncate_output(...)`、shell stdout/stderr 截断、字符串 payload 截断、`read_file` 文件大小上限、`read_file` 明显二进制拒绝、`write_file`、`edit_file`、`run_command` / `ShellRuntime`、`workspace_root`、timeout、基础参数校验、`run_command.env` 敏感输出脱敏、`RiskLevel`、`RiskAssessment`、`classify_command(...)`。
 
-仍是占位或未接入主链：`permissions` 仍未实现；`TraceContext` / `AgentEvent` 尚未由 `AgentLoop` 自动创建或透传到 `ToolRegistry`；`ToolRegistry` stats 尚未接入 logger hook 或持久化 metrics；文件资源限制仍是固定上限和最小 NUL 检测；`context`、`memory`、`mcp`、`observability`、`workspace/checkpoint/docker_runtime`、`cli`。
+仍是占位或未接入主链：风险分类尚未接入 `ShellRuntime`、`ShellCommandTool` 或 `ToolRegistry`；`PermissionPolicy`、审批对象和审计事件仍未实现；`TraceContext` / `AgentEvent` 尚未由 `AgentLoop` 自动创建或透传到 `ToolRegistry`；`ToolRegistry` stats 尚未接入 logger hook 或持久化 metrics；文件资源限制仍是固定上限和最小 NUL 检测；`context`、`memory`、`mcp`、`observability`、`workspace/checkpoint/docker_runtime`、`cli`。
 
 ## 下一步行动
 
-开始 Week 4 Day 1：风险分类。
+开始 Week 4 Day 2：策略判断。
 
-### Day 1 任务
+### Day 2 任务
 
-1. 按 TDD 新增 `tests/test_permissions_risk.py`。
-2. 在 `src/pca/permissions/risk.py` 实现 `RiskLevel`、`RiskAssessment` 和 `classify_command(...)`。
-3. 只做分类，不接入 `ShellRuntime`、`ShellCommandTool` 或 `ToolRegistry`。
-4. 跑聚焦测试、全量测试、三个示例和编译验证。
-5. 更新 `docs/07_IMPLEMENTATION_LOG.md` 和 `docs/09_NEXT_ACTIONS.md`；完成后生成 Day 1 面试题。
+1. 按 TDD 新增 `tests/test_permissions_policy.py`。
+2. 在 `src/pca/permissions/policy.py` 实现最小 `PermissionPolicy.decide(...)`。
+3. 建议新增 `DecisionAction` 和 `PermissionDecision`，把 `RiskLevel.SAFE/ASK/DENY` 映射到 `ALLOW/ASK/DENY`。
+4. 只做策略判断，不接入 `ShellRuntime`、`ShellCommandTool`、`ToolRegistry` 或 audit。
+5. 跑聚焦测试、全量测试、三个示例和编译验证；完成后生成 Day 2 面试题。
 
 ## 用户下次应发送
 
 ```text
-开始 Week 4 Day 1
+开始 Week 4 Day 2
 ```

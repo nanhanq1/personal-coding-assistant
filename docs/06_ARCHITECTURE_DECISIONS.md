@@ -1,5 +1,37 @@
 # Architecture Decisions
 
+## ADR-0013：Week 4 Day 1 先实现独立风险分类器，不接入执行链
+
+日期：2026-06-21
+
+### 背景
+
+Week 4 开始建设 Permission System。当前 `ShellRuntime.run(...)` 会在工作区边界和 timeout 校验后直接执行命令，`ShellCommandTool` 只负责把工具调用转发给 runtime，`ToolRegistry` 只负责工具路由、结果包装、输出截断和 stats。
+
+如果第一天就把权限逻辑硬接进 shell runtime 或 registry，分类 API、策略判断和审批对象还没稳定，就会影响已有 Agent Loop 与 Tool Runtime 行为。更稳妥的顺序是先定义可测试的风险分类结果，再由后续 Day 2-Day 4 接入策略和执行前 gate。
+
+### 决策
+
+- 在 `src/pca/permissions/risk.py` 定义 `RiskLevel`：`SAFE`、`ASK`、`DENY`。
+- 定义 `RiskAssessment(level, reason, matched_rule)`，让分类结果可测试、可解释。
+- 实现 `classify_command(command)`，支持字符串命令和 `list[str]` 命令。
+- 规则顺序为：先匹配明显破坏性 `DENY`，再匹配联网、内联代码、shell 操作符等 `ASK`，最后默认 `SAFE`。
+- 本次不修改 `ShellRuntime`、`ShellCommandTool`、`ToolRegistry` 或 `AgentLoop`。
+
+### 理由
+
+- 分类是策略判断和审批流的输入，不应该和执行拦截混在同一天完成。
+- `RiskAssessment.reason` 和 `matched_rule` 能让后续审批 UI、审计日志和测试知道为什么做出分类。
+- 独立纯函数更容易用 TDD 覆盖，也不会破坏现有 117 个测试和示例。
+- 先保留启发式字符串规则，明确误判边界，后续再通过 policy、audit 和真实验证加固。
+
+### 暂不采用
+
+- 暂不实现 `PermissionPolicy.decide(...)`。
+- 暂不实现审批对象、审批过期、审计 JSONL。
+- 暂不阻止 `run_command` 执行危险命令；shell gate 留到 Day 4。
+- 暂不实现完整 shell AST、跨平台解析器、命令 allowlist 或 sandbox。
+
 ## ADR-0012：Week 3 Day 6 在 ReadFileTool 读取前执行文件资源限制
 
 日期：2026-06-20

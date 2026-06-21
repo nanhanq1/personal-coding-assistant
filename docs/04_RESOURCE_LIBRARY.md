@@ -143,6 +143,15 @@
 - OpenHands Docs：https://docs.openhands.dev/overview/introduction
 - 建议阅读顺序：先看 `Path.stat().st_size` 如何在读取前获得文件大小，再看二进制模式 `open("rb")` 如何采样字节，最后对照 OpenHands 的 runtime/workspace 设计理解为什么真实 Agent 需要在工具边界设置资源限制。
 
+### Week 4 Day 1 风险分类资料
+
+- Cline Auto Approve & YOLO Mode：https://docs.cline.bot/features/auto-approve
+- OWASP Command Injection：https://owasp.org/www-community/attacks/Command_Injection
+- MCP Security Best Practices：https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices
+- MIT 6.858 Computer Systems Security：https://ocw.mit.edu/courses/6-858-computer-systems-security-fall-2014/
+- OpenHands GitHub：https://github.com/OpenHands/OpenHands
+- 建议阅读顺序：先看 Cline 如何区分 safe command 和 approval-required command，再看 OWASP 命令注入理解 shell 字符串风险，然后用 MCP security 文档理解 consent、scope 和 audit 为什么属于权限系统边界。
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |
@@ -161,6 +170,7 @@
 | `python metrics counters success failure duration tutorial` | 学习调用统计的最小指标设计 |
 | `agent tool output truncation stdout stderr observation` | 学习工具输出截断和 observation 预算 |
 | `coding agent file size limit binary detection` | 学习文件工具读取前资源限制 |
+| `coding agent command approval permission risk classification` | 学习命令风险分类和审批边界 |
 
 ## 长期资料池
 

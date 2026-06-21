@@ -2,6 +2,53 @@
 
 ## 2026-06-21
 
+### Week 4 Day 1 面试题归档与 Day 2 交接
+
+### 本次完成
+
+- 评审用户 Week 4 Day 1 三道面试题回答。
+- 将用户原始回答和标准补充答案追加到 `docs/Compilation-of-Interview-Questions.md` 的第 23 天记录。
+- 确认 Day 1 面试题已回答并归档，Week 4 Day 1 风险分类可以收口。
+- 将活跃任务推进到 Week 4 Day 2：Permission System 策略判断。
+- 更新 `docs/02_DAILY_TASKS.md` 和 `docs/09_NEXT_ACTIONS.md`，下一步聚焦 `PermissionPolicy.decide(...)`，暂不接入 shell gate 或 audit。
+
+### 验证
+
+- 本次只修改 Markdown 文档，未修改业务源码。
+- Day 1 面试题已回答并归档，可以进入 Week 4 Day 2。
+
+### 下一步
+
+- 开始 Week 4 Day 2：策略判断。
+
+## 2026-06-21
+
+### Week 4 Day 1 风险分类
+
+### 本次完成
+
+- 按 TDD 新增 `tests/test_permissions_risk.py`，先确认 RED：`pca.permissions.risk` 尚未导出 `RiskLevel`。
+- 在 `src/pca/permissions/risk.py` 实现 `RiskLevel`、`RiskAssessment` 和 `classify_command(...)`。
+- 覆盖 `SAFE`、`ASK`、`DENY` 三类最小命令风险：只读/本地验证命令、联网/内联代码命令、递归删除/格式化等破坏性命令。
+- 保持 Day 1 边界：只做风险分类，不接入 `ShellRuntime`、`ShellCommandTool`、`ToolRegistry` 或 `AgentLoop`。
+- 新增 ADR-0013，更新学习笔记、资料库、活跃任务和下一步门禁。
+
+### 验证
+
+- `E:\python\Scripts\pytest.exe tests\test_permissions_risk.py -q`：先 RED，最终 `7 passed`。
+- `E:\python\Scripts\pytest.exe -q`：`117 passed, 1 skipped`。
+- `python examples\01_minimal_agent.py`：通过。
+- `python examples\02_tool_agent.py`：通过。
+- `python examples\03_observed_tool_run.py`：通过。
+- `python -m compileall src examples -q`：通过。
+
+### 下一步
+
+- 等待用户回答 Week 4 Day 1 面试题。
+- 回答评审并归档到 `docs/Compilation-of-Interview-Questions.md` 后，才能进入 Week 4 Day 2：策略判断。
+
+## 2026-06-21
+
 ### 项目记忆文档优化
 
 ### 本次完成
