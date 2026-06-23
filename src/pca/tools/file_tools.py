@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Any
 
+from pca.permissions.file_risk import classify_file_change
+from pca.permissions.policy import DecisionAction, PermissionPolicy
 from pca.tools.base import Tool, ToolParameter
 
 
@@ -52,12 +54,13 @@ class ReadFileTool(Tool):
 class WriteFileTool(Tool):
     """写入工作区内的文件内容。"""
 
-    def __init__(self) -> None:
+    def __init__(self, permission_policy: PermissionPolicy | None = None) -> None:
+        self._permission_policy = permission_policy or PermissionPolicy()
         super().__init__(
             name="write_file",
             description=(
-                "写入工作区内的文件内容；写入或覆盖 workspace_root 内的文本文件，必要时自动创建父目录；"
-                "适合生成新文件或整文件替换，成功时返回 ok。"
+                "写入工作区内的文件内容；写入 workspace_root 内的新文本文件，必要时自动创建父目录；"
+                "覆盖已有文件会触发 permission approval，不会静默写盘；成功时返回 ok。"
             ),
             handler=self._run,
             parameters=(
@@ -69,7 +72,7 @@ class WriteFileTool(Tool):
                 ToolParameter(
                     name="content",
                     type="string",
-                    description="要写入文件的完整文本内容",
+                    description="要写入新文件的完整文本内容",
                 ),
                 ToolParameter(
                     name="workspace_root",
@@ -96,6 +99,16 @@ class WriteFileTool(Tool):
         if not isinstance(content, str):
             raise TypeError("content must be a string")
 
+        # 修改前旧代码：
+        # path.parent.mkdir(parents=True, exist_ok=True)
+        # path.write_text(content, encoding="utf-8")
+        #
+        # 问题：覆盖已有文件会静默写盘，没有进入 permission gate。
+        _ensure_file_permission(
+            tool_name=self.name,
+            path=path,
+            permission_policy=self._permission_policy,
+        )
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         return "ok"
@@ -104,12 +117,14 @@ class WriteFileTool(Tool):
 class EditFileTool(Tool):
     """对工作区内已有文件执行一次精确局部替换。"""
 
-    def __init__(self) -> None:
+    def __init__(self, permission_policy: PermissionPolicy | None = None) -> None:
+        self._permission_policy = permission_policy or PermissionPolicy()
         super().__init__(
             name="edit_file",
             description=(
                 "对工作区内已有文本文件做局部编辑；只替换一次在文件中唯一出现的 old_text；"
-                "如果 old_text 不存在或出现多次会拒绝写入，避免误改多个语义位置；成功时返回 ok。"
+                "如果 old_text 不存在或出现多次会拒绝写入，删除式编辑会触发 permission approval；"
+                "成功时返回 ok。"
             ),
             handler=self._run,
             parameters=(
@@ -126,7 +141,7 @@ class EditFileTool(Tool):
                 ToolParameter(
                     name="new_text",
                     type="string",
-                    description="替换后的文本；可以为空字符串，用于删除 old_text",
+                    description="替换后的文本；空字符串会被视为删除式编辑并触发 approval",
                 ),
                 ToolParameter(
                     name="workspace_root",
@@ -156,6 +171,20 @@ class EditFileTool(Tool):
         if not isinstance(new_text, str):
             raise TypeError("new_text must be a string")
 
+        # 修改前旧代码：
+        # content = path.read_text(encoding="utf-8")
+        # occurrences = content.count(old_text)
+        # ...
+        # path.write_text(content.replace(old_text, new_text, 1), encoding="utf-8")
+        #
+        # 问题：删除式编辑会静默写盘，没有进入 permission gate。
+        _ensure_file_permission(
+            tool_name=self.name,
+            path=path,
+            permission_policy=self._permission_policy,
+            old_text=old_text,
+            new_text=new_text,
+        )
         content = path.read_text(encoding="utf-8")
         occurrences = content.count(old_text)
         if occurrences == 0:
@@ -220,6 +249,45 @@ def _ensure_readable_text_file(path: Path) -> None:
         sample = file.read(BINARY_DETECTION_SAMPLE_BYTES)
     if b"\x00" in sample:
         raise ValueError(f"file appears to be binary: {path}")
+
+
+def _ensure_file_permission(
+    *,
+    tool_name: str,
+    path: Path,
+    permission_policy: PermissionPolicy,
+    old_text: str | None = None,
+    new_text: str | None = None,
+) -> None:
+    """在文件写盘前执行最小 permission gate。"""
+    assessment = classify_file_change(
+        tool_name=tool_name,
+        path=path,
+        old_text=old_text,
+        new_text=new_text,
+    )
+    decision = permission_policy.decide(assessment)
+
+    if decision.action is DecisionAction.ALLOW:
+        return
+
+    if decision.action is DecisionAction.ASK:
+        raise PermissionError(
+            "Permission approval required before file change: "
+            f"action={decision.action.value}; "
+            f"risk={assessment.level.value}; "
+            f"rule={assessment.matched_rule}; "
+            f"reason={decision.reason} {assessment.reason}"
+        )
+
+    if decision.action is DecisionAction.DENY:
+        raise PermissionError(
+            "Permission denied before file change: "
+            f"action={decision.action.value}; "
+            f"risk={assessment.level.value}; "
+            f"rule={assessment.matched_rule}; "
+            f"reason={decision.reason} {assessment.reason}"
+        )
 
 
 # 向后兼容的函数形式

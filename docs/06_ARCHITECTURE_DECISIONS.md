@@ -1,5 +1,183 @@
 # Architecture Decisions
 
+## ADR-0018：Week 4 Day 6 先实现独立权限审计事件和 JSONL 写入
+
+日期：2026-06-22
+
+### 背景
+
+Week 4 Day 1-Day 5 已经让 Permission System 具备风险分类、策略判断、审批对象、shell gate 和文件写盘前风险 gate。当前系统能阻止 `DENY` 和未审批的 `ASK` 操作静默执行，但缺少稳定的事实记录：事后很难回答“哪个工具、哪条规则、哪个策略动作、是否执行”。
+
+如果直接把审计逻辑硬接入 shell/file gate，很容易把“记录事实”和“改变行为”混在一起，也会在审批恢复、checkpoint、rollback 尚未完成前扩大主链改动范围。
+
+### 决策
+
+- 新增 `src/pca/permissions/audit.py`。
+- 定义 `PermissionAuditEvent`，保存 `timestamp`、`tool_name`、`action`、`risk_level`、`matched_rule`、`reason` 和 `executed`。
+- `PermissionAuditEvent.to_dict()` 将 `datetime` 和 `DecisionAction` 转成稳定 JSON 字段。
+- 定义 `append_audit_event(path, event)`，把单个事件追加为一行 JSONL。
+- 新增 `tests/test_permissions_audit.py` 覆盖字段保存、稳定序列化和 JSONL 追加写入。
+- 本次不把 audit 自动接入 `ShellCommandTool`、`WriteFileTool` 或 `EditFileTool`，避免 Day 6 改变现有 allow / ask / deny 行为。
+
+### 理由
+
+- audit 是事实记录层，不是策略层；它应该记录发生了什么，而不是决定能不能执行。
+- JSONL 一行一个事件，适合后续追加、回放、安全回归矩阵和真实验证报告。
+- `executed` 字段能区分“被允许且执行过”和“因为 ASK/DENY 没有执行”，为后续审批恢复和 rollback 留证据。
+- 先独立实现数据结构和持久化函数，可以让 Week 4 Day 7 示例和 Week 6 audit 完整性检查复用同一 API。
+
+### 暂不采用
+
+- 暂不实现交互式审批 UI。
+- 暂不让 `ASK` 审批后自动恢复执行。
+- 暂不做 checkpoint、rollback 或 sandbox 集成。
+- 暂不自动透传 `TraceContext`。
+- 暂不记录完整命令输出、文件内容、secret 或 env 值。
+
+## ADR-0017：Week 4 Day 5 在文件工具写盘前接入文件风险 gate
+
+日期：2026-06-22
+
+### 背景
+
+Week 4 Day 4 已经让 `run_command` 在进入 `ShellRuntime` 前经过 `classify_command(...)` 和 `PermissionPolicy.decide(...)`。但文件工具仍然只依赖 `workspace_root` 边界：路径在工作区内就可以直接写盘。
+
+这会留下一个重要缺口：覆盖已有文件、删除式编辑或大范围替换即使发生在工作区内，也可能破坏用户代码。workspace 边界只能回答“能不能碰这个路径”，不能回答“这次修改是否需要用户确认”。
+
+### 决策
+
+- 新增 `src/pca/permissions/file_risk.py`。
+- 定义 `classify_file_change(...)`，返回现有 `RiskAssessment`。
+- `write_file` 写新文件分类为 `RiskLevel.SAFE`，覆盖已有文件分类为 `RiskLevel.ASK`。
+- `edit_file` 小范围精确替换分类为 `RiskLevel.SAFE`。
+- `edit_file` 空字符串替换或大范围缩减分类为 `RiskLevel.ASK`。
+- 在 `WriteFileTool._run(...)` 和 `EditFileTool._run(...)` 写盘前调用文件风险分类和 `PermissionPolicy.decide(...)`。
+- `DecisionAction.ALLOW` 继续原写盘路径。
+- `DecisionAction.ASK` 抛出 `PermissionError`，由 `ToolRegistry.run(...)` 转成失败 `ToolResult`，表示需要审批但不执行。
+- 本次不实现 audit JSONL、checkpoint、rollback、完整 diff UI 或审批通过后的恢复执行。
+
+### 理由
+
+- 文件风险分类属于 permission 模块，可以和 shell 风险共用 `RiskAssessment` / `PermissionPolicy` 模型。
+- 文件工具最接近真实写盘动作，把 gate 放在 `WriteFileTool` / `EditFileTool` 写盘前能证明 ASK 不会修改磁盘。
+- `ToolRegistry` 继续保持通用路由、结果包装、统计和截断职责，不需要理解文件覆盖或删除式编辑语义。
+- `_resolve_workspace_path(...)` 继续负责 workspace 边界，不和 permission gate 混在一起。
+- 没有交互式审批 UI 前，`ASK` 必须失败返回，不能被当成允许执行。
+
+### 暂不采用
+
+- 暂不生成文件 diff 或完整审批 UI。
+- 暂不把审批对象接回 `write_file` / `edit_file` 的恢复执行链。
+- 暂不把文件风险写入 JSONL audit；Day 6 统一处理审计事件。
+- 暂不实现 checkpoint / rollback；后续 Git Safety 和 workspace checkpoint 再设计。
+- 暂不把所有文件编辑都默认 ASK；当前只拦截覆盖和删除式风险，保留新文件写入与小范围替换的学习闭环。
+
+## ADR-0016：Week 4 Day 4 在 ShellCommandTool 执行前接入 shell gate
+
+日期：2026-06-22
+
+### 背景
+
+Week 4 Day 1-Day 3 已经分别实现了命令风险分类、权限策略判断和审批对象。此前这些对象仍未接入 `run_command` 主链，`ShellCommandTool` 会把命令直接转发给 `ShellRuntime.run(...)`，导致 `RiskAssessment` 和 `PermissionDecision` 只能被单元测试证明，不能阻止真实 shell 执行。
+
+Day 4 的目标是证明危险命令不会进入真实 runtime，`ASK` 命令不会在没有用户确认时静默执行，同时保持安全命令的原执行路径。
+
+### 决策
+
+- 将 shell gate 放在 `src/pca/tools/shell_tools.py` 的 `ShellCommandTool._run(...)`。
+- `ShellCommandTool._run(...)` 先调用 `classify_command(arguments["command"])`。
+- 再调用 `PermissionPolicy.decide(assessment)`。
+- `DecisionAction.ALLOW` 时继续调用 `self._runtime.run(arguments)`。
+- `DecisionAction.ASK` 时抛出 `PermissionError`，由 `ToolRegistry.run(...)` 转成失败 `ToolResult`，表示需要审批但不执行。
+- `DecisionAction.DENY` 时抛出 `PermissionError`，由 `ToolRegistry.run(...)` 转成失败 `ToolResult`，并保证不进入 runtime。
+- 向后兼容函数 `pca.tools.shell_tools.run_command(...)` 也改为通过 `ShellCommandTool().run(arguments)`，避免绕过 gate。
+- 本次不实现交互式审批 UI、审批通过后恢复执行、audit JSONL、文件风险分类或 sandbox。
+
+### 理由
+
+- `ShellCommandTool` 是 `run_command` 的工具语义边界，能在具体工具执行前拦截，同时保留 `ShellRuntime` 作为纯执行器。
+- `ShellRuntime` 继续负责 workspace、cwd、timeout、env 和输出脱敏等底层安全边界，不混入业务权限策略。
+- `ToolRegistry` 继续负责路由、结果包装、统计和截断，不需要理解 shell 命令风险。
+- `ASK` 在没有审批 UI 时必须失败返回，不能把“需要问用户”误当成“允许执行”。
+- fake runtime 测试能证明拦截发生在执行前，而不是执行后包装错误。
+
+### 暂不采用
+
+- 暂不把审批通过结果接回执行链；后续需要 CLI/UI 和 audit 一起设计。
+- 暂不把权限结果写入 `ToolResult` 的专门字段；当前先用失败 `ToolResult` 表达阻断。
+- 暂不在 `ShellRuntime` 中重复分类命令；runtime 仍保持执行器职责。
+- 暂不阻止所有可能危险的 shell 形式；当前分类器仍是最小启发式规则，后续通过文件风险、audit、真实验证和 sandbox 加固。
+
+## ADR-0015：Week 4 Day 3 用独立审批对象承接 ASK 策略结果
+
+日期：2026-06-22
+
+### 背景
+
+Week 4 Day 1 已经能把命令分类为 `RiskAssessment`，Day 2 已经能把风险映射为 `PermissionDecision(action=ALLOW/ASK/DENY)`。其中 `DecisionAction.ASK` 只表示策略要求人工确认，还不是“用户已经同意执行”。
+
+如果后续 shell gate 直接把 `ASK` 当成布尔值处理，就会丢失请求 id、工具名、命令摘要、过期时间和用户理由，也无法为 audit 留下稳定证据。
+
+### 决策
+
+- 在 `src/pca/permissions/approval.py` 定义 `ApprovalRequest`。
+- `ApprovalRequest` 保存 `request_id`、`tool_name`、`command_summary`、`PermissionDecision`、`created_at` 和 `expires_at`。
+- `ApprovalRequest.is_expired(now)` 负责判断请求是否过期。
+- 定义 `ApprovalDecision`，保存 `request_id`、`approved`、`user_reason` 和 `decided_at`。
+- 提供 `ApprovalDecision.approve(...)` 和 `ApprovalDecision.reject(...)` 两个工厂方法。
+- 拒绝空 `request_id`、空 `tool_name`、空 `command_summary`、非 `PermissionDecision` 和无效过期时间。
+- 本次不修改 `ShellRuntime`、`ShellCommandTool`、`ToolRegistry`、`AgentLoop` 或 audit。
+
+### 理由
+
+- `PermissionDecision` 是系统策略，`ApprovalDecision` 是用户决定；二者分离后才能清楚表达“系统要求问”和“用户回答了什么”。
+- `ApprovalRequest` 保留原始策略判断，后续审批 UI 和审计事件可以解释为什么需要审批。
+- `request_id` 能把请求、用户决定和未来 audit 关联起来。
+- `expires_at` 避免用户很久以后批准一个已经不再对应当前上下文的危险操作。
+- 先让审批对象纯数据化，可以在 Day 4 接 shell gate 前稳定 API 和测试。
+
+### 暂不采用
+
+- 暂不生成默认 request id 或默认过期时间；当前由调用方显式传入，便于测试和后续 gate 控制。
+- 暂不让 `ApprovalDecision` 自动执行命令。
+- 暂不把审批结果写入 JSONL audit。
+- 暂不把过期请求接入 `ShellRuntime` 或 `ShellCommandTool`；shell gate 留到 Day 4。
+- 暂不实现交互式 CLI prompt、Web UI 或长期审批存储。
+
+## ADR-0014：Week 4 Day 2 用独立策略层映射风险到权限动作
+
+日期：2026-06-21
+
+### 背景
+
+Week 4 Day 1 已经实现 `RiskLevel`、`RiskAssessment` 和 `classify_command(...)`。风险分类只能回答“命令看起来多危险”，还不能回答“本次工具调用应该允许、询问还是拒绝”。如果把这两个概念混成一个枚举，后续就很难支持按用户配置、workspace 信任级别、工具类型或审批状态改变策略结果。
+
+同时，当前权限系统仍未接入 shell 执行链。如果 Day 2 同时修改 `ShellRuntime` 或 `ToolRegistry`，策略对象还没稳定就会影响已有工具主链。
+
+### 决策
+
+- 在 `src/pca/permissions/policy.py` 定义 `DecisionAction`：`ALLOW`、`ASK`、`DENY`。
+- 定义 `PermissionDecision(action, reason, assessment)`，保留原始 `RiskAssessment` 作为决策证据。
+- 实现 `PermissionPolicy.decide(assessment)`。
+- 默认策略映射为：`RiskLevel.SAFE -> ALLOW`、`RiskLevel.ASK -> ASK`、`RiskLevel.DENY -> DENY`。
+- `PermissionPolicy.decide(...)` 只接受 `RiskAssessment`，拒绝原始命令字符串或任意对象。
+- 本次不修改 `ShellRuntime`、`ShellCommandTool`、`ToolRegistry`、`AgentLoop`、审批对象或 audit。
+
+### 理由
+
+- `RiskLevel` 是事实判断，`DecisionAction` 是策略判断；分离后才能支持未来可配置策略。
+- `PermissionDecision` 保留 `assessment`，可以让后续审批 UI 和审计日志看到“为什么做出这个动作”。
+- policy 层保持纯判断，不执行命令、不做人机交互、不写审计，便于单元测试和后续替换。
+- 先稳定 `PermissionPolicy` API，再在 Day 3-Day 4 接入审批对象和 shell gate，能降低主链回归风险。
+
+### 暂不采用
+
+- 暂不实现用户配置、workspace trust、工具 allowlist 或 denylist。
+- 暂不实现审批请求、审批过期或审批结果对象。
+- 暂不把 `PermissionDecision` 写入 JSONL audit。
+- 暂不阻止 `run_command` 执行危险命令；shell gate 留到 Day 4。
+- 暂不引入 Open Policy Agent 或第三方策略引擎。
+
 ## ADR-0013：Week 4 Day 1 先实现独立风险分类器，不接入执行链
 
 日期：2026-06-21

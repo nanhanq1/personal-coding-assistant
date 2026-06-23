@@ -9,6 +9,7 @@
 - 第 1 周 Day 1 到 Day 7
 - 第 2 周 Day 1 到 Day 7
 - 第 3 周已完成的 Agent Core + Tool Runtime 加固切片
+- 第 4 周 Day 1-Day 6 已完成的 Permission System 风险分类、策略判断、审批对象、shell gate、文件风险 gate 和最小审计事件切片
 - 与上述主线直接相关的文档复核、规则治理和工业级边界补强
 
 不纳入“已实现主链架构图”的目录：
@@ -17,9 +18,9 @@
 - `src/pca/memory`
 - `src/pca/mcp`
 - `src/pca/observability`
-- `src/pca/permissions`
 
 这些目录虽然已经存在，但当前仍是占位或计划模块，本文只在后文“占位模块说明”中单列，不把它们画成当前已落地能力。
+`src/pca/permissions` 已有 Day 1-Day 6 的风险分类、策略判断、审批对象、文件风险分类和审计事件；Day 4-Day 5 已把风险分类和策略判断分别接入 `ShellCommandTool` 和文件工具写盘前 gate，但审批交互、审批恢复、audit 自动接入主链、checkpoint 和 rollback 仍未完成。
 
 ### 2. 证据来源
 
@@ -29,7 +30,7 @@
 - `docs/07_IMPLEMENTATION_LOG.md`
 - `docs/06_ARCHITECTURE_DECISIONS.md`
 - `README.md`
-- 已实现源码：`src/pca/core`、`src/pca/tools`、`src/pca/runtime`
+- 已实现源码：`src/pca/core`、`src/pca/tools`、`src/pca/runtime`、`src/pca/permissions/risk.py`、`src/pca/permissions/policy.py`、`src/pca/permissions/approval.py`、`src/pca/permissions/file_risk.py`、`src/pca/permissions/audit.py`
 
 ### 3. 阅读方式
 
@@ -62,6 +63,12 @@
 | 2026-06-20 | Week 3 Day 5 输出截断 | 新增 `truncate_output(...)`，在 `ToolRegistry` 结果边界截断 shell stdout/stderr 和字符串 payload | `src/pca/tools/base.py` `src/pca/tools/registry.py` `tests/test_tools.py` | 截断仍是固定字符上限，没有 token 预算、尾部保留、原始输出持久化和按工具配置 | 截断文本有可见标记，`ToolResult.output_truncated=True`，未截断输出保持兼容 | 输出控制 / 上下文预算 | 动态 token 预算、head/tail 策略、原始输出审计存储、按工具上限配置 |
 | 2026-06-20 | Week 3 Day 6 文件资源限制 | `ReadFileTool` 读取前拒绝超过 1MiB 的文件和含 NUL 字节的明显二进制文件 | `src/pca/tools/file_tools.py` `tests/test_file_tools.py` | 资源限制仍是固定上限和最小二进制信号，没有动态配置、编码探测、分块读取或二进制专用工具 | 大文件和明显二进制文件会稳定拒绝，并通过 `ToolRegistry.run(...)` 回写失败 `ToolResult` | 文件资源安全 / 上下文预算 | 动态上限、head/tail 分块读取、编码探测、专门二进制工具、审计日志 |
 | 2026-06-20 | Week 3 Day 7 加固验收示例 | 新增观察示例，展示成功读取、资源拒绝和 `ToolRegistry.get_stats()` | `examples/03_observed_tool_run.py` `tests/test_examples.py` | 示例能证明当前最小观测能力，但还没有结构化日志、trace 自动透传、持久化 metrics、权限审计或真实场景验证报告 | 通过示例和测试固定“真实已实现字段”，避免把未接入能力写成已完成 | 验收表达 / 文档真实性 | Week 4 接入权限策略后，再把审批结果、审计日志和 trace 串入主链 |
+| 2026-06-21 | Week 4 Day 1 风险分类 | 新增 `RiskLevel`、`RiskAssessment` 和 `classify_command(...)` | `src/pca/permissions/risk.py` `tests/test_permissions_risk.py` | 只做分类，不做策略决策、人工审批、审计，也未接入 shell 执行链 | `SAFE/ASK/DENY` 最小分类，记录 `reason` 和 `matched_rule`，覆盖 destructive/network/inline-code 基础规则 | 权限系统前置建模 / 执行前控制 | `PermissionPolicy.decide(...)`、审批对象、audit JSONL、shell gate、文件风险分类、真实安全验证 |
+| 2026-06-21 | Week 4 Day 2 策略判断 | 新增 `DecisionAction`、`PermissionDecision` 和 `PermissionPolicy.decide(...)` | `src/pca/permissions/policy.py` `tests/test_permissions_policy.py` | 只做风险到动作的策略映射，不做人类审批、审计，也未接入 shell 执行链 | `SAFE/ASK/DENY` 分别映射为 `ALLOW/ASK/DENY`，并拒绝非 `RiskAssessment` 输入 | 权限策略建模 / 执行前控制 | 审批对象、audit JSONL、shell gate、文件风险分类、真实安全验证 |
+| 2026-06-22 | Week 4 Day 3 审批对象 | 新增 `ApprovalRequest` 和 `ApprovalDecision` | `src/pca/permissions/approval.py` `tests/test_permissions_approval.py` | 只建模审批请求和用户决策，不接入交互 UI、执行恢复或审计 | 请求 id、工具名、命令摘要、策略判断、创建/过期时间和用户理由都有结构化对象 | 人工审批建模 / 可审计上下文 | 审批 UI、审批通过后恢复执行、audit JSONL、持久化审批记录 |
+| 2026-06-22 | Week 4 Day 4 shell gate | 在 `ShellCommandTool` 执行前接入风险分类和策略判断 | `src/pca/tools/shell_tools.py` `tests/test_permissions_shell_gate.py` | `ASK` 当前失败返回，不支持交互式批准后继续执行；没有 audit、文件风险和 sandbox | `DENY` 不进入 runtime，`ASK` 不静默执行，`ALLOW` 保持原 runtime 路径 | 执行前控制 / shell 安全边界 | 审批恢复、audit JSONL、文件风险分类、sandbox/docker runtime、真实安全验证 |
+| 2026-06-22 | Week 4 Day 5 文件风险分类 | 新增 `classify_file_change(...)`，并在文件工具写盘前接入 permission gate | `src/pca/permissions/file_risk.py` `src/pca/tools/file_tools.py` `tests/test_permissions_file_risk.py` | 覆盖写入和删除式编辑当前返回待审批失败，不支持审批通过后恢复执行；没有 audit 自动记录、diff UI、checkpoint 或 rollback | 新文件写入和小范围替换可放行；覆盖已有文件和 delete-like 编辑会在写盘前阻断并保持文件不变 | 文件变更安全 / 执行前控制 | 审批恢复、audit 自动接入、diff 预览、checkpoint/rollback |
+| 2026-06-22 | Week 4 Day 6 审计事件 | 新增 `PermissionAuditEvent` 和 `append_audit_event(...)` | `src/pca/permissions/audit.py` `tests/test_permissions_audit.py` | 只提供独立审计事件和 JSONL 追加写入，尚未自动接入 shell/file gate，也不记录 trace 或审批恢复 | 审计事件有稳定字段和 JSON 序列化；JSONL 一行一个事件，避免记录完整输出、文件内容和 secret | 审计证据 / 可回放基础 | audit 自动接入各 gate、trace 关联、audit 完整性矩阵、真实安全验证 |
 | 2026-05-27 | 流程/治理问题：教学规则固化 | 固化教学顺序、中文注释、资料链接、流程图要求 | `AGENTS.md` `docs/CODEX_PROJECT_BRIEF.md` | 规则已明确，但仍依赖人工遵守，没有自动化检查 | 仓库规则入口清晰 | 流程治理 / 规范执行 | 文档 lint、模板化任务单、规则检查脚本 |
 | 2026-06-03 | 流程/治理问题：面试题归档机制 | 新增每日面试题归档文件和格式规则 | `docs/Compilation-of-Interview-Questions.md` | 归档流程已固定，但仍依赖人工同步和门禁判断 | 只有已回答题才能归档，标题和内容格式固定 | 知识沉淀 / 流程门禁 | 自动化归档辅助、状态检查、面试题索引 |
 | 2026-06-12 | 流程/治理问题：未回答题不得归档 | 明确未回答面试题不能占位归档，必须先推送用户回答 | `AGENTS.md` `docs/CODEX_PROJECT_BRIEF.md` `docs/09_NEXT_ACTIONS.md` | 流程更严谨，但仍是人工门禁，没有自动阻断错误推进 | 待答题保留在 `docs/09_NEXT_ACTIONS.md`，不写占位答案 | 流程门禁 / 状态一致性 | 自动状态检查、待办门禁、归档校验脚本 |
@@ -80,9 +87,14 @@ flowchart LR
     F --> G["Tool.run(...)"]
     G --> H{"Concrete tool"}
     H --> I["read_file / write_file / edit_file"]
-    H --> J["run_command / ShellRuntime"]
-    I --> K["file resource guard / truncate_output"]
-    J --> K
+    H --> J["run_command / ShellCommandTool gate"]
+    J --> J2["classify_command + PermissionPolicy"]
+    J2 --> J3["ALLOW -> ShellRuntime"]
+    J2 --> J4["ASK / DENY -> failed ToolResult"]
+    I --> I2["file resource guard / file risk gate"]
+    I2 --> K["truncate_output"]
+    J3 --> K
+    J4 --> K
     K --> L["ToolResult"]
     L --> M["AgentLoop._tool_result_to_message(...)"]
     M --> B
@@ -92,7 +104,9 @@ flowchart LR
 ### 这张图表达的真实边界
 
 - 当前真实闭环已经存在：`User -> Message history -> mock LLM -> ToolCall -> AgentLoop -> ToolRegistry -> Tool -> FileTool/ShellRuntime -> ToolResult -> tool Message -> LLM`
-- 当前主链仍以 **mock LLM + 本地工具 + 文本 message history** 为中心，不包含真实模型 API、权限系统、RAG、MCP、长期记忆或可观测平台
+- 当前主链仍以 **mock LLM + 本地工具 + 文本 message history** 为中心，不包含真实模型 API、RAG、MCP、长期记忆或可观测平台
+- Permission System 的风险分类和策略判断已接入 `ShellCommandTool` 与文件工具写盘前 gate，当前 `run_command`、覆盖写入和删除式编辑会在执行前拦截 `ASK` / `DENY`
+- Permission audit 已有独立事件与 JSONL 写入 API，但尚未自动接入 shell/file gate
 - `ToolRegistry` 是“工具事实源 + 执行入口”
 - `ToolResult` 是“工具执行后的结构化结果信封”
 - `truncate_output(...)` 是“工具输出进入 `ToolResult` 和 message history 前的最小截断边界”
@@ -101,9 +115,9 @@ flowchart LR
 
 ### 与工业级项目相比的差异
 
-- 真实工业级系统通常会把 LLM adapter、权限策略、上下文构建、审计日志、trace、checkpoint 和回滚纳入同一主链；当前项目还没进入这些层
+- 真实工业级系统通常会把 LLM adapter、权限策略、上下文构建、审计日志、trace、checkpoint 和回滚纳入同一主链；当前项目只完成了 shell/file gate 的最小接入和独立 audit API，还没进入完整审批、审计自动接入和隔离执行
 - 当前 message history 是纯内存 list，没有持久化会话、恢复点和长上下文压缩
-- 工具执行仍在本机直接进行，没有隔离 runtime 和强制审批
+- 工具执行仍在本机进行；shell/file gate 已能阻止 `ASK` / `DENY` 静默执行，但还没有隔离 runtime、审批恢复和审计自动链路
 - 当前整体架构更像“教学型最小 Agent Harness”，不是“生产型 Agent Platform”
 
 ## 模块拆解
@@ -301,7 +315,7 @@ flowchart TD
 - `read_file` 只支持小型文本文件，读取前会拒绝超过 1MiB 的文件和含 NUL 字节的明显二进制文件
 - 当前仍不处理完整编码探测、大文件分块、图片/压缩包等二进制资源和文件锁冲突治理
 - `edit_file` 只支持精确单次替换，不支持 patch/diff、冲突合并、预览和撤销
-- 文件变更没有审批、审计、快照和自动 diff 展示
+- 文件变更已有最小写盘前风险 gate，覆盖写入和删除式编辑不会静默执行；仍没有审批恢复、审计自动接入、快照和自动 diff 展示
 - `workspace_root` 已经建立基本边界，但还没有“不同目录不同权限”的精细策略
 
 ## 5. `run_command / ShellRuntime`
@@ -346,7 +360,7 @@ flowchart TD
 ### 与工业级项目相比的差异
 
 - 仍在宿主机同步执行命令，没有隔离沙箱、容器 runtime 和资源限制
-- 没有危险命令分类、审批、命令 allowlist/denylist 和进程树治理
+- 已有最小危险命令分类和 shell gate；仍没有交互式审批恢复、命令 allowlist/denylist、audit 自动接入和进程树治理
 - 输出脱敏只覆盖显式 `env` 中一部分敏感 key，不是完整 secret 防泄漏系统
 - 通过 `ToolRegistry` 进入 `ToolResult` 时 stdout/stderr 会被截断，但底层 `ShellRuntime` 仍返回 raw 输出；当前还没有命令审计、trace、结构化日志和执行策略
 
@@ -391,22 +405,31 @@ flowchart TD
 
 ## 已存在但当前仍是占位/计划模块
 
-### 1. 目录现状
+### 1. 部分实现但未接入主链
+
+| 目录 | 当前状态 | 证据 | 计划周次 |
+| --- | --- | --- | --- |
+| `src/pca/permissions` | 部分实现并已接入 shell/file gate | `risk.py` 已实现 `RiskLevel`、`RiskAssessment`、`classify_command(...)`；`policy.py` 已实现 `DecisionAction`、`PermissionDecision`、`PermissionPolicy.decide(...)`；`approval.py` 已实现审批对象；`file_risk.py` 已实现文件风险分类；`audit.py` 已实现最小审计事件和 JSONL 写入；`ShellCommandTool` 与文件工具已在执行前调用分类和策略；交互式审批恢复和 audit 自动接入仍未实现 | Week 4 |
+
+### 2. 目录现状
 
 | 目录 | 当前状态 | 证据 | 计划周次 |
 | --- | --- | --- | --- |
 | `src/pca/context` | 占位 | `repo_map.py`、`retriever.py` 等文件当前只写明“计划在第 5/6 周实现” | Week 5 / Week 6 |
-| `src/pca/permissions` | 占位 | `risk.py`、`policy.py` 当前是占位说明 | Week 3 |
 | `src/pca/mcp` | 占位 | `server.py`、`client.py` 当前是占位说明 | Week 8 |
 | `src/pca/memory` | 占位 | `base.py` 等当前是占位说明 | Week 9 |
 | `src/pca/observability` | 占位 | `logger.py`、`tracing.py` 当前是占位说明 | Week 11 |
 
-### 2. 为什么不画进当前主链
+### 3. 为什么不画进当前主链
 
 - 这些目录已经存在，但还没有在当前测试主链、README 主链和实现日志中形成真实闭环
-- 如果把它们直接画进整体架构图，会把“计划结构”误说成“已实现结构”
+- `permissions/risk.py` 和 `permissions/policy.py` 已经挂到 `ShellCommandTool` 与文件工具写盘前 gate，但 `ApprovalRequest` / `ApprovalDecision` 还没有接入交互式审批恢复，audit 也尚未自动接入主链
+- 如果把权限系统画成完整审批和审计链路，会把“计划结构”误说成“已实现结构”
 - 当前更准确的表达方式是：
-  - 主链只画已完成的 `core + tools + runtime`
+  - 主链可以画已完成的 `core + tools + ShellCommandTool gate + runtime`
+  - `permissions/risk.py`、`permissions/policy.py` 和 `permissions/file_risk.py` 可以画成 shell/file 执行前 gate
+  - `approval.py` 只能画成已实现对象，不能画成已接入交互式审批流程
+  - `audit.py` 只能画成已实现独立事件和 JSONL 写入，不能画成已自动记录所有工具调用
   - 未来目录在附录中标记为“占位/计划中”
 
 ## 当前阶段总结
@@ -416,7 +439,8 @@ flowchart TD
 当前项目处于：
 
 - 12 周路线里的**第 2 周 Tool System 已收口**
-- 第 3 周 Agent Core + Tool Runtime 工业级加固进行中
+- 第 3 周 Agent Core + Tool Runtime 工业级加固已完成
+- Week 4 Day 6 Permission System 审计事件代码已完成，等待面试题回答和归档
 - 当前代码本质上是一个**教学型、可验证、边界逐步清晰的最小 Personal Coding Assistant Harness**
 
 ### 2. 当前已经具备的稳定骨架
@@ -430,6 +454,12 @@ flowchart TD
 - 带文件大小上限和明显二进制拒绝的 `read_file`
 - `write_file` / `edit_file`
 - `run_command` / `ShellRuntime`
+- `RiskLevel` / `RiskAssessment` / `classify_command(...)`
+- `DecisionAction` / `PermissionDecision` / `PermissionPolicy.decide(...)`
+- `ApprovalRequest` / `ApprovalDecision`
+- `ShellCommandTool` 执行前 shell gate
+- `WriteFileTool` / `EditFileTool` 写盘前文件风险 gate
+- `PermissionAuditEvent` / `append_audit_event(...)`
 - `ToolResult`
 - `AgentLoop._tool_result_to_message(...)`
 - `workspace_root`、timeout、路径校验和部分敏感输出脱敏
@@ -439,7 +469,7 @@ flowchart TD
 核心缺口仍集中在以下方向：
 
 - 真实 LLM adapter 与供应商协议适配
-- Permission System：危险命令分类、审批流、权限策略
+- Permission System：交互式审批流、audit 自动接入、审批通过后恢复执行
 - sandbox / docker runtime / checkpoint / rollback
 - 上下文工程、上下文压缩、RAG
 - MCP client/server
@@ -449,4 +479,4 @@ flowchart TD
 
 ### 4. 一句话结论
 
-当前项目已经把“怎么调用工具”这条主链讲清楚、写出来、测出来了；但距离“工业级 Agent 能不能安全执行、可审计执行、可恢复执行、可扩展执行”还差整整一个 Permission / Context / Memory / Observability 体系。
+当前项目已经把“怎么调用工具”这条主链讲清楚、写出来、测出来了，并已把 Permission System 的风险分类和策略判断接入 shell/file gate，同时具备最小审计事件和 JSONL 写入；但距离“工业级 Agent 能不能安全执行、可审计执行、可恢复执行、可扩展执行”还差交互式审批、audit 自动接入、sandbox/checkpoint/rollback、Context、Memory 和 Observability 体系。

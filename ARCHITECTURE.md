@@ -13,7 +13,10 @@ flowchart LR
     Loop --> R["ToolRegistry.run"]
     R --> T["Tool.run"]
     T --> F["File tools"]
-    T --> S["ShellRuntime"]
+    T --> G["ShellCommandTool gate"]
+    G --> P["classify_command + PermissionPolicy"]
+    P -->|ALLOW| S["ShellRuntime"]
+    P -->|ASK / DENY| TR
     F --> TR["ToolResult"]
     S --> TR
     TR --> M["AgentLoop._tool_result_to_message"]
@@ -29,10 +32,16 @@ flowchart LR
 - `src/pca/tools/registry.py`：`ToolRegistry`
 - `src/pca/tools/file_tools.py`：`read_file`、`write_file`、`edit_file`
 - `src/pca/runtime/shell_runtime.py`：`run_command`
+- `src/pca/permissions/risk.py`：`RiskLevel`、`RiskAssessment`、`classify_command(...)`
+- `src/pca/permissions/policy.py`：`DecisionAction`、`PermissionDecision`、`PermissionPolicy.decide(...)`
+- `src/pca/permissions/approval.py`：`ApprovalRequest`、`ApprovalDecision`
+
+当前部分实现但未接入主链：
+
+- `src/pca/permissions`：风险分类和策略判断已接入 `ShellCommandTool` 执行前 gate；审批对象已实现但尚未接入交互式批准流程；audit 和文件风险 gate 仍未实现
 
 当前仍是占位：
 
-- `src/pca/permissions`
 - `src/pca/context`
 - `src/pca/memory`
 - `src/pca/mcp`
@@ -79,7 +88,7 @@ flowchart TD
 | 模块 | 职责 | 禁止承担 |
 |---|---|---|
 | `core` | 消息结构、Agent loop、stop reason、tool result injection、event emission | 不直接读写文件、不直接执行 shell、不硬编码工具 |
-| `tools` | 工具接口、schema、registry、结果信封、工具元数据 | 不做策略判断、不做 sandbox |
+| `tools` | 工具接口、schema、registry、结果信封、工具元数据、在具体工具边界调用权限策略 | 不内置风险规则，不做 sandbox |
 | `runtime` | 工作区、命令执行、资源限制、checkpoint、rollback、sandbox adapter | 不决定业务权限，不构造 LLM prompt |
 | `permissions` | 风险分类、策略判断、审批、审计事件 | 不执行命令，不修改文件 |
 | `coding` | repo scan、symbol index、file relevance、patch/diff、test/lint/type/git workflow | 不保存长期个人记忆 |
@@ -147,7 +156,7 @@ evaluation -> all public interfaces
 
 - 配置入口：后续新增 `src/pca/config.py`，从文件、环境变量和 CLI 参数加载。
 - 密钥：只从环境变量读取；不写入 message history、logs、memory 或 docs。
-- 工具执行：默认 workspace scoped；危险命令和破坏性文件操作进入审批。
+- 工具执行：默认 workspace scoped；`run_command` 已经过最小 shell gate，`DENY` / `ASK` 不进入真实 shell runtime；破坏性文件操作、人工审批 UI、audit 和 sandbox 后续补齐。
 - 输出：stdout/stderr、文件内容、检索结果和 memory recall 都必须支持截断。
 - Git：commit/push 默认需要用户确认；自动 commit 只能在显式配置下启用。
 

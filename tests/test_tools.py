@@ -1,5 +1,4 @@
 """测试工具注册表功能"""
-import sys
 from typing import Any
 
 import pytest
@@ -523,26 +522,25 @@ def test_truncate_output_marks_large_text_with_visible_notice():
     assert was_truncated is True
 
 
-def test_tool_registry_truncates_large_shell_stdout_and_stderr(tmp_path):
+def test_tool_registry_truncates_large_shell_stdout_and_stderr():
     """测试 shell 大 stdout/stderr 会在 ToolResult 边界截断并设置元数据。"""
-    registry = create_coding_tool_registry()
+    registry = ToolRegistry()
+    registry.register(
+        Tool(
+            name="run_command",
+            description="测试 shell 结果形状的工具",
+            handler=lambda arguments: {
+                "stdout": "O" * 5000,
+                "stderr": "E" * 5000,
+                "returncode": 0,
+                "timed_out": False,
+            },
+        )
+    )
 
     result = registry.run(
         "run_command",
-        {
-            "command": [
-                sys.executable,
-                "-c",
-                (
-                    "import sys; "
-                    "sys.stdout.write('O' * 5000); "
-                    "sys.stderr.write('E' * 5000)"
-                ),
-            ],
-            "cwd": ".",
-            "workspace_root": str(tmp_path),
-            "timeout_seconds": 5,
-        },
+        {},
     )
 
     stdout = result.result["stdout"]
@@ -616,7 +614,9 @@ def test_builtin_coding_tool_schemas_describe_selection_boundaries():
     assert "相对路径" in read_file["parameters"]["properties"]["path"]["description"]
 
     write_file = schemas["write_file"]
-    assert "写入或覆盖" in write_file["description"]
+    assert "新文本文件" in write_file["description"]
+    assert "覆盖已有文件" in write_file["description"]
+    assert "approval" in write_file["description"]
     assert "自动创建父目录" in write_file["description"]
     assert "workspace_root" in write_file["description"]
     assert "返回 ok" in write_file["description"]
@@ -627,6 +627,8 @@ def test_builtin_coding_tool_schemas_describe_selection_boundaries():
     assert "只替换一次" in edit_file["description"]
     assert "old_text" in edit_file["description"]
     assert "出现多次" in edit_file["description"]
+    assert "删除式编辑" in edit_file["description"]
+    assert "approval" in edit_file["description"]
     assert "返回 ok" in edit_file["description"]
     assert "原文件中必须唯一出现" in edit_file["parameters"]["properties"]["old_text"]["description"]
     assert "替换后的文本" in edit_file["parameters"]["properties"]["new_text"]["description"]

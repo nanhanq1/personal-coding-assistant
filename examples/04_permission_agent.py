@@ -1,0 +1,100 @@
+import json
+import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from pca.tools import ToolResult, create_coding_tool_registry
+
+
+def _serialize_tool_result(result: ToolResult) -> dict[str, Any]:
+    """把 ToolResult 转成示例可打印的稳定 JSON 结构。"""
+    return {
+        "ok": result.ok,
+        "result": result.result,
+        "error_type": result.error_type,
+        "error_message": result.error_message,
+        "duration_ms": result.duration_ms,
+        "trace_id": result.trace_id,
+        "tool_call_id": result.tool_call_id,
+        "output_truncated": result.output_truncated,
+    }
+
+
+def main() -> None:
+    """展示当前真实 permission gate 能力：允许、拒绝、需要审批但不静默执行。"""
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+
+    registry = create_coding_tool_registry()
+    with TemporaryDirectory() as workspace_root:
+        workspace = Path(workspace_root)
+        safe_command = registry.run(
+            "run_command",
+            {
+                "command": ["cmd", "/c", "echo", "permission-safe"],
+                "workspace_root": str(workspace),
+                "timeout_seconds": 5,
+            },
+        )
+        denied_command = registry.run(
+            "run_command",
+            {
+                "command": ["rm", "-rf", "danger-zone"],
+                "workspace_root": str(workspace),
+                "timeout_seconds": 5,
+            },
+        )
+        approval_required_command = registry.run(
+            "run_command",
+            {
+                "command": ["python", "-c", "print('approval-required')"],
+                "workspace_root": str(workspace),
+                "timeout_seconds": 5,
+            },
+        )
+
+        new_file_write = registry.run(
+            "write_file",
+            {
+                "path": "permission-note.txt",
+                "content": "created by permission example",
+                "workspace_root": str(workspace),
+            },
+        )
+        overwrite_file = registry.run(
+            "write_file",
+            {
+                "path": "permission-note.txt",
+                "content": "this overwrite should not be written",
+                "workspace_root": str(workspace),
+            },
+        )
+        file_after_overwrite_attempt = (workspace / "permission-note.txt").read_text(
+            encoding="utf-8"
+        )
+
+    report = {
+        "safe_command": _serialize_tool_result(safe_command),
+        "denied_command": _serialize_tool_result(denied_command),
+        "approval_required_command": _serialize_tool_result(approval_required_command),
+        "new_file_write": _serialize_tool_result(new_file_write),
+        "overwrite_file": _serialize_tool_result(overwrite_file),
+        "file_after_overwrite_attempt": file_after_overwrite_attempt,
+        "stats": registry.get_stats(),
+        "capability_boundary": {
+            "interactive_approval": False,
+            "approval_resume": False,
+            "checkpoint": False,
+            "rollback": False,
+            "sandbox": False,
+            "audit_auto_wired": False,
+        },
+    }
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()

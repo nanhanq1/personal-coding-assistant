@@ -197,20 +197,20 @@ class TestWriteFileTool:
 
         assert outside_file.read_text(encoding="utf-8") == "secret"
 
-    def test_overwrites_existing_file(self, tmp_path):
-        """测试覆盖现有文件"""
+    def test_requires_approval_before_overwriting_existing_file(self, tmp_path):
+        """测试覆盖现有文件会在写盘前被 permission gate 拦截。"""
         tool = WriteFileTool()
         test_file = tmp_path / "existing.txt"
         test_file.write_text("Old content", encoding="utf-8")
 
-        result = tool.run({
-            "path": "existing.txt",
-            "content": "New content",
-            "workspace_root": str(tmp_path),
-        })
+        with pytest.raises(PermissionError, match="overwrite_existing_file"):
+            tool.run({
+                "path": "existing.txt",
+                "content": "New content",
+                "workspace_root": str(tmp_path),
+            })
 
-        assert result == "ok"
-        assert test_file.read_text(encoding="utf-8") == "New content"
+        assert test_file.read_text(encoding="utf-8") == "Old content"
 
     def test_creates_nested_directories(self, tmp_path):
         """测试自动创建嵌套目录"""

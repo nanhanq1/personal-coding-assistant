@@ -152,6 +152,37 @@
 - OpenHands GitHub：https://github.com/OpenHands/OpenHands
 - 建议阅读顺序：先看 Cline 如何区分 safe command 和 approval-required command，再看 OWASP 命令注入理解 shell 字符串风险，然后用 MCP security 文档理解 consent、scope 和 audit 为什么属于权限系统边界。
 
+### Week 4 Day 2 策略判断资料
+
+- Python `enum` 官方文档：https://docs.python.org/3/library/enum.html
+- Python `dataclasses` 官方文档：https://docs.python.org/3/library/dataclasses.html
+- Open Policy Agent policy language：https://www.openpolicyagent.org/docs/policy-language
+- Cline Auto Approve & YOLO Mode：https://docs.cline.bot/features/auto-approve
+- 建议阅读顺序：先复习 `Enum` 和 `dataclass` 如何表达 `DecisionAction` / `PermissionDecision`，再看 Cline 的 approval 设置理解策略动作，最后粗读 OPA 了解“策略是把输入事实映射成决策”的工程思路；Day 2 不直接引入 OPA。
+
+### Week 4 Day 3 审批对象资料
+
+- Python `dataclasses` 官方文档：https://docs.python.org/3/library/dataclasses.html
+- Python `uuid` 官方文档：https://docs.python.org/3/library/uuid.html
+- Python `datetime` 官方文档：https://docs.python.org/3/library/datetime.html
+- LangGraph interrupts / human-in-the-loop：https://docs.langchain.com/oss/python/langgraph/interrupts
+- Cline Auto Approve & YOLO Mode：https://docs.cline.bot/features/auto-approve
+- 建议阅读顺序：先复习 `dataclass`、`uuid` 和 `datetime` 如何表达不可变请求对象、请求 id 和过期时间，再看 LangGraph interrupts 理解 human-in-the-loop 为什么需要暂停和恢复，最后对照 Cline approval 理解用户确认和自动批准的边界；Day 3 只实现审批对象，不接 UI。
+
+### Week 4 Day 7 权限验收示例资料
+
+- Cline Auto Approve & YOLO Mode：https://docs.cline.bot/features/auto-approve
+- OpenHands Security Analyzer：https://docs.openhands.dev/sdk/guides/security
+- LangGraph interrupts / human-in-the-loop：https://docs.langchain.com/oss/python/langgraph/interrupts
+- 建议阅读顺序：先看 Cline 如何区分自动批准和需要确认的工具，再看 OpenHands 如何把安全分析和动作确认分开，最后看 LangGraph interrupt 理解为什么 `ASK` 需要暂停、审批和恢复；Day 7 只验收当前 gate，不实现恢复执行。
+
+### Week 5 Day 1 Workspace 抽象资料
+
+- Python `pathlib` 官方文档：https://docs.python.org/3/library/pathlib.html
+- OpenHands Docs：https://docs.openhands.dev/
+- mini-SWE-agent GitHub：https://github.com/SWE-agent/mini-swe-agent
+- 建议阅读顺序：先复习 `Path.resolve()`、`Path.parents` 和路径读写，再看 OpenHands 如何把 workspace/runtime/sandbox 分层，最后对照 mini-SWE-agent 的环境边界理解为什么 Coding Agent 需要统一 workspace 抽象。
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |
@@ -171,6 +202,11 @@
 | `agent tool output truncation stdout stderr observation` | 学习工具输出截断和 observation 预算 |
 | `coding agent file size limit binary detection` | 学习文件工具读取前资源限制 |
 | `coding agent command approval permission risk classification` | 学习命令风险分类和审批边界 |
+| `policy engine allow ask deny permission decision` | 学习策略判断和决策对象建模 |
+| `human in the loop agent approval workflow` | 学习审批请求、用户决定和恢复执行的边界 |
+| `agent tool permission approval checkpoint rollback` | 学习权限 gate 和后续恢复机制如何分层 |
+| `agent workspace sandbox checkpoint rollback` | 学习 workspace、sandbox、checkpoint 的边界 |
+| `python pathlib safe path resolution` | 学习安全路径解析和越界拒绝 |
 
 ## 长期资料池
 

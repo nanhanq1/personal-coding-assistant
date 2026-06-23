@@ -518,3 +518,113 @@
 - 标准回答：这个答案需要修正。`ShellRuntime` 是真实执行命令的底层 runtime，放 gate 的优点是可以作为最后防线，保护所有直接调用 runtime 的路径；但它太低层，不适合做人类审批、工具级策略、LLM tool call 上下文、审计事件和 UI 交互，也不应该承担 `ToolRegistry` 的统计和结果包装职责。`ShellCommandTool` 是 shell 专属 gate 的简单位置，能在调用 runtime 前分类并阻止危险命令，适合 Day 4 最小接入；缺点是只覆盖 shell 工具，未来文件写入、MCP 工具等还要重复实现。`ToolRegistry` 的执行前 hook 更适合作为长期方案，因为所有工具调用都经过 registry，能统一记录 allow / ask / deny、工具名、参数摘要、trace_id、审批结果和 stats；缺点是 registry 需要可插拔 policy，不能把 shell 专属规则硬编码进去。
 
   更稳的设计是：短期把 shell gate 放在 `ShellCommandTool` 或 `ToolRegistry` 的执行前边界；长期在 `ToolRegistry.run(...)` 增加通用 permission hook，让不同工具提供自己的 risk classifier；`ShellRuntime` 保留少量不可绕过的低层安全校验，例如 workspace、cwd、timeout，必要时作为最后防线。误判处理上，`ASK` 交给用户确认，`DENY` 默认拒绝但允许未来通过显式高级策略覆盖，`SAFE` 也要保留审计记录。审计记录至少包含 tool name、command 摘要、risk level、matched_rule、decision、reason、trace_id、时间和是否执行。测试策略包括：危险命令不会进入 runtime；`ASK` 生成审批请求；审批拒绝时不执行；审批通过时才执行；未知或解析失败命令默认偏保守；审计日志不泄漏敏感环境变量。
+
+## 第 24 天：2026-06-21
+
+### 面试题 1：`RiskLevel` 和 `DecisionAction` 为什么不能合并成一个枚举？请分别说明“风险分类”和“策略判断”回答的问题。
+
+- 用户回答：因为二者的边界不同。
+- 标准回答：方向正确，但需要说清楚“边界不同”具体是什么。`RiskLevel` 是风险分类结果，回答“这个命令或工具调用本身看起来多危险”，例如 `SAFE`、`ASK`、`DENY`；它来自 `classify_command(...)`，属于事实判断。`DecisionAction` 是策略判断结果，回答“在当前策略下系统准备怎么处理这次调用”，例如 `ALLOW`、`ASK`、`DENY`；它来自 `PermissionPolicy.decide(...)`，属于策略动作。二者不能合并，因为同一个风险等级在不同配置下可能产生不同动作：例如 `RiskLevel.ASK` 默认需要审批，但在可信 workspace 或用户显式配置下未来可能变成 `ALLOW`；反过来某些低风险命令在只读模式下也可能被策略拒绝。分开后，风险分类、策略配置、审批对象和审计记录才能独立演进。
+
+### 面试题 2：从 `classify_command("curl https://example.com")` 到 `PermissionPolicy().decide(...)`，请按当前源码说明数据如何从 `RiskAssessment` 变成 `PermissionDecision`，并指出今天为什么没有接入 `ShellRuntime`。
+
+- 用户回答：不清楚，请直接给出答案。
+- 标准回答：调用从 `classify_command("curl https://example.com")` 开始。`classify_command(...)` 先用 `_normalize_command(...)` 把字符串命令切成片段，得到类似 `("curl", "https://example.com")`。然后它构造 `lowered_parts` 和 `lowered_text`，先走 `_match_deny_rules(...)`；这条命令不是递归删除、Windows 删除、PowerShell `Remove-Item` 或 `format`，所以不会被判为 `DENY`。接着进入 `_match_ask_rules(...)`，因为第一个命令片段是 `curl`，命中 `network_access` 规则，于是返回 `RiskAssessment(level=RiskLevel.ASK, reason="Network commands can read from or write to external systems.", matched_rule="network_access")`。
+
+  这个 `RiskAssessment` 再传给 `PermissionPolicy().decide(assessment)`。`decide(...)` 先检查输入必须是 `RiskAssessment`，然后根据 `assessment.level` 做映射：`SAFE -> DecisionAction.ALLOW`、`ASK -> DecisionAction.ASK`、`DENY -> DecisionAction.DENY`。所以 `curl` 的结果会变成 `PermissionDecision(action=DecisionAction.ASK, reason="Ask risk assessments require approval before execution.", assessment=assessment)`，并保留原始 `assessment` 作为后续审批和审计的证据。
+
+  今天没有接入 `ShellRuntime`，是因为 Day 2 只稳定策略判断 API。`ShellRuntime` 是真实执行命令的层，一旦接入就会影响 `run_command` 的主链行为。现在还没有审批对象、审批结果和审计事件，如果过早接入 runtime，就会把“分类”“策略”“审批”“执行拦截”混在一起，测试和文档边界都会变模糊。真正的 shell gate 留到 Week 4 Day 4。
+
+### 面试题 3：如果未来项目支持用户配置“允许 curl 访问公司内网，但外网仍需审批”，你会如何扩展 `PermissionPolicy`？请说明需要新增哪些输入信息、默认策略如何避免误放行、审批对象和审计事件应分别记录什么，以及如何测试 `DENY` 命令的硬拒绝边界。
+
+- 用户回答：不清楚，请直接给出答案。
+- 标准回答：可以把 `PermissionPolicy.decide(...)` 从只接收 `RiskAssessment` 扩展为接收一个更完整的上下文，例如 `PermissionContext(tool_name, command, assessment, workspace_root, user_config, trace_id)`。用户配置里可以有允许访问的域名或网段，例如 `allowed_network_hosts=["intranet.example.com"]`，并且必须明确区分内网 host 和任意外网 URL。策略逻辑应先保留硬边界：如果 `assessment.level is RiskLevel.DENY`，默认直接返回 `DecisionAction.DENY`，不被普通 allowlist 覆盖；只有经过非常明确的高级策略和强审计才可能例外。然后再处理 `ASK`：如果命令是 `curl`，目标 host 在允许列表里，可以返回 `ALLOW`；否则仍返回 `ASK`。
+
+  默认策略要避免误放行：配置缺失、URL 解析失败、host 不在 allowlist、命令不是明确支持的网络命令、或匹配规则不确定时，都应该偏保守返回 `ASK` 或 `DENY`，不能默认 `ALLOW`。审批对象 `ApprovalRequest` 应记录给用户看的上下文：工具名、命令摘要、风险等级、策略原因、待批准动作、过期时间和 trace id。审计事件应记录系统可追溯证据：请求时间、决策动作、风险等级、matched_rule、policy_rule、用户是否批准、是否实际执行、trace id、工具名和脱敏后的命令摘要。
+
+  测试上至少要覆盖四类：第一，`curl https://intranet.example.com` 在配置允许时得到 `ALLOW`；第二，`curl https://example.com` 不在 allowlist 时仍是 `ASK`；第三，URL 解析失败或配置缺失时不会误放行；第四，`rm -rf /` 这类 `RiskLevel.DENY` 即使配置里写了 allow，也必须返回 `DENY`，并确认不会进入后续 runtime。这样才能证明“内网例外”没有破坏高危命令的硬拒绝边界。
+
+## 第 25 天：2026-06-22
+
+### 面试题 1：`PermissionDecision(action=ASK)` 和 `ApprovalRequest` 的区别是什么？为什么不能把 `ASK` 直接当成“用户已经同意执行”？
+
+- 用户回答：`PermissionDecision(action=ASK)` 是系统策略层的判断，意思是这次工具调用不能直接执行，需要询问用户。`ApprovalRequest` 是真正交给用户审批的请求对象，保存请求 id、工具名、命令摘要、策略判断、创建时间和过期时间。不能把 `ASK` 当成用户已经同意执行，因为 `ASK` 只是系统说“需要问”，不是用户说“同意”；真正代表用户同意的是 `ApprovalDecision(approved=True)`。
+- 标准回答：正确。`PermissionDecision(action=ASK)` 属于 policy 层，表达系统策略动作：这次调用需要人工确认。`ApprovalRequest` 属于审批层，表达一次可审查、可展示、可关联的请求，包含 `request_id`、`tool_name`、`command_summary`、原始 `PermissionDecision`、`created_at` 和 `expires_at`。二者不能混淆：`ASK` 是“需要问”，不是“已经批准”；只有用户返回 `ApprovalDecision(approved=True)`，且请求未过期、request id 匹配时，后续 shell gate 才能考虑执行。
+
+### 面试题 2：请沿着 `classify_command(...) -> PermissionPolicy.decide(...) -> ApprovalRequest -> ApprovalDecision` 说明：每一层分别保存了哪些信息，哪一层开始出现用户理由？
+
+- 用户回答：`classify_command(...)` 输出 `RiskAssessment`，保存 `level`、`reason`、`matched_rule`。`PermissionPolicy.decide(...)` 输出 `PermissionDecision`，保存 `action`、`reason`、`assessment`。`ApprovalRequest` 保存一次待审批请求，包括 `request_id`、`tool_name`、`command_summary`、`decision`、`created_at`、`expires_at`。`ApprovalDecision` 保存用户最终决定，包括 `request_id`、`approved`、`user_reason`、`decided_at`。用户理由从 `ApprovalDecision.user_reason` 开始出现，因为只有用户做出批准或拒绝时，才有用户为什么这么决定。
+- 标准回答：正确。调用链的职责边界是：`classify_command(...)` 做风险事实判断，`PermissionPolicy.decide(...)` 做系统策略判断，`ApprovalRequest` 把一次需要人工确认的策略判断包装成请求，`ApprovalDecision` 才记录用户的批准或拒绝。`user_reason` 不应该提前出现在 `RiskAssessment` 或 `PermissionDecision` 中，因为前两者是系统判断；用户理由只属于用户实际做出决定的那一刻。
+
+### 面试题 3：如果一个审批请求已经过期，后续 shell gate 应该如何处理？请说明边界情况、优化思路、方案对比，以及你会如何测试这个行为。
+
+- 用户回答：如果审批请求已经过期，shell gate 应该拒绝执行，并要求重新生成审批请求。过期请求可能已经脱离当前上下文，比如代码、目录、任务状态都变了，继续执行会有安全风险。边界情况包括：`now == expires_at` 视为已过期；用户批准了一个已过期请求也不能执行；`request_id` 不匹配不能执行；用户拒绝不能执行；只有用户批准且未过期才允许进入 shell 执行。方案上，保守方案是过期直接拒绝并重新审批，安全性最好，当前项目应采用；宽松方案是给宽限时间，但安全边界变模糊；自动刷新方案是重新生成请求并再次询问用户，适合后续 UI/CLI 完善后实现。测试上应覆盖已过期拒绝、刚好等于 `expires_at` 拒绝、未过期且批准允许、未过期但拒绝时拒绝执行。
+- 标准回答：正确。Day 4 的 shell gate 应采用保守语义：审批请求过期时直接拒绝执行，不把旧审批继续用于当前命令。关键边界是 `now >= expires_at` 都算过期；即使 `ApprovalDecision.approved=True`，只要请求过期、request id 不匹配或审批结果为拒绝，都不能进入 runtime。长期可以引入重新生成请求、CLI 重新提示或 UI 自动刷新，但默认不能给静默宽限。测试必须证明危险命令在过期、拒绝、id 不匹配时不会调用真实 runtime，只有未过期且批准的请求才会继续执行。
+
+## 第 26 天：2026-06-22
+
+### 面试题 1：shell gate 为什么放在 `ShellCommandTool`，而不是放在 `ShellRuntime` 或 `ToolRegistry`？
+
+- 用户回答：因为 `ShellCommandTool` 是 `run_command` 这个工具的执行前边界，最适合做“这次 shell 工具调用能不能执行”的判断。不放在 `ShellRuntime`，是因为 `ShellRuntime` 应该保持底层执行器职责，只负责 workspace、cwd、timeout、env、stdout/stderr 等运行时安全边界，不应该混入业务权限策略。不放在 `ToolRegistry`，是因为 `ToolRegistry` 是通用工具路由层，负责注册、查找、统计、包装 `ToolResult`，不应该理解 shell 命令风险。否则以后文件工具、MCP 工具、git 工具的风险逻辑都会污染 registry。
+- 标准回答：正确。`ShellCommandTool` 是当前 `run_command` 的工具语义边界，能在调用 `ShellRuntime.run(...)` 前做风险分类和策略判断。`ShellRuntime` 更适合保持为底层执行器，继续负责 workspace、cwd、timeout、env、输出捕获和敏感输出脱敏；如果把权限策略塞进去，会让 runtime 同时承担业务权限和执行细节。`ToolRegistry` 是通用路由、统计、截断和 `ToolResult` 包装层；如果直接硬编码 shell 风险规则，会污染所有工具。长期可以在 registry 增加可插拔 permission hook，但每个工具的风险分类仍应由对应工具或 classifier 提供。
+
+### 面试题 2：如何用测试证明 `DENY` 和 `ASK` 没有进入真实 runtime？为什么只看返回值不够？
+
+- 用户回答：用一个 fake runtime / recording runtime，它的 `run(...)` 会记录自己是否被调用。构造 `ShellCommandTool(runtime=fake_runtime)`，执行 `rm -rf .` 这类 `DENY` 命令，断言返回失败 `ToolResult`，更关键的是断言 `fake_runtime.calls == []`。`ASK` 也是一样，比如 `curl https://example.com`，应该返回需要审批的失败结果，并且 `fake_runtime.calls == []`。只看返回值不够，因为返回失败可能是命令已经执行后失败，也可能是 runtime 内部报错。要证明的是“执行前拦截”，所以必须观察 runtime 是否完全没被调用。
+- 标准回答：正确。Day 4 的测试重点不是“最终失败”，而是“执行前没有进入真实执行层”。fake runtime 的价值是把副作用边界变成可观察状态：只要 `calls` 为空，就能证明 gate 在 runtime 前阻断了命令。返回值只能证明调用结果是失败，不能区分失败发生在 permission gate、runtime 参数校验、subprocess 执行失败还是命令自身失败。工业级安全测试必须验证副作用没有发生，所以要断言 fake runtime 未被调用。
+
+### 面试题 3：当前没有交互式审批 UI 时，`ASK` 为什么应该失败返回，而不是直接执行或直接 deny？
+
+- 用户回答：因为 `ASK` 的语义是“需要用户确认后才能执行”，不是“允许执行”，也不是“永久拒绝”。如果直接执行，就等于系统替用户同意了，权限系统失效。如果直接 deny，又会把“需要确认的中风险命令”和“明确禁止的高风险命令”混在一起，后续无法支持人工审批。
+- 标准回答：正确。`ASK` 表达的是“需要人工确认”，不是 `ALLOW`，也不是 `DENY`。当前没有 CLI/UI 审批输入时，最保守且语义准确的行为是返回失败 `ToolResult`，提示 `approval required`，并保证不进入 runtime。直接执行会绕过用户确认；直接 deny 会丢失中风险命令未来可审批执行的语义。后续接入审批 UI 后，`ASK` 可以生成 `ApprovalRequest`，用户批准且请求仍有效时再进入执行链。
+
+## 第 27 天：2026-06-22
+
+### 面试题 1：workspace 边界和 permission gate 分别解决什么问题？为什么一个文件位于 `workspace_root` 内，仍然可能需要 `ASK`？
+
+- 用户回答：workspace 边界负责判断“路径是否在允许目录内”；permission gate 负责判断“这次操作是否危险”。文件即使在 workspace_root 内，覆盖已有文件或删除代码也可能破坏用户工作，所以需要 ASK。
+- 标准回答：正确。workspace 边界解决的是“工具是否能访问这个路径”，它防止读取或写入授权工作区之外的文件。permission gate 解决的是“这次具体副作用是否应该直接执行”，它关注覆盖、删除、联网、执行命令等风险。两者不是同一层安全能力：一个文件即使位于 `workspace_root` 内，覆盖已有文件、把代码替换为空字符串、删除大段内容等操作仍可能破坏用户工作，所以应分类为 `ASK`，在没有审批结果时不能静默写盘。
+
+### 面试题 2：请按调用链说明 `write_file` 覆盖已有文件时，从 `ToolRegistry.run(...)` 到最终返回失败 `ToolResult` 之间经过哪些关键函数？为什么测试能证明文件没有被改写？
+
+- 用户回答：调用链是：ToolRegistry.run("write_file", ...) -> Tool.run(...) 参数校验 -> WriteFileTool._run(...) -> _resolve_workspace_path(...) -> _ensure_file_permission(...) -> classify_file_change(...) -> PermissionPolicy.decide(...) -> PermissionError -> ToolRegistry 包装为失败 ToolResult。测试通过检查原文件内容仍是旧内容，证明没有写盘。
+- 标准回答：正确。覆盖写入从 `ToolRegistry.run("write_file", arguments)` 开始，registry 找到 `WriteFileTool` 后调用 `Tool.run(...)` 做基础参数校验。随后进入 `WriteFileTool._run(...)`，先通过 `_resolve_workspace_path(...)` 确认目标路径仍在 `workspace_root` 内，再检查 `content` 必须是字符串。真正创建父目录和 `path.write_text(...)` 之前，会调用 `_ensure_file_permission(...)`。这个函数调用 `classify_file_change(tool_name="write_file", path=...)`，因为目标文件已存在，得到 `RiskAssessment(level=ASK, matched_rule="overwrite_existing_file")`；再交给 `PermissionPolicy.decide(...)` 得到 `DecisionAction.ASK`，于是抛出 `PermissionError`。该异常被 `ToolRegistry.run(...)` 捕获并转换成 `ok=False`、`error_type="PermissionError"` 的失败 `ToolResult`。测试不仅检查失败结果，还检查磁盘上的原文件内容仍为旧值，因此能证明拦截发生在写盘前，而不是写盘后才报错。
+
+### 面试题 3：如果后续要支持“用户批准后继续执行这次覆盖写入”，你会如何设计审批恢复链路？
+
+- 用户回答：审批恢复链路应该保存 request_id、工具名、路径、原始参数、风险判断、创建时间、过期时间、文件版本/hash。用户批准后重新检查请求是否过期、文件内容是否变化、路径是否仍在 workspace 内，再执行写入。audit 记录发生了什么；checkpoint/rollback 负责出错后恢复；ASK/DENY 负责执行前是否允许进入副作用路径。
+- 标准回答：正确。一个可恢复的审批链路不能只保存“用户点了同意”，还要保存足够多的上下文来确认批准仍对应同一次操作。`ApprovalRequest` 至少应关联 `request_id`、`tool_name`、脱敏后的参数摘要、原始参数或可恢复 payload、`RiskAssessment` / `PermissionDecision`、`workspace_root`、目标路径、创建时间、过期时间，以及文件版本证据，例如 mtime、size、hash 或预期旧内容。用户批准后，执行层应重新校验 request id、审批未过期、路径仍在 workspace 内、当前文件版本仍匹配审批时看到的版本；如果文件在等待期间变化，应拒绝旧审批并要求重新生成请求。`ASK` / `DENY` 负责执行前策略动作，audit 负责记录分类、决策、审批和是否执行的事实，checkpoint/rollback 负责在实际副作用前后提供恢复能力。测试上要覆盖审批过期、文件内容变化、路径变化、request id 不匹配、用户拒绝和用户批准且版本匹配这几类路径，证明旧上下文中的危险写入不会被误执行。
+
+## 第 28 天：2026-06-22
+
+### 面试题 1：audit、log、metrics、trace 分别回答什么问题？为什么 `PermissionAuditEvent` 不应该负责决定 `ALLOW / ASK / DENY`？
+
+- 用户回答：audit 记录“权限相关事实”：谁在什么时间对哪个工具做了什么权限判断，命中了什么规则，最终是否执行，强调可追溯和安全证据。log 记录普通运行过程，比如某个模块启动、某个函数报错、某个文件写入失败，主要服务调试。metrics 记录聚合指标，比如工具调用次数、成功数、失败数、总耗时，回答“整体运行情况如何”。trace 记录一次请求的完整调用链，比如 `user input -> LLM -> tool call -> tool result -> final answer`，回答“一次任务是怎么走完的”。`PermissionAuditEvent` 不应该负责决定 `ALLOW / ASK / DENY`，因为这个职责属于 `PermissionPolicy`。audit 只记录事实，如果 audit 反过来参与决策，就会把“策略判断”和“事实记录”混在一起，后续测试、替换策略、审计回放都会变复杂。
+- 标准回答：正确。audit 是安全证据层，重点是可追溯、可回放和可解释；log 是调试事件流，重点是定位运行过程问题；metrics 是聚合数值，重点是趋势、吞吐、失败率和耗时；trace 是单次请求链路，重点是把同一次任务里的 LLM、tool call、tool result 和最终回答串起来。`PermissionAuditEvent` 不能决定 `ALLOW / ASK / DENY`，因为权限动作属于 `PermissionPolicy.decide(...)` 的策略职责。audit 如果参与决策，会造成职责倒置：记录层变成策略层，测试难以判断行为来自 policy 还是 audit，后续替换策略、导出审计或重放事件时也会混乱。正确边界是 policy 先做决策，audit 再记录这次决策和是否执行。
+
+### 面试题 2：从 `tests/test_permissions_audit.py` 出发，说明 `PermissionAuditEvent.to_dict()` 如何把 `datetime` 和 `DecisionAction` 转成稳定 JSON 字段，`append_audit_event(...)` 如何保证一行一个事件。
+
+- 用户回答：`PermissionAuditEvent.to_dict()` 把不能直接稳定写入 JSON 的对象转成普通值：`datetime` 通过 `timestamp.isoformat()` 转成字符串，例如 `"2026-06-22T10:00:00+00:00"`；`DecisionAction` 通过 `action.value` 转成 `"allow"`、`"ask"`、`"deny"`；其他字段如 `tool_name`、`risk_level`、`matched_rule`、`reason`、`executed` 保持普通 JSON 可表示类型。`append_audit_event(path, event)` 确保父目录存在，用 `json.dumps(event.to_dict(), ensure_ascii=False)` 把事件转成一条 JSON 字符串，追加写入文件，并补一个 `\n`。这样每个事件占一行，也就是 JSONL 格式，后续读取时可以逐行 `json.loads(line)`，适合追加、回放和安全审计。
+- 标准回答：正确。`tests/test_permissions_audit.py` 固定了当前 audit API 的三个契约：事件字段必须原样保存；`to_dict()` 必须输出稳定 JSON 字段；JSONL 写入必须一行一个事件。`datetime` 不能直接作为稳定 JSON 字段，所以通过 `isoformat()` 转为包含时区的字符串；`DecisionAction` 是枚举对象，写入 JSON 前必须取 `.value`，否则会把 Python 内部对象泄漏到序列化边界。`append_audit_event(...)` 使用 append 模式写文件，并在每次写入后补换行，让多个事件可以不断追加。JSONL 的优势是简单、可流式读取、单行损坏时影响范围小，适合后续 audit replay 和安全矩阵检查。
+
+### 面试题 3：如果后续要把 audit 接入 `ShellCommandTool` 和文件工具 gate，你会在哪一层调用 `append_audit_event(...)`？如何避免记录完整命令输出、文件内容、secret 或 env 值？如果写审计失败，应该阻断工具执行还是降级处理，为什么？
+
+- 用户回答：应该在具体工具的执行前 gate 里调用 `append_audit_event(...)`。对 shell 来说，位置应该在 `ShellCommandTool._run(...)` 中：先 `classify_command(...)`，再 `PermissionPolicy.decide(...)`，构造 `PermissionAuditEvent`，写 audit；如果 `ALLOW` 才进入 `ShellRuntime.run(...)`，如果 `ASK / DENY` 就返回失败，不执行。对文件工具来说，位置应该在 `_ensure_file_permission(...)` 或调用它的 `WriteFileTool._run(...)` / `EditFileTool._run(...)` 附近，因为这里最接近真实写盘动作。为了避免泄漏敏感信息，audit 不应该记录完整命令输出、完整文件内容、完整 env，可以只记录 `tool_name`、`action`、`risk_level`、`matched_rule`、简短 reason、是否执行，后续可以加参数摘要，但要脱敏。
+- 标准回答：方向正确，还需要补上审计失败时的策略。短期接入点可以放在最接近副作用的工具 gate：shell 是 `ShellCommandTool._run(...)` 里分类和策略判断之后、进入 `ShellRuntime.run(...)` 之前；文件工具是 `_ensure_file_permission(...)` 或调用它的写盘前边界。长期更理想的是在 `ToolRegistry` 增加可插拔 permission/audit hook，但风险分类仍由具体工具提供，避免 registry 硬编码 shell 或文件语义。审计内容应坚持“记录事实摘要，不记录敏感载荷”：可以记录工具名、动作、风险等级、命中规则、策略原因、是否执行、trace id 或 request id；不能记录完整 stdout/stderr、完整文件内容、完整 env、secret 值或未经脱敏的命令参数。审计写入失败的处理要看风险等级和产品策略：对高风险 `ASK / DENY` 或需要合规留痕的操作，审计失败应阻断执行或至少保持不执行；对低风险 `ALLOW` 操作，可以降级为失败告警或内存缓冲，但不能静默吞掉。当前教学阶段更保守的原则是：权限相关审计失败必须显式暴露，避免系统在没有证据的情况下执行高风险副作用。
+
+## 第 29 天：2026-06-23
+
+### 面试题 1：一个权限系统验收示例为什么必须同时覆盖 `ALLOW`、`ASK` 和 `DENY`？如果只覆盖成功路径，会漏掉什么风险？
+
+- 用户回答：权限系统不是只证明“能执行”，而是要证明三条路径都正确：`ALLOW` 低风险操作能正常执行，不能因为安全系统把正常工作流打断；`ASK` 有风险但不一定禁止的操作，在没有审批 UI 时不能静默执行，必须失败或暂停；`DENY` 明确危险操作必须在真实 runtime 前被拦截，不能进入 `ShellRuntime`。如果只覆盖成功路径，只能证明工具还能跑，不能证明危险命令不会执行，也不能证明需要审批的命令不会绕过用户确认。
+- 标准回答：正确。权限系统验收必须同时证明“正常工作不被误伤”和“危险副作用不会绕过边界”。`ALLOW` 路径证明低风险命令仍能进入原执行链路，避免安全层把 Agent 变成不可用；`ASK` 路径证明中风险操作在没有审批结果时不会被系统替用户同意；`DENY` 路径证明明确破坏性操作在真实 runtime 前被拒绝。只覆盖成功路径会留下两个关键盲点：高危命令可能已经进入 runtime 后才失败，中风险命令也可能在没有人工确认时被静默执行。
+
+### 面试题 2：请沿着 `ToolRegistry.run(...) -> ShellCommandTool._run(...) -> classify_command(...) -> PermissionPolicy.decide(...)` 说明 `rm -rf` 为什么不会进入 `ShellRuntime.run(...)`。
+
+- 用户回答：`rm -rf` 会先进入 `ToolRegistry.run`，它找到 `run_command` 对应的 `ShellCommandTool`。`ShellCommandTool._run` 不会马上调用 `ShellRuntime`，而是先调用 `classify_command`。`classify_command` 识别 `rm -rf` 命中 `recursive_delete`，返回 `RiskLevel.DENY`。`PermissionPolicy.decide` 把 `DENY` 风险转换成 `DecisionAction.DENY`。`ShellCommandTool._run` 看到 `DENY` 后直接抛 `PermissionError`。这个异常被 `ToolRegistry.run` 包装成失败 `ToolResult`，所以 `ShellRuntime.run` 根本不会被调用。
+- 标准回答：正确。当前执行前 gate 放在 `ShellCommandTool._run(...)` 中。`ToolRegistry.run("run_command", arguments)` 先找到并运行 `ShellCommandTool`；`ShellCommandTool._run(...)` 在调用 `self._runtime.run(arguments)` 前先执行 `classify_command(arguments["command"])`。对于 `["rm", "-rf", ...]`，分类器命中 `recursive_delete`，得到 `RiskAssessment(level=RiskLevel.DENY, matched_rule="recursive_delete")`。随后 `PermissionPolicy.decide(...)` 返回 `PermissionDecision(action=DecisionAction.DENY, ...)`。`ShellCommandTool._run(...)` 对 `DENY` 直接抛出 `PermissionError`，异常被 `ToolRegistry.run(...)` 捕获并转换成失败 `ToolResult`。因此真实副作用边界 `ShellRuntime.run(...)` 不会被调用。
+
+### 面试题 3：如果 Week 5 要加入 checkpoint/rollback，你会把它放在 permission gate 之前还是之后？请说明边界情况、方案对比、如何测试，以及如何证明失败时可以恢复。
+
+- 用户回答：我会把 checkpoint 放在 permission gate 通过之后、真实执行之前。如果放在 permission gate 之前，`DENY` 或未批准的 `ASK` 也会创建无意义 checkpoint，增加噪音。如果放在执行之后，就太晚了，已经无法保证能恢复执行前状态。更合理的链路是：先做风险分类和策略判断；`DENY` 直接拒绝；`ASK` 等用户批准；只有 `ALLOW` 或 `ASK` 被批准后，才在副作用发生前创建 checkpoint，然后执行工具。执行失败或用户要求撤销时，用 checkpoint rollback。边界情况包括：命令访问网络、删除大量文件、修改多个文件、执行到一半失败。不是所有副作用都能 rollback，比如外部网络请求不能靠本地 checkpoint 恢复，所以 Week 5 需要明确 rollback 只覆盖本地 workspace 文件状态。测试上可以构造一个临时 workspace：先写原文件，创建 checkpoint，执行修改，再触发失败或调用 rollback，断言文件内容恢复到执行前。
+- 标准回答：正确。checkpoint/rollback 应放在 permission gate 通过之后、真实副作用执行之前。放在 gate 之前会为本来不会执行的 `DENY` 或未审批 `ASK` 创建噪音快照；放在执行之后则失去恢复执行前状态的证据。合理顺序是：风险分类和策略判断先决定是否允许进入副作用路径；`DENY` 不执行也不创建 checkpoint；`ASK` 在未批准前不执行；只有 `ALLOW` 或审批通过后，才创建本地 workspace checkpoint，然后执行文件修改或命令。rollback 的边界必须明确：本地文件状态可以通过 snapshot/git diff 恢复，外部网络请求、远程 API、安装包副作用、后台进程等不能保证自动恢复。测试要覆盖创建快照、修改文件、失败后恢复、多个文件恢复、dirty workspace、以及不可回滚副作用的显式拒绝或降级说明。

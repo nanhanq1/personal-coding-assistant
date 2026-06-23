@@ -1,0 +1,55 @@
+"""权限审计事件。
+
+修改前旧代码：
+审计事件模块尚未实现，permission gate 只能拦截或放行，但没有稳定的
+JSONL 事实记录。
+
+问题：后续审批、sandbox、rollback 和安全回归需要可追溯证据，不能只依赖
+异常消息或测试断言。
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from pca.permissions.policy import DecisionAction
+
+
+@dataclass(frozen=True)
+class PermissionAuditEvent:
+    """一次权限判断的事实记录，不参与 allow / ask / deny 决策。"""
+
+    timestamp: datetime
+    tool_name: str
+    action: DecisionAction
+    risk_level: str
+    matched_rule: str
+    reason: str
+    executed: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为稳定 JSON 字段，避免把 enum 或 datetime 对象直接写入文件。"""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "tool_name": self.tool_name,
+            "action": self.action.value,
+            "risk_level": self.risk_level,
+            "matched_rule": self.matched_rule,
+            "reason": self.reason,
+            "executed": self.executed,
+        }
+
+
+def append_audit_event(path: Path, event: PermissionAuditEvent) -> None:
+    """把权限审计事件追加为一行 JSONL。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as file:
+        file.write(json.dumps(event.to_dict(), ensure_ascii=False))
+        file.write("\n")
+
+
+__all__ = ["PermissionAuditEvent", "append_audit_event"]

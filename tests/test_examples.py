@@ -79,3 +79,56 @@ def test_observed_tool_run_example_reports_real_read_file_stats():
     assert report["stats"]["read_file"]["calls"] == 2
     assert report["stats"]["read_file"]["successes"] == 1
     assert report["stats"]["read_file"]["failures"] == 1
+
+
+def test_permission_agent_example_reports_allow_deny_and_ask_paths():
+    """测试 Week 4 Day 7 示例能展示 permission gate 的当前真实边界。"""
+    repo_root = Path(__file__).resolve().parents[1]
+
+    completed = subprocess.run(
+        [sys.executable, "examples/04_permission_agent.py"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+
+    report = json.loads(completed.stdout)
+
+    assert report["safe_command"]["ok"] is True
+    assert report["safe_command"]["result"]["returncode"] == 0
+    assert "permission-safe" in report["safe_command"]["result"]["stdout"]
+
+    assert report["denied_command"]["ok"] is False
+    assert report["denied_command"]["error_type"] == "PermissionError"
+    assert "action=deny" in report["denied_command"]["error_message"]
+    assert "recursive_delete" in report["denied_command"]["error_message"]
+
+    assert report["approval_required_command"]["ok"] is False
+    assert report["approval_required_command"]["error_type"] == "PermissionError"
+    assert "action=ask" in report["approval_required_command"]["error_message"]
+    assert "inline_code" in report["approval_required_command"]["error_message"]
+
+    assert report["new_file_write"]["ok"] is True
+    assert report["overwrite_file"]["ok"] is False
+    assert report["overwrite_file"]["error_type"] == "PermissionError"
+    assert "action=ask" in report["overwrite_file"]["error_message"]
+    assert "overwrite_existing_file" in report["overwrite_file"]["error_message"]
+    assert report["file_after_overwrite_attempt"] == "created by permission example"
+
+    assert report["stats"]["run_command"]["calls"] == 3
+    assert report["stats"]["run_command"]["successes"] == 1
+    assert report["stats"]["run_command"]["failures"] == 2
+    assert report["stats"]["write_file"]["calls"] == 2
+    assert report["stats"]["write_file"]["successes"] == 1
+    assert report["stats"]["write_file"]["failures"] == 1
+
+    assert report["capability_boundary"] == {
+        "interactive_approval": False,
+        "approval_resume": False,
+        "checkpoint": False,
+        "rollback": False,
+        "sandbox": False,
+        "audit_auto_wired": False,
+    }

@@ -110,7 +110,7 @@
 | Day | 学习目标 | 代码任务 | 阅读任务 | 测试任务 | 文档任务 | 复盘问题 | 完成标准 |
 |---|---|---|---|---|---|---|---|
 | 1 | 风险分类 | `RiskLevel`、`RiskAssessment`、`classify_command` | Cline approval docs/code | `rm/del/curl/python -c` 分类测试 | 学习笔记 | 分类和拦截区别 | 分类测试通过 |
-| 2 | 策略判断 | `PermissionPolicy.decide` | policy engine basics | allow/ask/deny 测试 | ADR-0009 草稿 | risk 和 policy 区别 | 策略测试通过 |
+| 2 | 策略判断 | `PermissionPolicy.decide` | policy engine basics | allow/ask/deny 测试 | ADR-0014 草稿 | risk 和 policy 区别 | 策略测试通过 |
 | 3 | 审批对象 | `ApprovalRequest`、`ApprovalDecision` | human-in-the-loop | approve/reject/expired 测试 | 流程图 | 审批为什么要记录理由 | 审批测试通过 |
 | 4 | 接入 shell | `ShellCommandTool` 或 registry 前置 permission hook | OpenHands action model | 危险命令不会执行测试 | 更新 ARCHITECTURE | gate 放哪层 | shell gate 通过 |
 | 5 | 文件风险 | classify write/edit overwrite/delete-like paths | Aider diff workflow | 覆盖写入 ask 测试 | 记录文件策略 | workspace 和 permission 区别 | 文件风险测试通过 |
