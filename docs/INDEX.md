@@ -35,6 +35,7 @@
 | `docs/14_24_WEEK_PLAN.md` | 完整 24 周工业级路线和每日任务 |
 | `docs/15_MEMORY_SYSTEM.md` | 项目协作记忆与未来运行时记忆边界 |
 | `docs/16_TEACHING_WORKFLOW.md` | 教学协作流程、用户先写代码流程和每日收口门禁 |
+| `docs/17_WEEK6_HARDENING_REPORT.md` | Week 6 Tool Runtime 加固报告和 9 维差距评估 |
 
 ## 代码实现时读取
 

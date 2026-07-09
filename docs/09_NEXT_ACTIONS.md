@@ -4,15 +4,15 @@
 
 ## 当前状态
 
-- 路线阶段：24 周工业级路线，Week 6 Day 1 待开始。
-- 当前主题：Tool Runtime 加固周 - 现状评估。
+- 路线阶段：24 周工业级路线，Week 6 Day 1 等待面试题回答。
+- 当前主题：Tool Runtime 加固周 - 现状评估已完成，等待用户回答后归档。
 - 真实已完成：Week 1 Agent Loop、Week 2 Tool Runtime 基线、Week 3 Agent Core + Tool Runtime 加固验收与 Day 7 面试题归档、Week 4 Permission System 风险分类、策略判断、审批对象、shell gate、文件风险、审计事件、权限验收示例与 Day 7 面试题归档、Week 5 Workspace / Sandbox / Checkpoint 全部 Day 1-Day 7 已完成并归档面试题。
 - 最新聚焦测试：2026-07-02，`E:\python\Scripts\pytest.exe tests\test_examples.py::test_checkpoint_rollback_example_reports_restored_file_state_and_boundaries -q` 先 RED 后为 `1 passed`；`E:\python\Scripts\pytest.exe tests\test_examples.py -q` 为 `5 passed`。
-- 最新全量测试：2026-07-02，`E:\python\Scripts\pytest.exe -q` 为 `168 passed, 1 skipped`；默认 `python -m pytest -q` 缺少 pytest。
-- 最新示例：2026-07-02，`examples\01_minimal_agent.py`、`examples\02_tool_agent.py`、`examples\03_observed_tool_run.py`、`examples\04_permission_agent.py`、`examples\05_checkpoint_rollback.py` 均通过；`examples\05_checkpoint_rollback.py` 输出 `restored=true`，并明确不可恢复网络/API、包安装、后台进程、workspace 外副作用和 shell/Docker/Git 自动 rollback。
-- 最新编译验证：2026-07-04，用户在本机 PowerShell 运行 `python -m compileall src examples -q` 后无错误输出，返回提示符，视为通过。
-- 阻塞项：无；Week 6 Day 1 尚未开始。
-- 最新文档维护：2026-07-04 新增 `docs/16_TEACHING_WORKFLOW.md`，并优化 `docs/15_MEMORY_SYSTEM.md`、`docs/CODEX_PROJECT_BRIEF.md`、`DOC_RULES.md` 和 `docs/INDEX.md`；Week 6 Day 1 状态仍为待开始。
+- 最新全量测试：2026-07-09，`E:\python\Scripts\pytest.exe -q` 为 `168 passed, 1 skipped`；默认 `python -m pytest -q` 缺少 pytest。
+- 最新示例：2026-07-09，`examples\01_minimal_agent.py`、`examples\02_tool_agent.py`、`examples\03_observed_tool_run.py`、`examples\04_permission_agent.py`、`examples\05_checkpoint_rollback.py` 均通过；`examples\05_checkpoint_rollback.py` 输出 `restored=true`。
+- 最新编译验证：2026-07-09，`python -m compileall src examples -q` 无错误输出。
+- 阻塞项：等待用户回答 Week 6 Day 1 面试题；未回答前不得归档，不得推进 Week 6 Day 2。
+- 最新文档维护：2026-07-09 新增 `docs/17_WEEK6_HARDENING_REPORT.md`，并更新 `docs/02_DAILY_TASKS.md`、`docs/04_RESOURCE_LIBRARY.md`、`docs/07_IMPLEMENTATION_LOG.md`、`docs/09_NEXT_ACTIONS.md` 和 `docs/INDEX.md`。
 
 ## 当前能力边界
 

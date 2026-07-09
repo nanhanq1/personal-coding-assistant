@@ -220,9 +220,14 @@
 
 - 项目工业级标准：`docs/INDUSTRIAL_STANDARDS.md`
 - OpenTelemetry Observability Primer：https://opentelemetry.io/docs/concepts/observability-primer/
+- OpenTelemetry Traces 官方文档：https://opentelemetry.io/docs/concepts/signals/traces/
+- Python logging HOWTO：https://docs.python.org/3/howto/logging.html
+- pytest fixtures 官方文档：https://docs.pytest.org/en/stable/how-to/fixtures.html
+- Git diff 官方文档：https://git-scm.com/docs/git-diff
+- Git 官方视频入口：https://git-scm.com/videos
 - OpenHands Docs：https://docs.openhands.dev/
 - Cline Auto Approve & YOLO Mode：https://docs.cline.bot/features/auto-approve
-- 建议阅读顺序：先按项目 9 维标准列出当前差距，再用 OpenTelemetry 理解可观测性证据，用 OpenHands/Cline 对照 runtime、permission、approval 和 safety 边界。
+- 建议阅读顺序：先按项目 9 维标准列出当前差距，再用 OpenTelemetry 理解 trace 和可观测性证据，用 Python logging 理解结构化日志入口，用 pytest fixtures 设计安全回归测试夹具，用 Git diff 理解 checkpoint 证据，最后用 OpenHands/Cline 对照 runtime、permission、approval 和 safety 边界。
 
 ## 视频搜索关键词
 

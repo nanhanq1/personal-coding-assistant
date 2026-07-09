@@ -2,6 +2,33 @@
 
 本文件只保留当前活跃实现记录。历史记录归档在 `docs/archive/implementation_log/`。
 
+## 2026-07-09
+
+### Week 6 Day 1 Tool Runtime 加固现状评估
+
+### 本次完成
+
+- 读取教学规则、当前状态、日任务、周 Sprint、工业级标准、已实现架构、ADR-0014 到 ADR-0024 和教学流程。
+- 核对 Week 4-5 的 permission、workspace、checkpoint、runtime 和 rollback 当前源码证据。
+- 新增 `docs/17_WEEK6_HARDENING_REPORT.md`，按 9 个工业级维度列出当前状态、证据、差距和 P0/P1/P2 优先级。
+- 更新 `docs/04_RESOURCE_LIBRARY.md`，补充 Week 6 Day 1 的官方资料和视频入口。
+- 更新 `docs/02_DAILY_TASKS.md`、`docs/09_NEXT_ACTIONS.md` 和 `docs/INDEX.md`。
+
+### 验证
+
+- `E:\python\Scripts\pytest.exe -q`：`168 passed, 1 skipped`。
+- `python examples\01_minimal_agent.py`：通过。
+- `python examples\02_tool_agent.py`：通过，输出工具 schema。
+- `python examples\03_observed_tool_run.py`：通过，展示成功读取、二进制拒绝和 stats。
+- `python examples\04_permission_agent.py`：通过，展示 shell/file gate 和能力边界。
+- `python examples\05_checkpoint_rollback.py`：通过，输出 `restored=true`。
+- `python -m compileall src examples -q`：通过，无输出。
+
+### 下一步
+
+- 等待用户回答 Week 6 Day 1 面试题。
+- 用户回答并评审后，再归档第 37 天面试题并推进 Week 6 Day 2。
+
 ## 2026-07-04
 
 ### 教学文档与记忆文档维护
