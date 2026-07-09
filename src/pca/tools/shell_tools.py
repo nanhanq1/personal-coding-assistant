@@ -2,6 +2,7 @@ from typing import Any
 
 from pca.permissions.policy import DecisionAction, PermissionPolicy
 from pca.permissions.risk import classify_command
+from pca.runtime.interface import CommandRuntime
 from pca.runtime.shell_runtime import ShellRuntime
 from pca.tools.base import Tool, ToolParameter
 
@@ -11,9 +12,14 @@ class ShellCommandTool(Tool):
 
     def __init__(
         self,
-        runtime: ShellRuntime | None = None,
+        runtime: CommandRuntime | None = None,
         permission_policy: PermissionPolicy | None = None,
     ) -> None:
+        # 修改前旧代码：
+        # runtime: ShellRuntime | None = None
+        #
+        # 问题：调用方类型边界写死到本地 ShellRuntime，虽然测试里已能注入 fake
+        # runtime，但接口层没有显式表达“只依赖 run(arguments)”这个契约。
         self._runtime = runtime or ShellRuntime()
         self._permission_policy = permission_policy or PermissionPolicy()
         super().__init__(

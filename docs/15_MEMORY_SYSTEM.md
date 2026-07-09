@@ -9,11 +9,12 @@
 - 明确 `src/pca/memory/` 当前是长期记忆模块占位，不能宣传为已接入主链。
 - 为后续 Week 15-18 的 Personal Assistant Memory 实现提供设计边界。
 
-## 两套记忆
+## 三套记忆
 
 | 层级 | 当前载体 | 用途 | 当前状态 |
 |---|---|---|---|
 | 项目协作记忆 | `AGENTS.md`、`docs/09_NEXT_ACTIONS.md`、`docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md` | 帮 AI 和用户恢复项目上下文 | 已使用 |
+| Codex 外部记忆 | `C:\Users\南汉卿\.codex\memories\...` | 保存跨会话经验、偏好、历史 rollout 摘要 | 只读参考，不能替代仓库 live-state |
 | 产品运行时记忆 | `src/pca/memory/` | 未来让 Agent 记住用户偏好、任务状态、项目知识和学习进度 | 占位，未接入主链 |
 
 ## 项目记忆文件清单
@@ -39,6 +40,25 @@
 | 当前模块学习笔记 | `docs/05_LEARNING_NOTES.md` | 当前模块学习或概念边界变化 | README |
 | 已回答面试题 | `docs/Compilation-of-Interview-Questions.md` | 用户回答后 | Next Actions |
 
+## Codex 外部记忆使用边界
+
+Codex 外部记忆可以帮助恢复历史偏好和失败经验，但不能成为项目事实源。
+
+使用规则：
+
+- 先看仓库 live-state：`AGENTS.md`、`docs/INDEX.md`、`docs/09_NEXT_ACTIONS.md`。
+- 再用外部记忆查找历史偏好、失败模式或上次 rollout 的证据。
+- 如果外部记忆和仓库文档冲突，以仓库当前文件为准。
+- 如果外部记忆涉及测试结果、当前周次、阻塞项，必须用仓库文件或重新运行命令验证。
+- 不能把外部记忆中的状态直接写成当前状态；只能作为“可能相关的历史线索”。
+
+常见误用：
+
+- 用旧 rollout 推断今天的 Week/Day。
+- 把历史测试通过当成当前通过。
+- 把历史能力边界当成当前源码事实。
+- 把 Codex 记忆更新当成项目文档更新。
+
 ## 会话恢复流程
 
 ```mermaid
@@ -58,6 +78,7 @@ flowchart TD
 - 启动读取顺序以 `AGENTS.md` 为准，本图只表达职责流。
 - 当前周次、测试数字、阻塞项和下一步只从 `docs/09_NEXT_ACTIONS.md` 读取。
 - 完成工作后先判断是否真的改变了活跃任务；若改变，再同步 `docs/02_DAILY_TASKS.md`、`docs/07_IMPLEMENTATION_LOG.md`、`docs/09_NEXT_ACTIONS.md`。
+- 如果任务涉及教学流程，按 `docs/16_TEACHING_WORKFLOW.md` 组织讲解和收口。
 
 ## 产品运行时记忆边界
 

@@ -4,36 +4,36 @@
 
 ## 当前状态
 
-- 路线阶段：24 周工业级路线，Week 5 Day 1 待开始。
-- 当前主题：Workspace / Sandbox / Checkpoint - Workspace 抽象。
-- 真实已完成：Week 1 Agent Loop、Week 2 Tool Runtime 基线、Week 3 Agent Core + Tool Runtime 加固验收与 Day 7 面试题归档、Week 4 Permission System 风险分类、策略判断、审批对象、shell gate、文件风险、审计事件、权限验收示例与 Day 7 面试题归档。
-- 最新聚焦测试：2026-06-23，`E:\python\Scripts\pytest.exe tests\test_examples.py -q` 为 `4 passed`。
-- 最新全量测试：2026-06-23，`E:\python\Scripts\pytest.exe -q` 为 `138 passed, 1 skipped`；默认 `python -m pytest -q` 缺少 pytest。
-- 最新示例：2026-06-23，`examples\01_minimal_agent.py`、`examples\02_tool_agent.py`、`examples\03_observed_tool_run.py`、`examples\04_permission_agent.py` 均通过。
-- 最新编译验证：2026-06-23，`python -m compileall src examples -q` 通过。
-- 阻塞项：无；Week 5 Day 1 尚未实现。
-- 最新文档维护：2026-06-23 归档 Week 4 Day 7 面试题到 `docs/Compilation-of-Interview-Questions.md` 第 29 天，并推进活跃任务到 Week 5 Day 1。
+- 路线阶段：24 周工业级路线，Week 6 Day 1 待开始。
+- 当前主题：Tool Runtime 加固周 - 现状评估。
+- 真实已完成：Week 1 Agent Loop、Week 2 Tool Runtime 基线、Week 3 Agent Core + Tool Runtime 加固验收与 Day 7 面试题归档、Week 4 Permission System 风险分类、策略判断、审批对象、shell gate、文件风险、审计事件、权限验收示例与 Day 7 面试题归档、Week 5 Workspace / Sandbox / Checkpoint 全部 Day 1-Day 7 已完成并归档面试题。
+- 最新聚焦测试：2026-07-02，`E:\python\Scripts\pytest.exe tests\test_examples.py::test_checkpoint_rollback_example_reports_restored_file_state_and_boundaries -q` 先 RED 后为 `1 passed`；`E:\python\Scripts\pytest.exe tests\test_examples.py -q` 为 `5 passed`。
+- 最新全量测试：2026-07-02，`E:\python\Scripts\pytest.exe -q` 为 `168 passed, 1 skipped`；默认 `python -m pytest -q` 缺少 pytest。
+- 最新示例：2026-07-02，`examples\01_minimal_agent.py`、`examples\02_tool_agent.py`、`examples\03_observed_tool_run.py`、`examples\04_permission_agent.py`、`examples\05_checkpoint_rollback.py` 均通过；`examples\05_checkpoint_rollback.py` 输出 `restored=true`，并明确不可恢复网络/API、包安装、后台进程、workspace 外副作用和 shell/Docker/Git 自动 rollback。
+- 最新编译验证：2026-07-04，用户在本机 PowerShell 运行 `python -m compileall src examples -q` 后无错误输出，返回提示符，视为通过。
+- 阻塞项：无；Week 6 Day 1 尚未开始。
+- 最新文档维护：2026-07-04 新增 `docs/16_TEACHING_WORKFLOW.md`，并优化 `docs/15_MEMORY_SYSTEM.md`、`docs/CODEX_PROJECT_BRIEF.md`、`DOC_RULES.md` 和 `docs/INDEX.md`；Week 6 Day 1 状态仍为待开始。
 
 ## 当前能力边界
 
-已实现：`Message`、`ToolCall`、`TraceContext`、`AgentEvent`、`ScriptedLLM`、`AgentLoop`、`Tool`、`ToolParameter`、`ToolRegistry`、`ToolRegistry.get_stats()`、工具调用 `calls/successes/failures/total_duration_ms` 统计、`ToolResult`、`ToolResult.trace_id`、`ToolResult.tool_call_id`、`ToolResult.output_truncated`、`truncate_output(...)`、shell stdout/stderr 截断、字符串 payload 截断、`read_file` 文件大小上限、`read_file` 明显二进制拒绝、`write_file`、`edit_file`、`run_command` / `ShellRuntime`、`workspace_root`、timeout、基础参数校验、`run_command.env` 敏感输出脱敏、`RiskLevel`、`RiskAssessment`、`classify_command(...)`、`classify_file_change(...)`、`DecisionAction`、`PermissionDecision`、`PermissionPolicy.decide(...)`、`ApprovalRequest`、`ApprovalDecision`、`PermissionAuditEvent`、`append_audit_event(...)`、`ShellCommandTool` 执行前 shell gate、`WriteFileTool`/`EditFileTool` 写盘前文件风险 gate。
+已实现：`Message`、`ToolCall`、`TraceContext`、`AgentEvent`、`ScriptedLLM`、`AgentLoop`、`Tool`、`ToolParameter`、`ToolRegistry`、`ToolRegistry.get_stats()`、工具调用统计、`ToolResult`、输出截断、文件资源限制、`write_file`、`edit_file`、`run_command` / `ShellRuntime`、`CommandRuntime` Protocol、`DockerRuntime` graceful fallback adapter、`workspace_root`、timeout、env 敏感输出脱敏、`RiskLevel`、`RiskAssessment`、`classify_command(...)`、`classify_file_change(...)`、`PermissionPolicy.decide(...)`、`ApprovalRequest`、`ApprovalDecision`、`PermissionAuditEvent`、`append_audit_event(...)`、shell/file 执行前 permission gate、`Workspace(root)`、`FileCheckpoint`、`GitCheckpoint`、文件工具允许执行失败路径的本地 rollback。
 
-仍是占位或未接入主链：审批对象尚未接入交互式批准流程；shell/file gate 尚未支持审批通过后恢复执行；audit 尚未自动接入 shell/file gate；尚未有统一 `Workspace(root)` 抽象；尚未实现 checkpoint/rollback；尚未实现 Docker sandbox adapter；`TraceContext` / `AgentEvent` 尚未由 `AgentLoop` 自动创建或透传到 `ToolRegistry`；`ToolRegistry` stats 尚未接入 logger hook 或持久化 metrics；文件资源限制仍是固定上限和最小 NUL 检测；`context`、`memory`、`mcp`、`observability`、`cli`。
+仍是占位或未接入主链：审批对象尚未接入交互式批准流程；shell/file gate 尚未支持审批通过后恢复执行；audit 尚未自动接入 shell/file gate；`Workspace(root)` 尚未迁移接入 shell runtime 主链；`GitCheckpoint` 尚未自动接入失败回滚链路；`GitCheckpoint` 尚不处理 untracked 文件、staged diff、stash、commit 或 sandbox 外副作用；`DockerRuntime` 尚未接入默认主链，尚不是完整 Docker sandbox；shell 命令、Docker、网络/API、包安装、后台进程和 workspace 外副作用尚不支持自动 rollback；`TraceContext` / `AgentEvent` 尚未由 `AgentLoop` 自动创建或透传到 `ToolRegistry`；`context`、`memory`、`mcp`、`observability`、`cli`。
 
 ## 下一步行动
 
-开始 Week 5 Day 1：Workspace 抽象。
+开始 Week 6 Day 1：Tool Runtime 加固周现状评估。
 
 ### Day 1 任务
 
-1. 按 TDD 新增 `tests/test_workspace.py`。
-2. 新增 `src/pca/runtime/workspace.py`，定义 `Workspace(root)`。
-3. 覆盖 root 不存在、root 是文件、相对路径解析、绝对路径越界、`..` 越界等测试。
-4. 先稳定 API 和迁移计划，不大范围改文件工具和 shell runtime 主链。
-5. 完成后跑聚焦测试、全量测试和编译验证；生成 Day 1 面试题。
+1. 阅读 `docs/INDUSTRIAL_STANDARDS.md`。
+2. 对 Week 4-5 的 permission、workspace、checkpoint、runtime 和 rollback 做 9 维差距评估。
+3. 产出 Week 6 加固报告初版，列出 P0/P1/P2 优先级。
+4. 跑基线测试、示例和编译验证。
+5. 完成后生成 Week 6 Day 1 面试题，等待用户回答。
 
 ## 用户下次应发送
 
 ```text
-开始 Week 5 Day 1
+开始 Week 6 Day 1
 ```

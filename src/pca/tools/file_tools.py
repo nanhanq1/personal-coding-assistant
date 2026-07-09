@@ -1,8 +1,10 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from pca.permissions.file_risk import classify_file_change
 from pca.permissions.policy import DecisionAction, PermissionPolicy
+from pca.runtime.checkpoints import FileCheckpoint
+from pca.runtime.workspace import Workspace
 from pca.tools.base import Tool, ToolParameter
 
 
@@ -109,8 +111,17 @@ class WriteFileTool(Tool):
             path=path,
             permission_policy=self._permission_policy,
         )
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
+
+        # 修改前旧代码：
+        # path.parent.mkdir(parents=True, exist_ok=True)
+        # path.write_text(content, encoding="utf-8")
+        #
+        # 问题：permission 已允许后，如果写盘中途失败，半成品文件会留在 workspace 中。
+        _run_with_file_checkpoint(
+            workspace_root=_resolve_workspace_root(arguments),
+            path=path,
+            operation=lambda: _write_text_file(path, content),
+        )
         return "ok"
 
 
@@ -192,7 +203,18 @@ class EditFileTool(Tool):
         if occurrences > 1:
             raise ValueError("old_text appears multiple times")
 
-        path.write_text(content.replace(old_text, new_text, 1), encoding="utf-8")
+        # 修改前旧代码：
+        # path.write_text(content.replace(old_text, new_text, 1), encoding="utf-8")
+        #
+        # 问题：permission 已允许后，如果写盘阶段失败，文件可能停在替换后的半完成状态。
+        _run_with_file_checkpoint(
+            workspace_root=_resolve_workspace_root(arguments),
+            path=path,
+            operation=lambda: _write_text_file(
+                path,
+                content.replace(old_text, new_text, 1),
+            ),
+        )
         return "ok"
 
 
@@ -288,6 +310,34 @@ def _ensure_file_permission(
             f"rule={assessment.matched_rule}; "
             f"reason={decision.reason} {assessment.reason}"
         )
+
+
+def _run_with_file_checkpoint(
+    *,
+    workspace_root: Path,
+    path: Path,
+    operation: Callable[[], None],
+) -> None:
+    """在允许进入副作用路径后执行文件修改，失败时恢复本地文件状态。"""
+    workspace = Workspace(workspace_root)
+    checkpoint = FileCheckpoint.create(workspace, [path])
+    try:
+        operation()
+    except Exception as operation_error:
+        try:
+            checkpoint.restore()
+        except Exception as rollback_error:
+            raise RuntimeError(
+                "file change failed and rollback failed: "
+                f"original={operation_error}; rollback={rollback_error}"
+            ) from operation_error
+        raise
+
+
+def _write_text_file(path: Path, content: str) -> None:
+    """写入文本文件；独立函数让 rollback 集成点保持清晰。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
 
 
 # 向后兼容的函数形式

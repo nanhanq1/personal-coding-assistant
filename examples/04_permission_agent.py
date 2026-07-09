@@ -84,11 +84,21 @@ def main() -> None:
         "overwrite_file": _serialize_tool_result(overwrite_file),
         "file_after_overwrite_attempt": file_after_overwrite_attempt,
         "stats": registry.get_stats(),
+        # 修改前旧代码：
+        # "rollback_auto_wired": False,
+        #
+        # 问题：Week 5 Day 6 已经把文件工具的允许执行失败路径接入 FileCheckpoint，
+        # 但这不等于 shell/Docker/Git 全链路 rollback 都已完成。
         "capability_boundary": {
             "interactive_approval": False,
             "approval_resume": False,
-            "checkpoint": False,
-            "rollback": False,
+            "file_checkpoint_api": True,
+            "git_checkpoint_api": True,
+            "command_runtime_interface": True,
+            "docker_runtime_adapter": True,
+            "checkpoint_auto_wired": False,
+            "file_tool_rollback_on_allowed_failure": True,
+            "rollback_auto_wired": False,
             "sandbox": False,
             "audit_auto_wired": False,
         },

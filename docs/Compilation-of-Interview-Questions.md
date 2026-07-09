@@ -628,3 +628,139 @@
 
 - 用户回答：我会把 checkpoint 放在 permission gate 通过之后、真实执行之前。如果放在 permission gate 之前，`DENY` 或未批准的 `ASK` 也会创建无意义 checkpoint，增加噪音。如果放在执行之后，就太晚了，已经无法保证能恢复执行前状态。更合理的链路是：先做风险分类和策略判断；`DENY` 直接拒绝；`ASK` 等用户批准；只有 `ALLOW` 或 `ASK` 被批准后，才在副作用发生前创建 checkpoint，然后执行工具。执行失败或用户要求撤销时，用 checkpoint rollback。边界情况包括：命令访问网络、删除大量文件、修改多个文件、执行到一半失败。不是所有副作用都能 rollback，比如外部网络请求不能靠本地 checkpoint 恢复，所以 Week 5 需要明确 rollback 只覆盖本地 workspace 文件状态。测试上可以构造一个临时 workspace：先写原文件，创建 checkpoint，执行修改，再触发失败或调用 rollback，断言文件内容恢复到执行前。
 - 标准回答：正确。checkpoint/rollback 应放在 permission gate 通过之后、真实副作用执行之前。放在 gate 之前会为本来不会执行的 `DENY` 或未审批 `ASK` 创建噪音快照；放在执行之后则失去恢复执行前状态的证据。合理顺序是：风险分类和策略判断先决定是否允许进入副作用路径；`DENY` 不执行也不创建 checkpoint；`ASK` 在未批准前不执行；只有 `ALLOW` 或审批通过后，才创建本地 workspace checkpoint，然后执行文件修改或命令。rollback 的边界必须明确：本地文件状态可以通过 snapshot/git diff 恢复，外部网络请求、远程 API、安装包副作用、后台进程等不能保证自动恢复。测试要覆盖创建快照、修改文件、失败后恢复、多个文件恢复、dirty workspace、以及不可回滚副作用的显式拒绝或降级说明。
+
+## 第 30 天：2026-07-01
+
+### 面试题 1：`Workspace(root)` 和文件工具里的 `_resolve_workspace_path(...)` helper 有什么区别？为什么后续 checkpoint / rollback 更适合依赖 Workspace 对象？
+
+- 用户回答：`Workspace(root)` 是一个可复用的边界对象；`_resolve_workspace_path(...)` 只是文件工具内部 helper。后续 checkpoint / rollback 不只服务文件工具，还要服务 shell、sandbox、快照恢复，所以需要统一的 `Workspace` 作为路径边界事实源，避免每个模块各写一套规则导致漂移。
+- 标准回答：正确。`_resolve_workspace_path(...)` 是文件工具内部的局部实现细节，只服务当前 `read_file`、`write_file`、`edit_file` 的路径解析；`Workspace(root)` 是 runtime 层可复用边界对象，可以被 checkpoint、rollback、sandbox、shell runtime 和未来文件工具迁移共享。checkpoint / rollback 需要统一判断“哪些文件属于可恢复的授权工作区”，如果各模块重复写路径规则，就可能出现文件工具允许、checkpoint 不保存，或 shell 认为合法、rollback 无法恢复的边界漂移。`Workspace` 应成为路径归属事实源，permission gate 再负责判断“这次操作是否允许执行”。
+
+### 面试题 2：请从 `Workspace.resolve_path("../outside.txt")` 开始，说明代码如何把相对路径解析成绝对路径，并在哪一步判断它越界。
+
+- 用户回答：`Workspace.resolve_path("../outside.txt")` 会先把输入转成 `Path`。因为它是相对路径，所以拼到 `self.root / "../outside.txt"`，再调用 `.resolve()` 得到真实绝对路径。最后用 `_is_inside(...)` 判断：如果解析后的路径既不等于 `root`，也不在 `root.parents` 关系内，就抛 `ValueError("path is outside workspace")`。
+- 标准回答：方向正确，需要把 parents 关系表述得更精确：判断逻辑是“解析后的路径既不等于 `self.root`，并且 `self.root` 不在解析后路径的 `parents` 中”，就说明路径越界。调用链是：`resolve_path(...)` 先用 `_coerce_path(path, label="path")` 拒绝空路径和坏类型；发现输入不是绝对路径后，用 `(self.root / raw_path).resolve()` 消解 `..`、符号链接等路径成分；随后调用 `_is_inside(resolved_path)`。`_is_inside(...)` 返回 `path == self.root or self.root in path.parents`。对于 `../outside.txt`，解析后路径落到 root 的父目录下，不满足该条件，因此抛出 `ValueError`，阻止 workspace 外路径继续进入文件操作。
+
+### 面试题 3：如果 Day 2 要实现 `FileCheckpoint`，它应该如何使用 `Workspace`？哪些文件状态能回滚，哪些副作用不能靠本地 checkpoint 回滚？如何测试这些边界？
+
+- 用户回答：`FileCheckpoint` 应该接收 `Workspace`，所有要保存或恢复的路径都先通过 `workspace.resolve_path(...)` 校验。它能回滚本地 workspace 内文件的内容、创建、删除等文件状态；不能回滚外部命令副作用、网络请求、数据库写入、进程启动、workspace 外文件修改。测试应覆盖：保存后修改文件再恢复、保存后删除文件再恢复、新建文件回滚、越界路径拒绝、workspace 外副作用不被声明为可恢复。
+- 标准回答：正确。`FileCheckpoint` 应以 `Workspace` 作为边界输入，创建快照、记录相对路径、恢复文件时都必须先通过 `workspace.resolve_path(...)`，保证 checkpoint 不读取或写回 workspace 外文件。它适合恢复本地 workspace 内的文件内容、文件删除、快照后新建文件的清理，以及多个文件的组合状态；但不能保证恢复网络请求、远程 API、数据库写入、包安装产生的全局副作用、后台进程、系统环境变量变化或 workspace 外文件修改。测试应使用 `tmp_path` 构造隔离 workspace，覆盖文件内容恢复、删除后恢复、新文件 rollback、多个文件恢复、越界路径拒绝，以及明确不可回滚副作用不被 `FileCheckpoint` 宣称为支持范围。
+
+## 第 31 天：2026-07-01
+
+### 面试题 1：`FileCheckpoint.create(workspace, paths)` 为什么必须先调用 `Workspace.resolve_path(...)`？如果 checkpoint 自己重新写路径判断，会带来什么风险？
+
+- 用户回答：`Workspace` 是 runtime 层的路径边界事实源。`FileCheckpoint` 会读取和写回真实磁盘文件，如果不先经过 `Workspace.resolve_path(...)`，就可能把 `../outside.txt`、workspace 外绝对路径、符号链接解析后的外部路径也纳入快照或恢复范围。如果 checkpoint 自己再写一套路径判断，会带来边界漂移：文件工具认为路径合法，checkpoint 认为非法；或者 checkpoint 允许了文件工具本来不允许的路径。这样 rollback 可能漏恢复文件，也可能误删或覆盖 workspace 外文件。正确做法是 checkpoint 只负责保存和恢复文件状态，路径归属统一交给 `Workspace`。
+- 标准回答：正确。`FileCheckpoint` 的职责是保存和恢复文件状态，不应该重新定义“哪些路径属于授权工作区”。路径归属必须交给 `Workspace.resolve_path(...)`，这样相对路径、绝对路径、`..`、空路径、坏类型和符号链接解析后的越界情况都使用同一套边界规则。否则会出现边界漂移：文件工具、shell runtime、checkpoint 和未来 sandbox 对同一路径做出不同判断。对 rollback 来说，这种漂移尤其危险，因为它可能造成该保存的文件没有保存，或者 restore 时写回 workspace 外路径。
+
+### 面试题 2：当前 `FileCheckpoint` 如何区分快照时“文件存在”和“文件不存在”？请分别解释修改后恢复、删除后恢复、新建文件清理这三条 rollback 语义。
+
+- 用户回答：创建快照时，每个路径先解析成 workspace 内绝对路径，然后检查 `path.exists()`。如果文件存在，就记录 `existed=True`，并用 `read_bytes()` 保存原始 bytes 内容；如果文件不存在，就记录 `existed=False`，不保存内容。修改后恢复是指快照时文件存在，后来内容被改了，`restore()` 会把原始 bytes 写回去。删除后恢复是指快照时文件存在，后来被删除，`restore()` 会重新创建父目录并写回原始内容。新建文件清理是指快照时文件不存在，后来这个被跟踪路径新建了文件，`restore()` 会删除它，让状态回到当时不存在。
+- 标准回答：正确。当前实现记录的是“被跟踪路径在快照时的状态”，不是记录每一步操作日志。`_FileSnapshot` 用 `existed` 表达快照时是否存在，用 `content` 保存存在文件的 bytes 内容。`restore()` 根据 `existed` 分两条路径：快照时存在的文件会被写回原始 bytes，因此能覆盖后续修改，也能重建后续删除；快照时不存在的文件如果后来被创建，则会被删除，恢复到“不存在”的状态。这也是为什么测试必须同时覆盖修改、删除和快照后新建三类场景。
+
+### 面试题 3：如果未来要把 `FileCheckpoint` 接入 `WriteFileTool` 或 `ShellCommandTool`，你会把它放在 permission gate 的哪一侧？如果 restore 过程中失败，应该如何设计错误语义、审计和测试？
+
+- 用户回答：我会把 `FileCheckpoint` 放在 permission gate 通过之后、真实副作用执行之前。合理链路是：tool call -> workspace path resolve -> permission risk classify -> `PermissionPolicy.decide(...)` -> `ALLOW` 或审批通过 -> create `FileCheckpoint` -> 执行真实写文件或 shell 命令 -> 失败或用户撤销时 restore。不能放在 permission gate 之前，因为 `DENY` 或未审批的 `ASK` 本来不会执行，创建 checkpoint 是噪音；也不能放在执行之后，因为那时已经失去执行前状态证据。如果 `restore()` 过程中失败，不能假装回滚成功，应该返回或抛出明确错误，记录哪个 checkpoint、哪个文件失败、是否已经部分恢复、原始错误类型和消息，以及是否需要用户手动介入。审计上应记录 rollback attempt、成功或失败、受影响路径摘要，但不能记录完整文件内容或 secret。测试要覆盖单文件恢复失败、多文件部分恢复、目标路径变成目录、权限不足、恢复失败时原错误被保留，以及 audit/错误结果能让用户知道 workspace 可能处于半恢复状态。
+- 标准回答：正确。checkpoint 应放在 permission gate 通过之后、真实副作用之前。`DENY` 和未批准的 `ASK` 不应创建快照，因为没有副作用会发生；执行后再创建则无法保存执行前状态。接入 `WriteFileTool` 时，checkpoint 应在写盘前创建；接入 `ShellCommandTool` 时，要先明确哪些路径会被跟踪，否则 shell 命令可能修改未知文件。restore 失败时要采用显式失败语义，不能把半恢复状态包装成成功。工业级设计还需要 audit 记录 rollback 尝试、结果、路径摘要、trace/request id，并在测试中证明部分恢复、目录冲突、权限错误和原始异常保留都能被调用方观察到。
+
+## 第 32 天：2026-07-01
+
+### 面试题 1：`GitCheckpoint` 和 `FileCheckpoint` 分别适合什么场景？为什么 Day 3 不直接用 `FileCheckpoint` 扫描整个仓库？
+
+- 用户回答：`FileCheckpoint` 适合显式文件列表和普通 workspace 文件状态，例如某个工具准备修改一两个已知文件时，按路径保存 bytes 内容、是否存在，并在失败时恢复这些文件。`GitCheckpoint` 适合 git repo 内的代码修改状态，尤其是 tracked 文件的 dirty tree。Day 3 不直接用 `FileCheckpoint` 扫描整个仓库，是因为递归扫描会带来范围、性能、忽略规则和误删风险：仓库里可能有 `.git`、缓存、虚拟环境、构建产物、大文件和 untracked 文件。git 已经知道哪些文件被跟踪，也知道 tracked 文件相对 index 的差异，所以用 `git diff` 表达 dirty state 更符合代码仓库语义。
+- 标准回答：正确。`FileCheckpoint` 是显式文件粒度的本地快照，适合调用方已经知道要保护哪些文件的场景；它不要求目录是 git repo，也不依赖 git 命令。`GitCheckpoint` 是仓库级 dirty diff 快照，适合 Coding Agent 在 git workspace 中保护 tracked 文件修改状态。直接用 `FileCheckpoint` 扫描整个仓库会把“快照哪些文件”的问题变成递归扫描策略问题：要排除 `.git`、依赖目录、构建目录、缓存、大文件、二进制文件和 untracked 文件，还要处理性能和误删风险。git diff 已经把 tracked 文件变化建模为统一 diff，更适合 Day 3 的最小实现。
+
+### 面试题 2：当前 `GitCheckpoint.create(...)` 保存的是哪一种 diff？为什么 restore 要先 `git restore --worktree -- .`，再 `git apply` 保存的 diff？
+
+- 用户回答：当前 `GitCheckpoint.create(...)` 保存的是 `git diff --binary -- .`，也就是 tracked working tree 相对 index 的 dirty diff，不包含 untracked 文件，也不完整表达 staged diff。restore 先执行 `git restore --worktree -- .`，是为了把 tracked working tree 清回 index 状态，移除 checkpoint 创建之后发生的额外修改；然后再 `git apply` 保存的 diff，把工作区恢复到 checkpoint 创建时的 dirty 内容。这样 restore 的目标不是“变干净”，而是“回到创建 checkpoint 的那个 dirty 状态”。
+- 标准回答：正确。当前实现保存的是 tracked working tree 相对 index 的 diff：`git diff --binary -- .`。它描述的是“工作区文件内容相对 index 的未暂存变化”。`restore()` 的两步顺序很关键：先 `git restore --worktree -- .` 把 tracked working tree 回到 index，清掉 checkpoint 之后的新修改；再把 checkpoint 保存的 diff 输入 `git apply --whitespace=nowarn -`，重建当时的 dirty state。如果只反向应用某个 diff，可能遇到后续修改冲突；如果只 restore，则会丢掉 checkpoint 创建时本来就存在的 dirty 修改。
+
+### 面试题 3：当前 `GitCheckpoint` 为什么不处理 untracked 文件、staged diff 和 sandbox 外副作用？如果未来要支持这些能力，你会如何扩展测试和错误语义？
+
+- 用户回答：当前 Day 3 只做最小 git diff checkpoint，所以不处理 untracked 文件、staged diff 和 sandbox 外副作用。untracked 文件不在普通 `git diff` 中，需要单独决定是否保存内容、删除策略和忽略规则；staged diff 涉及 index 状态，restore 时要区分 working tree 和 index；sandbox 外副作用例如网络请求、数据库写入、后台进程和 workspace 外文件修改，不属于 git 能恢复的本地文件状态。未来如果要支持这些能力，可以增加 untracked manifest 或 tar/bytes 快照，增加 staged diff 的 `git diff --cached` 保存和 index restore 测试，增加半恢复错误对象，明确哪些路径已恢复、哪些失败、是否需要用户手动处理。测试要覆盖 untracked 文件创建/删除、staged 文件恢复、diff apply 失败、部分恢复、git 命令失败和不可回滚副作用的显式说明。
+- 标准回答：正确。当前 `GitCheckpoint` 故意只覆盖 tracked working tree diff，是为了把 Day 3 范围控制在一个可测试的最小语义内。untracked 文件没有进入普通 `git diff`，贸然删除或保存它们可能误删用户临时文件；staged diff 属于 index 状态，和 working tree 状态是两层不同事实；sandbox 外副作用更不属于 git 能表达或恢复的范围。未来扩展应先定义数据模型：untracked 文件可用 manifest 加 bytes 快照或按 ignore 规则选择性纳入；staged diff 可单独保存 `git diff --cached` 并设计 index restore；恢复失败应返回结构化错误，包含失败阶段、git stderr/stdout 摘要、是否已经执行过 restore、是否可能处于半恢复状态和人工处理建议。测试必须覆盖成功恢复、untracked 策略、staged 状态、apply 冲突、部分恢复和不可回滚副作用不被虚假承诺。
+
+## 第 33 天：2026-07-02
+
+### 面试题 1：为什么要先定义 `CommandRuntime` interface，再实现 Docker runtime adapter？
+
+- 用户回答：先定义 `CommandRuntime` interface，是为了先稳定调用方和执行器之间的契约。工具层只需要知道有一个对象能 `run(arguments)` 并返回 `stdout`、`stderr`、`returncode`、`timed_out` 等结构化结果，而不需要知道底层是本地 `ShellRuntime`、fake runtime、Docker runtime 还是远程 sandbox。这样 Docker adapter 只是接口的一个实现，不会反向污染 `ShellCommandTool`、permission gate 或 `ToolRegistry`。如果先做 Docker，很容易把容器检测、挂载、权限、fallback、checkpoint 和 audit 混在一起，接口边界反而不清楚。
+- 标准回答：正确。`CommandRuntime` 先于 Docker adapter 的价值是先固定“命令执行器的最小形状”，再替换具体执行环境。工具层和权限层依赖的是稳定抽象，而不是 Docker 细节。`ShellCommandTool` 负责工具 schema 和执行前 permission gate；`CommandRuntime` 负责执行命令并返回结构化结果；Docker adapter 只是未来的一个 `CommandRuntime` 实现。这样可以用 fake runtime 做快速测试，用 `ShellRuntime` 保持当前行为，用 Docker runtime 做隔离执行，而不会让每个调用方都理解容器、挂载和 fallback 细节。
+
+### 面试题 2：现在 `ShellCommandTool` 从收到 `run_command` 参数到调用 fake runtime / ShellRuntime，中间经过哪些层？
+
+- 用户回答：调用链是：`ToolRegistry.run("run_command", arguments)` 先找到 `ShellCommandTool`，然后进入 `Tool.run(arguments)` 做基础参数校验，再进入 `ShellCommandTool._run(...)`。`_run(...)` 先调用 `classify_command(arguments["command"])` 做风险分类，再调用 `PermissionPolicy.decide(...)` 得到 `ALLOW`、`ASK` 或 `DENY`。如果是 `DENY`，直接抛 `PermissionError`，不会进入 runtime；如果是 `ASK`，在没有审批结果时也抛 `PermissionError`；只有 `ALLOW` 才调用 `self._runtime.run(arguments)`。这里的 `_runtime` 类型是 `CommandRuntime`，所以可以是 fake runtime，也可以是默认的 `ShellRuntime()`。
+- 标准回答：正确。当前主链是 `ToolRegistry.run(...) -> Tool.run(...) -> ShellCommandTool._run(...) -> classify_command(...) -> PermissionPolicy.decide(...) -> CommandRuntime.run(...)`。`ToolRegistry` 负责查找工具、包装 `ToolResult`、统计和输出截断；`Tool.run(...)` 负责基础参数 schema 校验；`ShellCommandTool._run(...)` 是 shell 工具的执行前 gate；`classify_command(...)` 和 `PermissionPolicy.decide(...)` 决定是否允许进入真实副作用边界；`self._runtime.run(arguments)` 才是真正执行器调用。因为 `self._runtime` 现在按 `CommandRuntime` 注入，fake runtime 只要实现 `run(arguments)` 就能用于测试，默认实现仍是 `ShellRuntime()`。
+
+### 面试题 3：如果未来 Docker 不可用，系统应该如何 graceful fallback？哪些能力可以降级，哪些风险不能静默放行？
+
+- 用户回答：如果 Docker 不可用，系统应该明确报告 sandbox 不可用，而不是让用户以为命令在容器里运行、实际却在宿主机运行。可降级的能力包括：低风险只读命令可以在用户明确允许的情况下回退到 `ShellRuntime`；测试环境可以使用 fake runtime；文档或 dry-run 可以只返回“需要 Docker”错误。不能静默放行的是高风险写文件、删除、安装依赖、网络访问、修改系统状态等操作，尤其是用户要求 sandbox 隔离时，不能自动退回宿主机执行。fallback 必须可见、可测试、可审计。
+- 标准回答：正确。graceful fallback 的核心是“清晰失败或显式降级”，不是“偷偷换成宿主机执行”。如果 Docker 不可用，adapter 应返回稳定错误，例如说明 Docker executable 不存在、daemon 不可用或当前环境不支持容器。低风险场景可以由上层策略决定是否改用 `ShellRuntime`，但必须让用户或策略明确知道这是非 sandbox 执行。高风险命令、需要隔离保证的命令、修改 workspace 或系统状态的命令，不能因为 Docker 不可用就静默执行。未来测试要覆盖 Docker 不存在、Docker 命令失败、fallback 错误字段、不会调用宿主机 runtime，以及文档中不把 fallback 误写成完整 sandbox。
+
+## 第 34 天：2026-07-02
+
+### 面试题 1：为什么 Docker adapter 应该实现 `CommandRuntime`，而不是直接改 `ShellCommandTool`？
+
+- 用户回答：Docker adapter 应该实现 `CommandRuntime`，因为 `CommandRuntime` 是命令执行器的统一接口，工具层只需要依赖 `run(arguments)` 和结构化返回值，不应该知道底层是本地 shell、fake runtime、Docker 还是未来远程 sandbox。`ShellCommandTool` 的职责是工具 schema、参数校验后的工具语义，以及执行前 permission gate；Docker adapter 的职责是具体运行环境。如果直接改 `ShellCommandTool`，会把 Docker CLI、镜像、挂载目录、daemon 检测、fallback 语义和权限判断混在一个工具里，后续测试和替换 runtime 都会变困难。让 `DockerRuntime` 实现 `CommandRuntime`，可以保持 `ShellCommandTool` 只依赖抽象，也能用 fake runtime、`ShellRuntime` 和 `DockerRuntime` 复用同一调用边界。
+- 标准回答：正确。这里的核心是分层：`ShellCommandTool` 是工具语义边界，`CommandRuntime` 是命令执行边界，`DockerRuntime` 是执行边界的一个实现。Docker 不应该反向污染工具层，否则工具层会同时承担权限、schema、容器参数、运行环境检测和 fallback 策略。通过 `CommandRuntime.run(arguments)`，上层只关心输入输出契约，底层可以替换为本地 shell、fake runtime、Docker runtime 或远程 sandbox。这样后续 Day 6 rollback、audit 和 trace 接入时也有更清楚的插入点。
+
+### 面试题 2：Docker 不可用时为什么不能静默回退到宿主机 `ShellRuntime`？这和 graceful fallback 的区别是什么？
+
+- 用户回答：Docker 不可用时不能静默回退到宿主机 `ShellRuntime`，因为用户或上层策略以为命令会在 sandbox 里执行，实际却在宿主机执行，这会破坏安全边界。比如命令本来应该只修改容器内文件系统，静默回退后可能改到真实工作区、访问真实环境变量、安装依赖或执行危险命令。graceful fallback 的意思是清楚失败或显式降级，例如返回 `sandboxed=False`、`fallback="docker_unavailable"`、稳定的 `returncode` 和错误信息，让上层知道没有隔离执行。静默降级是隐藏事实，graceful fallback 是暴露事实并让调用方做明确决策。
+- 标准回答：正确。安全系统最怕“用户以为有隔离，实际没有隔离”。如果 Docker adapter 在 Docker 不可用时偷偷调用 `ShellRuntime`，`sandbox` 这个承诺就变成了假承诺。graceful fallback 必须可见、可测试、可解释：Docker CLI 缺失、daemon 不可用、检查超时都应该返回结构化失败，而不是伪装成容器执行。是否允许改用本地 shell 应该由更上层策略、用户确认或明确配置决定，不能由 adapter 自动偷偷决定。
+
+### 面试题 3：如果 `DockerRuntime.run(...)` 返回 `sandboxed=False` 和 `fallback="docker_unavailable"`，上层调用方应该如何处理？请从安全、用户体验和测试三个角度回答。
+
+- 用户回答：从安全角度，上层应该把这次结果视为“没有 sandbox 执行”，不能继续假设副作用被隔离；对于危险命令、写文件、联网、安装依赖或用户明确要求 sandbox 的任务，应该阻断或要求用户确认，不能自动换成本地 shell。从用户体验角度，应该给出清楚提示：Docker CLI 缺失、daemon 不可用或检查超时，并说明本次命令没有执行在隔离环境中，可以提示用户启动 Docker、安装 Docker，或选择明确的非 sandbox 模式。从测试角度，应该覆盖 fallback 字段、`sandboxed=False`、稳定 returncode、stderr 信息，以及 Docker 不可用时不会调用宿主机 shell；还要测试示例和文档不会把 adapter 误写成完整 sandbox。
+- 标准回答：正确。上层处理应该分三层。安全层面，`sandboxed=False` 表示隔离保证不存在，不能继续执行依赖 sandbox 的高风险操作；如果要本地执行，必须经过显式策略或用户确认。用户体验层面，错误要可解释，让用户知道是 Docker 可用性问题，而不是命令本身失败，也要给出下一步选择。测试层面，fallback 是契约：稳定字段、稳定 returncode、不调用宿主机 shell、示例能力边界和文档状态都要被测试或复核。这样才能保证 graceful fallback 不被误用成静默降级。
+
+## 第 35 天：2026-07-02
+
+### 面试题 1：为什么 `DENY` 和未审批 `ASK` 不应该创建 checkpoint？如果它们也创建 checkpoint，会带来什么误导或成本？
+
+- 用户回答：`DENY` 和未审批 `ASK` 都没有进入真实副作用路径，所以不应该创建 checkpoint。`DENY` 表示系统明确禁止执行，未审批 `ASK` 表示需要用户确认但还没有批准；这两种情况下文件不应该被修改，也就没有需要恢复的执行前状态。如果它们也创建 checkpoint，会误导后续维护者以为操作已经被允许或即将执行，还会增加无意义的磁盘读取、状态记录和审计噪音。更严重的是，checkpoint 数量变多后，真正需要 rollback 的执行失败路径会被噪音淹没，permission gate 和 rollback 的职责边界也会混乱。正确顺序应该是：先做风险分类和策略判断，只有 `ALLOW` 或未来审批通过后，才在真实写盘前创建 checkpoint。
+- 标准回答：正确。checkpoint 是“已经允许进入副作用路径后的执行前状态证据”，不是所有工具调用都要创建的通用日志。`DENY` 的语义是明确禁止执行；未审批 `ASK` 的语义是暂停并等待用户确认。这两个路径都不应该触碰真实副作用边界，因此也不需要保存可恢复状态。过早创建 checkpoint 会带来三个问题：第一，职责误导，让人以为阻断路径也进入了执行准备阶段；第二，产生额外 I/O 和状态噪音；第三，让 audit、rollback 和 permission gate 的边界难以解释。工业级设计里，permission gate 负责“能不能执行”，checkpoint/rollback 负责“允许执行后失败了如何恢复”。
+
+### 面试题 2：请按调用链说明一次 `EditFileTool` 小范围编辑失败后如何从 permission gate 走到 `FileCheckpoint.restore()`。
+
+- 用户回答：调用链是：`ToolRegistry.run("edit_file", arguments)` 找到 `EditFileTool`，进入 `Tool.run(...)` 做基础参数校验，再进入 `EditFileTool._run(...)`。`EditFileTool._run(...)` 先通过 `_resolve_workspace_path(...)` 解析并确认目标文件在 `workspace_root` 内，然后检查 `old_text`、`new_text` 类型和空值。接着调用 `_ensure_file_permission(...)`，里面用 `classify_file_change(tool_name="edit_file", path=..., old_text=..., new_text=...)` 做文件风险分类，小范围精确替换会得到 `RiskLevel.SAFE` 和 `matched_rule="small_exact_edit"`；`PermissionPolicy.decide(...)` 把它转换成 `DecisionAction.ALLOW`。只有看到 `ALLOW` 后，`EditFileTool` 才读取文件内容、确认 `old_text` 只出现一次，然后调用 `_run_with_file_checkpoint(...)`。这个 helper 用 `Workspace(workspace_root)` 创建工作区对象，再用 `FileCheckpoint.create(workspace, [path])` 保存目标文件执行前状态，随后执行真实 `path.write_text(...)`。如果写盘阶段抛异常，`except` 分支会调用 `checkpoint.restore()` 把文件恢复到写盘前内容，然后继续抛出原始异常，让上层知道这次编辑失败。
+- 标准回答：正确。关键点是 checkpoint 创建发生在 permission `ALLOW` 之后、真实写盘之前。当前路径可以拆成六层：`ToolRegistry.run(...)` 负责路由、结构化结果和统计；`Tool.run(...)` 负责基础 schema 校验；`EditFileTool._run(...)` 负责文件工具语义；`_ensure_file_permission(...)` 负责调用 `classify_file_change(...)` 和 `PermissionPolicy.decide(...)`；`_run_with_file_checkpoint(...)` 负责执行前创建 `FileCheckpoint` 并包裹真实写盘；`FileCheckpoint.restore()` 负责把被跟踪文件恢复到快照状态。测试不能只看异常返回，还要断言磁盘上的文件内容恢复为原始内容，才能证明 rollback 真的发生在本地文件状态上。
+
+### 面试题 3：如果未来要支持多文件 patch、shell 命令和 Docker sandbox 的统一 rollback，你会如何拆分 `FileCheckpoint`、`GitCheckpoint`、runtime 和 audit？请说明边界情况、优化思路、方案对比和测试方法。
+
+- 用户回答：我会把职责拆开：`FileCheckpoint` 继续负责显式文件列表的 bytes 快照，适合工具已知会修改哪些文件的场景；`GitCheckpoint` 负责 git repo 中 tracked working tree 的 diff 快照，适合多文件代码 patch 和仓库级 dirty state；runtime 负责执行命令或容器任务，不直接决定权限，也不假装能恢复所有外部副作用；audit 负责记录 permission 决策、checkpoint 创建、执行是否发生、rollback 尝试和结果。对于多文件 patch，如果文件列表明确，可以用 `FileCheckpoint` 包裹所有目标文件；如果是代码仓库级 patch，可以用 `GitCheckpoint` 保存 tracked diff。对于 shell 命令，必须先分析或声明可能修改的路径，否则不能承诺完整 rollback；对于 Docker sandbox，优先让副作用发生在容器或挂载 workspace 内，容器外网络/API、数据库、包安装、后台进程都不能被本地 checkpoint 自动恢复。方案上，保守方案是只对已知文件列表启用 `FileCheckpoint`，安全但覆盖有限；仓库方案是使用 `GitCheckpoint`，适合代码修改但不处理 untracked/staged；sandbox 方案是用 Docker 隔离进程和文件系统，但 Docker 不可用时不能静默降级。测试上要覆盖多文件部分失败恢复、rollback 失败报告、`ASK/DENY` 不创建 checkpoint、shell 命令未知副作用不承诺恢复、Docker 不可用 fallback、不记录 secret 或完整文件内容，以及 audit 能说明执行和 rollback 的真实状态。
+- 标准回答：正确。统一 rollback 不应该做成一个“什么都能恢复”的魔法函数，而应该是多个边界的组合。`FileCheckpoint` 适合显式路径和单次文件工具；`GitCheckpoint` 适合 git tracked 文件的仓库状态；runtime 负责运行命令、容器或未来远程 sandbox；audit 负责留下事实证据，包括风险判断、策略动作、是否执行、是否创建 checkpoint、rollback 是否成功。边界情况必须提前说明：untracked 文件、staged diff、workspace 外文件、网络请求、数据库写入、包安装、后台进程和容器外副作用都不能被普通文件 checkpoint 自动恢复。长期优化可以引入 patch plan、路径影响分析、GitCheckpoint staged/untracked 扩展、Docker volume 隔离、rollback audit event 和半恢复错误对象。测试应从行为证明出发：文件内容真的恢复、多文件部分失败可观察、restore 失败不伪装成功、危险操作未获许可不创建 checkpoint、Docker fallback 不调用宿主机 shell、audit 不泄漏完整内容或 secret。
+
+## 第 36 天：2026-07-04
+
+### 面试题 1：`FileCheckpoint` 能恢复什么状态？为什么不能把它宣传成能恢复网络/API、包安装或后台进程副作用？
+
+- 用户回答：`FileCheckpoint` 能恢复的是显式传入路径在 workspace 内的本地文件状态。它会记录文件在 checkpoint 创建时是否存在；如果存在，会保存原始 bytes 内容；如果不存在，会记录不存在状态。恢复时，它能把被修改的文件写回原始内容，能把被删除的文件重新创建出来，也能删除 checkpoint 之后新建的被跟踪文件。它不能恢复网络/API、包安装或后台进程副作用，因为这些副作用不一定表现为 workspace 内某个已跟踪文件的 bytes 内容变化。网络请求可能已经影响远端系统，包安装可能改动全局环境或依赖缓存，后台进程可能持续运行或产生外部状态，这些都不在 `FileCheckpoint` 的数据模型中。把它宣传成完整事务系统会误导用户，以为所有副作用都可撤销；正确表述应该是：它只保证显式跟踪的本地 workspace 文件状态可以恢复。
+- 标准回答：正确。`FileCheckpoint` 的恢复范围是“显式文件列表 + workspace 内 + 文件 bytes 状态”。它可以覆盖三类本地文件语义：快照后内容被修改时写回旧内容，快照后文件被删除时重建文件，快照时不存在但后来被创建时删除这个被跟踪路径。它不记录远端 API 调用、数据库写入、pip/npm 安装、系统环境变化、后台进程、workspace 外文件或 Docker 外部副作用。因此它不是通用 rollback、不是事务系统、也不是 sandbox。工业级表达必须把能力和边界同时说清楚：本地文件状态可恢复，外部副作用只能通过 sandbox、审计、补偿操作或人工处理。
+
+### 面试题 2：从 `examples/05_checkpoint_rollback.py` 追到 `Workspace.resolve_path(...)` 和 `FileCheckpoint.restore()`，请说明路径边界和文件恢复分别在哪一层完成。
+
+- 用户回答：在 `examples/05_checkpoint_rollback.py` 中，示例先创建临时 workspace 和 `demo.txt`，然后构造 `Workspace(workspace_path)`，再调用 `FileCheckpoint.create(workspace, [file_name])`。路径边界不由示例自己判断，也不由 checkpoint 重新写一套规则，而是在 `FileCheckpoint.create(...)` 内部对每个 path 调用 `workspace.resolve_path(...)` 完成。`Workspace.resolve_path(...)` 会把相对路径基于 root 解析成绝对路径，并确认解析后的路径仍等于 root 或者位于 root 的 parents 链内，否则抛出越界错误。文件恢复发生在 `FileCheckpoint.restore()`：它遍历保存的 snapshot，如果快照时文件存在，就通过 `_restore_existing_file(...)` 写回原始 bytes；如果快照时文件不存在，就通过 `_restore_missing_file(...)` 删除后来创建的被跟踪文件。也就是说，`Workspace` 负责“这个路径是否属于授权工作区”，`FileCheckpoint` 负责“这个文件状态如何保存和恢复”。
+- 标准回答：正确。示例层只负责构造一个可运行场景，不直接承担安全边界。路径边界由 `Workspace.resolve_path(...)` 完成：它校验输入类型和空路径，把相对路径拼到 workspace root 下并 `.resolve()`，再用 `path == root or root in path.parents` 判断解析后路径是否仍在工作区内。`FileCheckpoint.create(...)` 必须复用这个路径边界，避免 checkpoint 和工具各自维护规则导致漂移。恢复层由 `FileCheckpoint.restore()` 完成，它根据 `_FileSnapshot.existed` 分成“写回原 bytes”与“删除快照时不存在的文件”两条路径。这个分层很重要：Workspace 是路径归属事实源，FileCheckpoint 是文件状态恢复机制。
+
+### 面试题 3：如果未来要把 rollback 扩展到多文件 patch、GitCheckpoint 和 shell/Docker runtime，你会如何设计执行顺序、失败报告、审计记录和测试矩阵？
+
+- 用户回答：我会先保持分层，不做一个“万能 rollback”。执行顺序上，先解析 workspace 和风险分类，再由 `PermissionPolicy` 判断；只有 `ALLOW` 或未来审批通过后，才创建合适的 checkpoint，然后执行真实副作用。多文件 patch 如果有明确文件列表，可以创建一个覆盖所有目标文件的 `FileCheckpoint`；如果是 git repo 级代码修改，可以创建 `GitCheckpoint` 保存 tracked dirty diff；shell/Docker runtime 只有在能声明或隔离副作用范围时才承诺 rollback。失败报告要结构化，至少包含原始执行错误、rollback 是否尝试、哪些文件或阶段恢复成功、哪些失败、是否存在半恢复状态，以及用户下一步应该怎么处理。审计记录应包含 trace id、工具名、风险等级、策略动作、checkpoint 类型、是否执行、rollback 尝试和结果，但不能记录完整文件内容、secret 或完整 stdout/stderr。测试矩阵要覆盖：多文件全部恢复、部分写入失败、restore 自身失败、`ASK/DENY` 不创建 checkpoint、GitCheckpoint tracked diff 恢复、untracked/staged 不被误承诺、Docker 不可用 fallback 不调用宿主机 shell、shell 未知副作用不承诺恢复，以及 audit 字段完整且脱敏。
+- 标准回答：正确。统一 rollback 应该是分层编排，而不是单个全能函数。推荐顺序是：workspace 边界校验 -> permission 分类和策略 -> 审批通过或 `ALLOW` -> 创建对应 checkpoint -> 执行 runtime/tool -> 失败时恢复 -> 写入结构化 audit。多文件 patch 可用 `FileCheckpoint` 或未来 patch plan；仓库级 tracked 修改可用 `GitCheckpoint`；shell/Docker 需要先解决副作用范围、sandbox 隔离和 audit 事实记录，不能默认承诺恢复所有外部状态。失败报告不能只返回“rollback failed”，而要说明阶段、原始错误、恢复错误、路径摘要、半恢复风险和人工处理建议。测试要从行为出发，证明文件真的恢复、未授权路径不创建 checkpoint、恢复失败可观察、Docker fallback 不静默降级、Git untracked/staged 边界不被误说成已支持、审计不泄漏敏感信息。
+
+## 第 36 天：2026-07-04
+
+### 面试题 1：`FileCheckpoint` 能恢复什么状态？为什么不能把它宣传成能恢复网络/API、包安装或后台进程副作用？
+
+- 用户回答：`FileCheckpoint` 能恢复的是显式传入路径在 workspace 内的本地文件状态。它会记录文件在 checkpoint 创建时是否存在；如果存在，会保存原始 bytes 内容；如果不存在，会记录不存在状态。恢复时，它能把被修改的文件写回原始内容，能把被删除的文件重新创建出来，也能删除 checkpoint 之后新建的被跟踪文件。它不能恢复网络/API、包安装或后台进程副作用，因为这些副作用不一定表现为 workspace 内某个已跟踪文件的 bytes 内容变化。网络请求可能已经影响远端系统，包安装可能改动全局环境或依赖缓存，后台进程可能持续运行或产生外部状态，这些都不在 `FileCheckpoint` 的数据模型中。把它宣传成完整事务系统会误导用户，以为所有副作用都可撤销；正确表述应该是：它只保证显式跟踪的本地 workspace 文件状态可以恢复。
+- 标准回答：正确。`FileCheckpoint` 的恢复范围是“显式文件列表 + workspace 内 + 文件 bytes 状态”。它可以覆盖三类本地文件语义：快照后内容被修改时写回旧内容，快照后文件被删除时重建文件，快照时不存在但后来被创建时删除这个被跟踪路径。它不记录远端 API 调用、数据库写入、pip/npm 安装、系统环境变化、后台进程、workspace 外文件或 Docker 外部副作用。因此它不是通用 rollback、不是事务系统、也不是 sandbox。工业级表达必须把能力和边界同时说清楚：本地文件状态可恢复，外部副作用只能通过 sandbox、审计、补偿操作或人工处理。
+
+### 面试题 2：从 `examples/05_checkpoint_rollback.py` 追到 `Workspace.resolve_path(...)` 和 `FileCheckpoint.restore()`，请说明路径边界和文件恢复分别在哪一层完成。
+
+- 用户回答：在 `examples/05_checkpoint_rollback.py` 中，示例先创建临时 workspace 和 `demo.txt`，然后构造 `Workspace(workspace_path)`，再调用 `FileCheckpoint.create(workspace, [file_name])`。路径边界不由示例自己判断，也不由 checkpoint 重新写一套规则，而是在 `FileCheckpoint.create(...)` 内部对每个 path 调用 `workspace.resolve_path(...)` 完成。`Workspace.resolve_path(...)` 会把相对路径基于 root 解析成绝对路径，并确认解析后的路径仍等于 root 或者位于 root 的 parents 链内，否则抛出越界错误。文件恢复发生在 `FileCheckpoint.restore()`：它遍历保存的 snapshot，如果快照时文件存在，就通过 `_restore_existing_file(...)` 写回原始 bytes；如果快照时文件不存在，就通过 `_restore_missing_file(...)` 删除后来创建的被跟踪文件。也就是说，`Workspace` 负责“这个路径是否属于授权工作区”，`FileCheckpoint` 负责“这个文件状态如何保存和恢复”。
+- 标准回答：正确。示例层只负责构造一个可运行场景，不直接承担安全边界。路径边界由 `Workspace.resolve_path(...)` 完成：它校验输入类型和空路径，把相对路径拼到 workspace root 下并 `.resolve()`，再用 `path == root or root in path.parents` 判断解析后路径是否仍在工作区内。`FileCheckpoint.create(...)` 必须复用这个路径边界，避免 checkpoint 和工具各自维护规则导致漂移。恢复层由 `FileCheckpoint.restore()` 完成，它根据 `_FileSnapshot.existed` 分成“写回原 bytes”与“删除快照时不存在的文件”两条路径。这个分层很重要：Workspace 是路径归属事实源，FileCheckpoint 是文件状态恢复机制。
+
+### 面试题 3：如果未来要把 rollback 扩展到多文件 patch、GitCheckpoint 和 shell/Docker runtime，你会如何设计执行顺序、失败报告、审计记录和测试矩阵？
+
+- 用户回答：我会先保持分层，不做一个“万能 rollback”。执行顺序上，先解析 workspace 和风险分类，再由 `PermissionPolicy` 判断；只有 `ALLOW` 或未来审批通过后，才创建合适的 checkpoint，然后执行真实副作用。多文件 patch 如果有明确文件列表，可以创建一个覆盖所有目标文件的 `FileCheckpoint`；如果是 git repo 级代码修改，可以创建 `GitCheckpoint` 保存 tracked dirty diff；shell/Docker runtime 只有在能声明或隔离副作用范围时才承诺 rollback。失败报告要结构化，至少包含原始执行错误、rollback 是否尝试、哪些文件或阶段恢复成功、哪些失败、是否存在半恢复状态，以及用户下一步应该怎么处理。审计记录应包含 trace id、工具名、风险等级、策略动作、checkpoint 类型、是否执行、rollback 尝试和结果，但不能记录完整文件内容、secret 或完整 stdout/stderr。测试矩阵要覆盖：多文件全部恢复、部分写入失败、restore 自身失败、`ASK/DENY` 不创建 checkpoint、GitCheckpoint tracked diff 恢复、untracked/staged 不被误承诺、Docker 不可用 fallback 不调用宿主机 shell、shell 未知副作用不承诺恢复，以及 audit 字段完整且脱敏。
+- 标准回答：正确。统一 rollback 应该是分层编排，而不是单个全能函数。推荐顺序是：workspace 边界校验 -> permission 分类和策略 -> 审批通过或 `ALLOW` -> 创建对应 checkpoint -> 执行 runtime/tool -> 失败时恢复 -> 写入结构化 audit。多文件 patch 可用 `FileCheckpoint` 或未来 patch plan；仓库级 tracked 修改可用 `GitCheckpoint`；shell/Docker 需要先解决副作用范围、sandbox 隔离和 audit 事实记录，不能默认承诺恢复所有外部状态。失败报告不能只返回“rollback failed”，而要说明阶段、原始错误、恢复错误、路径摘要、半恢复风险和人工处理建议。测试要从行为出发，证明文件真的恢复、未授权路径不创建 checkpoint、恢复失败可观察、Docker fallback 不静默降级、Git untracked/staged 边界不被误说成已支持、审计不泄漏敏感信息。

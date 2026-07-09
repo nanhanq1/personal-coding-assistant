@@ -1,5 +1,217 @@
 # Architecture Decisions
 
+## ADR-0024：Week 5 Day 6 只在文件工具允许执行失败路径接入 FileCheckpoint rollback
+
+日期：2026-07-02
+
+### 背景
+
+Week 4 已经在 shell/file 工具执行前接入 permission gate，Week 5 Day 1-Day 3 已经提供 `Workspace(root)`、`FileCheckpoint` 和 `GitCheckpoint`。但在 Day 6 之前，文件工具即使通过 permission 进入写盘路径，写盘阶段如果发生异常，也可能把半成品内容留在 workspace 内。
+
+如果在 `DENY` 或未审批 `ASK` 阶段就创建 checkpoint，会把“尚未允许执行”的阻断路径误当成副作用路径；如果直接实现完整事务系统，又会牵涉 shell、Docker、Git、外部网络/API 和后台进程，超过 Day 6 切片。
+
+### 决策
+
+- 在 `src/pca/tools/file_tools.py` 中为 `WriteFileTool` 和 `EditFileTool` 增加最小 rollback 集成。
+- 文件工具仍先解析 workspace 路径，再执行文件风险分类和 `PermissionPolicy.decide(...)`。
+- `DecisionAction.ALLOW` 后才创建 `FileCheckpoint`，随后执行真实写盘。
+- 写盘过程中抛异常时调用 `checkpoint.restore()` 恢复本地文件状态，然后继续抛出原始异常。
+- `DecisionAction.ASK` 和 `DecisionAction.DENY` 在写盘前失败，不创建 checkpoint。
+- rollback 失败时返回清晰 `RuntimeError`，同时包含原始写盘失败和 rollback 失败摘要。
+- 示例能力边界新增 `file_tool_rollback_on_allowed_failure=True`，但保留 `rollback_auto_wired=False`，避免误解成 shell/Docker/Git 全链路 rollback。
+
+### 理由
+
+- permission gate 决定“是否允许进入副作用路径”，checkpoint 只服务“已经允许后的失败恢复”，两者职责不能倒置。
+- `FileCheckpoint` 已经按显式文件路径保存 bytes 状态，适合文件工具的单文件写盘失败恢复。
+- 继续让 `ToolRegistry` 只负责路由、结构化结果、统计和输出截断，不让它理解具体文件事务。
+- 保持 `GitCheckpoint` 独立，避免 Day 6 把 tracked diff、untracked 文件、staged state 和文件工具单文件 rollback 混成一个抽象。
+
+### 暂不采用
+
+- 暂不把 rollback 接入 shell 命令、DockerRuntime、GitCheckpoint 或完整 AgentLoop 主链。
+- 暂不实现多文件事务、后台进程清理、包安装撤销、网络/API 回滚或 workspace 外副作用恢复。
+- 暂不实现交互式审批通过后的恢复执行。
+- 暂不把 audit JSONL 自动接入 rollback 成功/失败事件。
+- 暂不新增用户可见 undo UI 或长期 rollback 历史。
+
+## ADR-0023：Week 5 Day 5 DockerRuntime 不可用时必须 graceful fallback
+
+日期：2026-07-02
+
+### 背景
+
+Week 5 Day 4 已经定义了薄 `CommandRuntime` Protocol，并让 `ShellCommandTool` 依赖接口注入执行器。Day 5 需要把 `src/pca/runtime/docker_runtime.py` 从占位升级为最小 Docker adapter，但当前项目不能假设每台开发机都安装 Docker，也不能假设 Docker daemon 正在运行。
+
+如果 Docker 不可用时静默回退到 `ShellRuntime`，用户会误以为命令在 sandbox 中执行，实际副作用却发生在宿主机。这个风险比直接失败更高，因为它破坏了安全边界的可解释性。
+
+### 决策
+
+- 新增 `DockerRuntime`，实现 `run(arguments)`，满足 `CommandRuntime` 结构化接口。
+- `DockerRuntime` 复用当前命令 runtime 的输入语义：`command`、`workspace_root`、`cwd`、`timeout_seconds` 和 `env`。
+- 执行前先检查 Docker CLI：`shutil.which("docker")`。
+- Docker CLI 存在后再检查 daemon：`docker version --format "{{.Server.Version}}"`。
+- Docker CLI 缺失时返回稳定结果：`returncode=127`、`timed_out=False`、`sandboxed=False`、`fallback="docker_unavailable"`。
+- Docker daemon 不可用或检查超时时返回稳定结果：`returncode=125`、`timed_out=False`、`sandboxed=False`、`fallback="docker_unavailable"`。
+- Docker 确认可用后才构造 `docker run --rm -v <workspace>:/workspace -w <cwd> <image> ...`。
+- Docker 不可用时绝不回退到宿主机 shell 执行。
+- `examples/04_permission_agent.py` 只声明 `docker_runtime_adapter=True`，仍保持 `sandbox=False`，避免把 adapter API 误写成完整 sandbox 能力。
+
+### 理由
+
+- `DockerRuntime` 是 `CommandRuntime` 的一个可替换实现，不应该改变工具层、权限层、checkpoint 层或 audit 层职责。
+- graceful fallback 的核心是“清楚失败并保留结构化证据”，不是静默降级。
+- `sandboxed=False` 和 `fallback="docker_unavailable"` 让调用方可以明确区分“没有执行隔离命令”和“容器内执行失败”。
+- CLI 缺失和 daemon 不可用使用不同 returncode，便于后续诊断和测试。
+- Day 5 先锁住不可用语义，可以让没有 Docker 的机器继续运行全量测试。
+
+### 暂不采用
+
+- 暂不实现完整 Docker sandbox 策略、镜像拉取策略、网络隔离、CPU/内存限制、进程树清理或容器复用。
+- 暂不把 `DockerRuntime` 自动接入 `ShellCommandTool` 默认主链。
+- 暂不把 Docker adapter 和 permission gate、checkpoint/rollback 或 audit 自动串联。
+- 暂不承诺 Docker 能恢复网络请求、数据库写入、宿主机挂载目录之外的副作用或外部服务状态。
+
+## ADR-0022：Week 5 Day 4 先定义薄 `CommandRuntime` Protocol
+
+日期：2026-07-02
+
+### 背景
+
+Week 5 Day 1-Day 3 已经分别实现 `Workspace(root)`、`FileCheckpoint` 和 `GitCheckpoint`，但命令执行仍然由 `ShellCommandTool` 默认转发到具体 `ShellRuntime`。进入 sandbox adapter 前，系统需要先明确“命令执行器”应该暴露什么最小接口，否则 Docker runtime、fake runtime 和本地 shell runtime 会各自长出不同调用形状。
+
+如果直接在 Day 4 实现 Docker，会把接口设计、Docker 可用性检测、容器参数、挂载目录、权限策略和 fallback 语义混在一起；如果继续让调用方类型写死为 `ShellRuntime`，后续替换 sandbox runtime 时会牵动工具层和测试。
+
+### 决策
+
+- 新增 `src/pca/runtime/interface.py`。
+- 定义 `@runtime_checkable` 的 `CommandRuntime` Protocol。
+- `CommandRuntime.run(arguments)` 接收 `dict[str, Any]` 并返回 `dict[str, Any]`。
+- 返回语义继续沿用当前命令结果字段：`stdout`、`stderr`、`returncode`、`timed_out`，允许保留 `duration_ms` 等额外结构化字段。
+- `ShellCommandTool` 的 runtime 注入类型从具体 `ShellRuntime | None` 改为 `CommandRuntime | None`。
+- `ShellCommandTool` 默认仍使用 `ShellRuntime()`，因此现有本地命令行为不变。
+- 新增 `tests/test_runtime_interface.py`，用 fake runtime 证明调用方只依赖 `run(arguments)`，不是依赖具体 `ShellRuntime`。
+- 更新 `examples/04_permission_agent.py` 能力边界：`command_runtime_interface=True`，但 `sandbox=False`、`checkpoint_auto_wired=False`、`rollback_auto_wired=False`。
+
+### 理由
+
+- `CommandRuntime` 是执行器抽象，不是权限系统、checkpoint 系统或 audit 系统。
+- Protocol 比继承基类更适合当前阶段：fake runtime、ShellRuntime 和未来 DockerRuntime 只要结构兼容即可被注入。
+- 先固定薄接口，可以让 Day 5 Docker adapter 只回答“如何执行或如何清晰失败”，不把工具层、权限层和 sandbox 层搅在一起。
+- fake runtime 测试能锁住替换点：`ShellCommandTool` 应调用 `runtime.run(arguments)`，而不是假设 runtime 必须是 `ShellRuntime`。
+- 保持输入输出语义不变，可以避免破坏现有 `run_command`、permission gate、`ToolRegistry` 截断和示例。
+
+### 暂不采用
+
+- 暂不实现 Docker sandbox；Day 5 单独处理 adapter 和 Docker 不可用 fallback。
+- 暂不迁移文件工具或 shell runtime 的 workspace 解析到 `Workspace(root)`。
+- 暂不把 checkpoint/rollback 自动接入 runtime interface。
+- 暂不把 permission gate 放进 `CommandRuntime`；权限仍在工具执行前边界处理。
+- 暂不把 audit 写入、trace 透传、资源限制策略或进程树清理塞进接口本身。
+
+## ADR-0021：Week 5 Day 3 用 git diff 实现独立 GitCheckpoint
+
+日期：2026-07-01
+
+### 背景
+
+Week 5 Day 2 的 `FileCheckpoint` 已经能按显式文件列表保存和恢复 bytes 状态，但它不适合直接表达一个代码仓库的 dirty tree。Coding Agent 修改代码时，更常见的问题是“当前 git repo 中 tracked 文件相对 index 发生了哪些改动，以及能否回到某个 dirty 状态”。
+
+如果用 `FileCheckpoint` 扫描整个仓库，会引入递归范围、性能、忽略规则和误删风险；如果提前接入完整 git workflow，又会牵涉 commit、stash、branch、merge conflict 和远程同步，超出 Day 3 切片。
+
+### 决策
+
+- 在 `src/pca/runtime/checkpoints.py` 中定义 `GitCheckpoint`。
+- `GitCheckpoint.create(workspace)` 只接受 `Workspace`。
+- 创建时先用 `git rev-parse --is-inside-work-tree` 确认 workspace 位于 git worktree 内。
+- 创建时保存 `git diff --binary -- .` 的输出，表示 tracked working tree 相对 index 的 dirty diff。
+- `checkpoint.restore()` 先运行 `git restore --worktree -- .`，把 tracked working tree 恢复到 index，再用 `git apply --whitespace=nowarn -` 应用保存的 diff，恢复到 checkpoint 创建时的 dirty 状态。
+- 非 git workspace 抛出清晰 `ValueError`；git 命令不可用抛出清晰 `RuntimeError`；git 命令执行失败保留 stderr/stdout 摘要。
+- 更新 `examples/04_permission_agent.py` 的能力边界：`git_checkpoint_api=True`，但 `checkpoint_auto_wired=False`、`rollback_auto_wired=False`。
+
+### 理由
+
+- git diff 是代码仓库 tracked 文件状态的天然表达，比手动递归复制更接近 Coding Agent 的真实工作流。
+- `Workspace` 继续作为 root 边界输入，`GitCheckpoint` 不重新定义路径归属。
+- 只处理 `tracked working tree vs index`，能把 Day 3 范围控制在 dirty diff 保存和恢复，不混入 commit/stash/branch 语义。
+- restore 采用“恢复到 index，再应用 checkpoint diff”的方式，能把后续修改回滚到 checkpoint 创建时的 dirty 状态，而不是简单撤销所有改动。
+
+### 暂不采用
+
+- 暂不处理 untracked 文件；普通 `git diff` 不包含它们。
+- 暂不保存 staged diff、commit、branch、stash 或远程状态。
+- 暂不接入 `WriteFileTool`、`EditFileTool`、`ShellCommandTool` 或 permission gate 自动 rollback。
+- 暂不实现事务性 restore；如果 git restore 成功但 git apply 失败，调用方会收到错误，后续需要显式半恢复报告和 audit。
+- 暂不把 `GitCheckpoint` 视为 sandbox；它不能恢复网络请求、数据库写入、后台进程、包安装或 workspace 外副作用。
+
+## ADR-0020：Week 5 Day 2 先实现独立 FileCheckpoint 文件快照 API
+
+日期：2026-07-01
+
+### 背景
+
+Week 5 Day 1 已经引入 `Workspace(root)`，让 runtime 层有了统一的路径边界事实源。Day 2 需要在不扩大执行主链风险的前提下，先证明本地 workspace 文件状态可以被保存和恢复。
+
+当前文件工具和 shell runtime 仍各自维护既有路径解析与 permission gate。直接把 rollback 接进这些主链会同时牵涉审批恢复、audit、失败语义和多文件事务，容易超过 Day 2 的教学切片。
+
+### 决策
+
+- 在 `src/pca/runtime/checkpoints.py` 中定义 `FileCheckpoint`。
+- `FileCheckpoint.create(workspace, paths)` 只接受 `Workspace` 和显式路径列表。
+- 每个路径先通过 `workspace.resolve_path(...)`，越界路径直接拒绝。
+- 快照记录文件是否存在；存在时保存原始 `bytes` 内容。
+- `checkpoint.restore()` 恢复快照时存在的文件内容，重建快照后被删除的文件，并删除快照时不存在但后来创建的被跟踪文件。
+- 当前只支持文件粒度；如果目标是目录，则拒绝，避免误把递归目录删除纳入最小文件 checkpoint 语义。
+- 更新 `examples/04_permission_agent.py` 的能力边界：`file_checkpoint_api=True`，但 `checkpoint_auto_wired=False`、`rollback_auto_wired=False`。
+
+### 理由
+
+- checkpoint 是“执行前状态证据”，必须复用 `Workspace` 的路径边界，不能在 checkpoint 内重复实现一套可能漂移的路径规则。
+- 使用 `bytes` 保存内容可以避免当前层提前假设文本编码，适合作为最小文件状态恢复。
+- 只跟踪显式传入路径，能避免 Day 2 扫描整个 workspace 或递归复制目录带来的性能和误删风险。
+- 暂不自动接入 permission gate，可以保持 Week 4 shell/file gate 行为稳定，并为后续 Day 6 rollback 集成预留清晰接入点。
+
+### 暂不采用
+
+- 暂不实现 Git diff/stash 形式的 checkpoint；Day 3 单独处理。
+- 暂不递归快照目录、权限位、mtime、符号链接元数据或文件锁状态。
+- 暂不自动接入 `WriteFileTool`、`EditFileTool`、`ShellCommandTool` 或 `ShellRuntime`。
+- 暂不实现失败时的事务性 restore、审计事件或用户可见 undo UI。
+- 暂不宣称能恢复网络请求、数据库写入、后台进程、包安装或 workspace 外副作用。
+
+## ADR-0019：Week 5 Day 1 先引入独立 Workspace(root) 抽象，不立即迁移主链
+
+日期：2026-07-01
+
+### 背景
+
+Week 2 的文件工具和 shell runtime 已经各自实现了 `workspace_root`、相对路径解析、绝对路径越界拒绝和 `cwd` 边界。Week 4 又在这些工具执行前接入了 shell/file permission gate。
+
+进入 Week 5 后，checkpoint、rollback 和 sandbox 都需要共享同一个“授权工作区根目录”概念。如果继续让文件工具、shell runtime、checkpoint 各自维护路径规则，后续很容易出现边界漂移：某个模块认为路径在工作区内，另一个模块却允许或拒绝不同的路径。
+
+### 决策
+
+- 在 `src/pca/runtime/workspace.py` 中定义 `Workspace(root)`。
+- `Workspace(root)` 在构造时要求 `root` 是已存在目录，并保存解析后的绝对 `Path`。
+- `Workspace.resolve_path(path)` 支持相对路径和绝对路径；相对路径基于 `root` 解析，绝对路径必须仍位于 `root` 内。
+- `Workspace.resolve_path(path)` 拒绝空路径、非字符串/PathLike 路径、绝对路径越界和 `..` 解析后越界。
+- `Workspace.contains(path)` 返回布尔值，用于后续 checkpoint/sandbox 判断路径归属；越界或非法路径返回 `False`。
+- 本次只新增独立抽象和 `tests/test_workspace.py`，不立即替换 `file_tools.py` 或 `shell_runtime.py` 的既有主链。
+
+### 理由
+
+- Workspace 是“路径边界事实源”，permission 是“是否允许本次操作”的策略层；两者职责不同，不能混在一起。
+- 先独立实现并测试 `Workspace(root)`，可以为 Day 2 checkpoint、Day 3 git checkpoint 和 Day 4 runtime interface 复用同一个边界对象。
+- 不立即迁移主链可以避免破坏 Week 4 已经通过的 shell/file permission gate，也让 Day 1 的行为变化保持最小。
+- `contains(...)` 不抛越界异常，更适合后续做预检、过滤和报告；`resolve_path(...)` 则适合需要拿到真实路径并执行文件操作的边界。
+
+### 暂不采用
+
+- 暂不实现 checkpoint、rollback 或 Docker sandbox。
+- 暂不把 `Workspace` 接入 `ReadFileTool`、`WriteFileTool`、`EditFileTool` 或 `ShellRuntime`。
+- 暂不支持多个 workspace、workspace trust level、只读 workspace 或路径级权限。
+- 暂不把 symlink 策略扩展成独立配置；当前使用 `Path.resolve()` 后再做 root 归属判断。
+
 ## ADR-0018：Week 4 Day 6 先实现独立权限审计事件和 JSONL 写入
 
 日期：2026-06-22

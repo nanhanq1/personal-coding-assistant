@@ -10,6 +10,13 @@
 - 第 2 周 Day 1 到 Day 7
 - 第 3 周已完成的 Agent Core + Tool Runtime 加固切片
 - 第 4 周 Day 1-Day 6 已完成的 Permission System 风险分类、策略判断、审批对象、shell gate、文件风险 gate 和最小审计事件切片
+- 第 5 周 Day 1 已完成的 `Workspace(root)` 独立路径边界抽象
+- 第 5 周 Day 2 已完成的 `FileCheckpoint` 独立文件快照 API
+- 第 5 周 Day 3 已完成的 `GitCheckpoint` 独立 git diff 快照 API
+- 第 5 周 Day 4 已完成的 `CommandRuntime` 薄命令执行接口
+- 第 5 周 Day 5 已完成的 `DockerRuntime` graceful fallback adapter
+- 第 5 周 Day 6 已完成的文件工具允许执行失败路径 rollback 集成
+- 第 5 周 Day 7 已完成的 rollback 验收示例
 - 与上述主线直接相关的文档复核、规则治理和工业级边界补强
 
 不纳入“已实现主链架构图”的目录：
@@ -20,7 +27,7 @@
 - `src/pca/observability`
 
 这些目录虽然已经存在，但当前仍是占位或计划模块，本文只在后文“占位模块说明”中单列，不把它们画成当前已落地能力。
-`src/pca/permissions` 已有 Day 1-Day 6 的风险分类、策略判断、审批对象、文件风险分类和审计事件；Day 4-Day 5 已把风险分类和策略判断分别接入 `ShellCommandTool` 和文件工具写盘前 gate，但审批交互、审批恢复、audit 自动接入主链、checkpoint 和 rollback 仍未完成。
+`src/pca/permissions` 已有 Day 1-Day 6 的风险分类、策略判断、审批对象、文件风险分类和审计事件；Day 4-Day 5 已把风险分类和策略判断分别接入 `ShellCommandTool` 和文件工具写盘前 gate。`src/pca/runtime/workspace.py` 已实现独立 `Workspace(root)` 边界对象，`src/pca/runtime/checkpoints.py` 已实现独立 `FileCheckpoint` 文件快照 API 和独立 `GitCheckpoint` git diff 快照 API，`src/pca/runtime/interface.py` 已实现薄 `CommandRuntime` Protocol，`src/pca/runtime/docker_runtime.py` 已实现最小 `DockerRuntime` graceful fallback adapter；Week 5 Day 6 已把 `FileCheckpoint` 接入文件工具允许执行后的写盘失败恢复路径；Week 5 Day 7 已用 `examples/05_checkpoint_rollback.py` 验收本地文件 rollback 边界。但审批交互、审批恢复、audit 自动接入主链、shell/Docker/Git rollback 自动接入主链和完整 Docker sandbox 仍未完成。
 
 ### 2. 证据来源
 
@@ -30,7 +37,7 @@
 - `docs/07_IMPLEMENTATION_LOG.md`
 - `docs/06_ARCHITECTURE_DECISIONS.md`
 - `README.md`
-- 已实现源码：`src/pca/core`、`src/pca/tools`、`src/pca/runtime`、`src/pca/permissions/risk.py`、`src/pca/permissions/policy.py`、`src/pca/permissions/approval.py`、`src/pca/permissions/file_risk.py`、`src/pca/permissions/audit.py`
+- 已实现源码：`src/pca/core`、`src/pca/tools`、`src/pca/runtime/shell_runtime.py`、`src/pca/runtime/interface.py`、`src/pca/runtime/docker_runtime.py`、`src/pca/runtime/workspace.py`、`src/pca/runtime/checkpoints.py`、`src/pca/permissions/risk.py`、`src/pca/permissions/policy.py`、`src/pca/permissions/approval.py`、`src/pca/permissions/file_risk.py`、`src/pca/permissions/audit.py`
 
 ### 3. 阅读方式
 
@@ -69,6 +76,13 @@
 | 2026-06-22 | Week 4 Day 4 shell gate | 在 `ShellCommandTool` 执行前接入风险分类和策略判断 | `src/pca/tools/shell_tools.py` `tests/test_permissions_shell_gate.py` | `ASK` 当前失败返回，不支持交互式批准后继续执行；没有 audit、文件风险和 sandbox | `DENY` 不进入 runtime，`ASK` 不静默执行，`ALLOW` 保持原 runtime 路径 | 执行前控制 / shell 安全边界 | 审批恢复、audit JSONL、文件风险分类、sandbox/docker runtime、真实安全验证 |
 | 2026-06-22 | Week 4 Day 5 文件风险分类 | 新增 `classify_file_change(...)`，并在文件工具写盘前接入 permission gate | `src/pca/permissions/file_risk.py` `src/pca/tools/file_tools.py` `tests/test_permissions_file_risk.py` | 覆盖写入和删除式编辑当前返回待审批失败，不支持审批通过后恢复执行；没有 audit 自动记录、diff UI、checkpoint 或 rollback | 新文件写入和小范围替换可放行；覆盖已有文件和 delete-like 编辑会在写盘前阻断并保持文件不变 | 文件变更安全 / 执行前控制 | 审批恢复、audit 自动接入、diff 预览、checkpoint/rollback |
 | 2026-06-22 | Week 4 Day 6 审计事件 | 新增 `PermissionAuditEvent` 和 `append_audit_event(...)` | `src/pca/permissions/audit.py` `tests/test_permissions_audit.py` | 只提供独立审计事件和 JSONL 追加写入，尚未自动接入 shell/file gate，也不记录 trace 或审批恢复 | 审计事件有稳定字段和 JSON 序列化；JSONL 一行一个事件，避免记录完整输出、文件内容和 secret | 审计证据 / 可回放基础 | audit 自动接入各 gate、trace 关联、audit 完整性矩阵、真实安全验证 |
+| 2026-07-01 | Week 5 Day 1 Workspace 抽象 | 新增 `Workspace(root)`、`resolve_path(...)` 和 `contains(...)` | `src/pca/runtime/workspace.py` `tests/test_workspace.py` | 只是独立路径边界对象，尚未迁移文件工具和 shell runtime 主链，也没有 checkpoint/rollback | root 必须是已存在目录；相对/绝对路径解析后必须位于 workspace 内；越界路径稳定拒绝 | workspace 生命周期 / 路径边界统一 | FileCheckpoint、GitCheckpoint、rollback、sandbox adapter、主链迁移 |
+| 2026-07-01 | Week 5 Day 2 FileCheckpoint 文件快照 | 新增 `FileCheckpoint.create(...)` 和 `restore()` | `src/pca/runtime/checkpoints.py` `tests/test_checkpoints.py` | 只是独立文件快照 API，尚未自动接入 permission gate、文件工具或 shell runtime，也没有事务性 restore | 显式路径先过 `Workspace.resolve_path(...)`；能恢复修改/删除文件，清理快照后新建的被跟踪文件，越界路径拒绝 | workspace 生命周期 / 文件状态恢复 | 自动 rollback 集成、restore 失败语义、audit 记录、sandbox adapter |
+| 2026-07-01 | Week 5 Day 3 GitCheckpoint diff 快照 | 新增 `GitCheckpoint.create(...)` 和 `restore()` | `src/pca/runtime/checkpoints.py` `tests/test_git_checkpoints.py` | 只是独立 git diff API，尚未自动接入 permission gate、文件工具或 shell runtime；不处理 untracked 文件、staged diff、stash、commit 或 sandbox 外副作用 | 创建时保存 `git diff --binary -- .`；restore 先恢复 tracked working tree 到 index，再应用保存的 diff；非 git workspace 和 git 不可用有清晰错误 | workspace 生命周期 / git dirty state 恢复 | 自动 rollback 集成、半恢复报告、untracked 策略、staged diff 策略、audit 记录、sandbox adapter |
+| 2026-07-02 | Week 5 Day 4 CommandRuntime interface | 新增薄 `CommandRuntime` Protocol，并让 `ShellCommandTool` 依赖接口注入执行器 | `src/pca/runtime/interface.py` `src/pca/tools/shell_tools.py` `tests/test_runtime_interface.py` | 只是命令执行器接口，不是 Docker sandbox；尚未实现 Docker adapter、自动 rollback、audit 自动接入或主链迁移 | fake runtime 和 `ShellRuntime` 都满足 `run(arguments)`；`ShellCommandTool` 只依赖 `CommandRuntime` | runtime 可替换性 / sandbox 前置边界 | Docker adapter graceful fallback、sandbox 资源限制、rollback 集成、audit/trace 接入 |
+| 2026-07-02 | Week 5 Day 5 DockerRuntime graceful fallback | 新增最小 `DockerRuntime` adapter | `src/pca/runtime/docker_runtime.py` `tests/test_docker_runtime.py` | 只是 Docker adapter API，不是完整 sandbox；尚未接入默认主链、permission gate、checkpoint/rollback 或 audit 自动链路 | Docker CLI 缺失和 daemon 不可用时返回稳定 fallback；不可用时不回退宿主机 shell；示例标记 `docker_runtime_adapter=True` 但 `sandbox=False` | runtime 可替换性 / sandbox 不可用语义 | 完整 Docker sandbox 策略、资源限制、网络策略、rollback 集成、audit/trace 接入 |
+| 2026-07-02 | Week 5 Day 6 文件工具 rollback 集成 | 在 `WriteFileTool` / `EditFileTool` 的允许执行失败路径接入 `FileCheckpoint` | `src/pca/tools/file_tools.py` `tests/test_rollback_integration.py` | 只覆盖文件工具单文件写盘失败恢复；不覆盖 shell、Docker、Git、网络/API、包安装、后台进程或 workspace 外副作用 | `ALLOW` 后写盘失败会恢复本地文件状态；`ASK` / `DENY` 不创建 checkpoint；示例标记 `file_tool_rollback_on_allowed_failure=True` | workspace 生命周期 / 本地文件失败恢复 | 多文件 patch 事务、GitCheckpoint 主链接入、rollback audit、shell/Docker sandbox rollback |
+| 2026-07-04 | Week 5 Day 7 rollback 验收示例 | 新增 `examples/05_checkpoint_rollback.py` 和示例测试，证明本地文件状态可恢复且边界可见 | `examples/05_checkpoint_rollback.py` `tests/test_examples.py` | 示例只证明本地 workspace 文件状态恢复，不新增完整事务系统 | JSON 输出 `restored=true`，并明确网络/API、包安装、后台进程、workspace 外副作用和 shell/Docker/Git 自动 rollback 均不承诺恢复 | 验收表达 / 文档真实性 | Week 6 继续补 error taxonomy、audit 完整性、safety suite 和真实验证 |
 | 2026-05-27 | 流程/治理问题：教学规则固化 | 固化教学顺序、中文注释、资料链接、流程图要求 | `AGENTS.md` `docs/CODEX_PROJECT_BRIEF.md` | 规则已明确，但仍依赖人工遵守，没有自动化检查 | 仓库规则入口清晰 | 流程治理 / 规范执行 | 文档 lint、模板化任务单、规则检查脚本 |
 | 2026-06-03 | 流程/治理问题：面试题归档机制 | 新增每日面试题归档文件和格式规则 | `docs/Compilation-of-Interview-Questions.md` | 归档流程已固定，但仍依赖人工同步和门禁判断 | 只有已回答题才能归档，标题和内容格式固定 | 知识沉淀 / 流程门禁 | 自动化归档辅助、状态检查、面试题索引 |
 | 2026-06-12 | 流程/治理问题：未回答题不得归档 | 明确未回答面试题不能占位归档，必须先推送用户回答 | `AGENTS.md` `docs/CODEX_PROJECT_BRIEF.md` `docs/09_NEXT_ACTIONS.md` | 流程更严谨，但仍是人工门禁，没有自动阻断错误推进 | 待答题保留在 `docs/09_NEXT_ACTIONS.md`，不写占位答案 | 流程门禁 / 状态一致性 | 自动状态检查、待办门禁、归档校验脚本 |
@@ -88,6 +102,14 @@ flowchart LR
     G --> H{"Concrete tool"}
     H --> I["read_file / write_file / edit_file"]
     H --> J["run_command / ShellCommandTool gate"]
+    W["Workspace(root) independent boundary"]
+    Ck["FileCheckpoint API"]
+    W --> Ck
+    Ck --> F["file tool rollback on allowed failure"]
+    Gk["GitCheckpoint independent diff API"]
+    W --> Gk
+    Dk["DockerRuntime graceful fallback adapter"]
+    CR["CommandRuntime Protocol"] -.-> Dk
     J --> J2["classify_command + PermissionPolicy"]
     J2 --> J3["ALLOW -> ShellRuntime"]
     J2 --> J4["ASK / DENY -> failed ToolResult"]
@@ -107,6 +129,10 @@ flowchart LR
 - 当前主链仍以 **mock LLM + 本地工具 + 文本 message history** 为中心，不包含真实模型 API、RAG、MCP、长期记忆或可观测平台
 - Permission System 的风险分类和策略判断已接入 `ShellCommandTool` 与文件工具写盘前 gate，当前 `run_command`、覆盖写入和删除式编辑会在执行前拦截 `ASK` / `DENY`
 - Permission audit 已有独立事件与 JSONL 写入 API，但尚未自动接入 shell/file gate
+- `Workspace(root)` 已有独立路径边界 API，但尚未迁移接入 shell runtime 主链
+- `FileCheckpoint` 已有独立文件快照 API，并已接入文件工具允许执行后的写盘失败 rollback 路径
+- `GitCheckpoint` 已有独立 git diff 快照 API，但尚未自动接入工具执行失败后的 rollback 链路，也不处理 untracked 文件或 staged diff
+- `CommandRuntime` 已有薄命令执行接口，`ShellCommandTool` 已依赖接口注入执行器；`DockerRuntime` 已有 graceful fallback adapter，但未接入默认主链，也不是完整 sandbox
 - `ToolRegistry` 是“工具事实源 + 执行入口”
 - `ToolResult` 是“工具执行后的结构化结果信封”
 - `truncate_output(...)` 是“工具输出进入 `ToolResult` 和 message history 前的最小截断边界”
@@ -440,7 +466,8 @@ flowchart TD
 
 - 12 周路线里的**第 2 周 Tool System 已收口**
 - 第 3 周 Agent Core + Tool Runtime 工业级加固已完成
-- Week 4 Day 6 Permission System 审计事件代码已完成，等待面试题回答和归档
+- Week 4 Permission System 验收已完成并归档
+- Week 5 Workspace / Sandbox / Checkpoint 已完成 Day 1-Day 7，并归档 Day 7 面试题
 - 当前代码本质上是一个**教学型、可验证、边界逐步清晰的最小 Personal Coding Assistant Harness**
 
 ### 2. 当前已经具备的稳定骨架
@@ -454,12 +481,19 @@ flowchart TD
 - 带文件大小上限和明显二进制拒绝的 `read_file`
 - `write_file` / `edit_file`
 - `run_command` / `ShellRuntime`
+- `CommandRuntime`
 - `RiskLevel` / `RiskAssessment` / `classify_command(...)`
 - `DecisionAction` / `PermissionDecision` / `PermissionPolicy.decide(...)`
 - `ApprovalRequest` / `ApprovalDecision`
 - `ShellCommandTool` 执行前 shell gate
 - `WriteFileTool` / `EditFileTool` 写盘前文件风险 gate
 - `PermissionAuditEvent` / `append_audit_event(...)`
+- `Workspace(root)` / `Workspace.resolve_path(...)` / `Workspace.contains(...)`
+- `FileCheckpoint.create(...)` / `FileCheckpoint.restore()`
+- `GitCheckpoint.create(...)` / `GitCheckpoint.restore()`
+- `DockerRuntime.run(...)` / `fallback="docker_unavailable"`
+- 文件工具允许执行失败路径 rollback
+- `examples/05_checkpoint_rollback.py` rollback 验收示例
 - `ToolResult`
 - `AgentLoop._tool_result_to_message(...)`
 - `workspace_root`、timeout、路径校验和部分敏感输出脱敏
@@ -470,7 +504,7 @@ flowchart TD
 
 - 真实 LLM adapter 与供应商协议适配
 - Permission System：交互式审批流、audit 自动接入、审批通过后恢复执行
-- sandbox / docker runtime / checkpoint / rollback
+- shell/Docker/Git rollback 自动接入、sandbox / docker runtime、GitCheckpoint untracked/staged 扩展
 - 上下文工程、上下文压缩、RAG
 - MCP client/server
 - 长期记忆系统
@@ -479,4 +513,4 @@ flowchart TD
 
 ### 4. 一句话结论
 
-当前项目已经把“怎么调用工具”这条主链讲清楚、写出来、测出来了，并已把 Permission System 的风险分类和策略判断接入 shell/file gate，同时具备最小审计事件和 JSONL 写入；但距离“工业级 Agent 能不能安全执行、可审计执行、可恢复执行、可扩展执行”还差交互式审批、audit 自动接入、sandbox/checkpoint/rollback、Context、Memory 和 Observability 体系。
+当前项目已经把“怎么调用工具”这条主链讲清楚、写出来、测出来了，并已把 Permission System 的风险分类和策略判断接入 shell/file gate，同时具备最小审计事件、JSONL 写入、独立 `Workspace(root)` 边界对象、独立 `FileCheckpoint` 文件快照 API、文件工具允许执行失败路径 rollback、独立 `GitCheckpoint` git diff 快照 API、薄 `CommandRuntime` 命令执行接口和最小 `DockerRuntime` graceful fallback adapter；但距离“工业级 Agent 能不能安全执行、可审计执行、可恢复执行、可扩展执行”还差交互式审批、audit 自动接入、shell/Docker/Git rollback 自动接入、完整 Docker sandbox 策略、Context、Memory 和 Observability 体系。

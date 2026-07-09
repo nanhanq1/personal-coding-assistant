@@ -17,10 +17,17 @@ flowchart LR
     G --> P["classify_command + PermissionPolicy"]
     P -->|ALLOW| S["ShellRuntime"]
     P -->|ASK / DENY| TR
-    F --> TR["ToolResult"]
+    F --> Q["file risk gate"]
+    Q --> TR["ToolResult"]
     S --> TR
     TR --> M["AgentLoop._tool_result_to_message"]
     M --> H
+    W["Workspace(root) independent runtime boundary"]
+    W --> Ck["FileCheckpoint independent API"]
+    W --> Gk["GitCheckpoint independent diff API"]
+    CR["CommandRuntime Protocol"]
+    CR -.-> S
+    CR -.-> Dk["DockerRuntime adapter graceful fallback"]
 ```
 
 真实已实现：
@@ -32,13 +39,23 @@ flowchart LR
 - `src/pca/tools/registry.py`：`ToolRegistry`
 - `src/pca/tools/file_tools.py`：`read_file`、`write_file`、`edit_file`
 - `src/pca/runtime/shell_runtime.py`：`run_command`
+- `src/pca/runtime/interface.py`：`CommandRuntime`
+- `src/pca/runtime/docker_runtime.py`：`DockerRuntime`
+- `src/pca/runtime/workspace.py`：`Workspace(root)`、`resolve_path(...)`、`contains(...)`
+- `src/pca/runtime/checkpoints.py`：`FileCheckpoint.create(...)`、`FileCheckpoint.restore()`、`GitCheckpoint.create(...)`、`GitCheckpoint.restore()`
 - `src/pca/permissions/risk.py`：`RiskLevel`、`RiskAssessment`、`classify_command(...)`
 - `src/pca/permissions/policy.py`：`DecisionAction`、`PermissionDecision`、`PermissionPolicy.decide(...)`
 - `src/pca/permissions/approval.py`：`ApprovalRequest`、`ApprovalDecision`
+- `src/pca/permissions/file_risk.py`：`classify_file_change(...)`
+- `src/pca/permissions/audit.py`：`PermissionAuditEvent`、`append_audit_event(...)`
 
 当前部分实现但未接入主链：
 
-- `src/pca/permissions`：风险分类和策略判断已接入 `ShellCommandTool` 执行前 gate；审批对象已实现但尚未接入交互式批准流程；audit 和文件风险 gate 仍未实现
+- `src/pca/permissions`：风险分类和策略判断已接入 `ShellCommandTool` 执行前 gate；文件风险分类已接入 `WriteFileTool` / `EditFileTool` 写盘前 gate；审批对象已实现但尚未接入交互式批准流程；audit 已有独立 JSONL API 但尚未自动接入 shell/file gate。
+- `src/pca/runtime/workspace.py`：`Workspace(root)` 已实现为独立边界对象，但文件工具和 shell runtime 主链仍使用原有局部路径解析逻辑，迁移留到后续 checkpoint/rollback 加固。
+- `src/pca/runtime/checkpoints.py`：`FileCheckpoint` 已实现为独立文件快照 API，且已接入 `WriteFileTool` / `EditFileTool` 在 permission 允许后的写盘失败恢复路径；`GitCheckpoint` 已实现为独立 git diff 快照 API，但尚未自动接入工具失败 rollback 链路。
+- `src/pca/runtime/interface.py`：`CommandRuntime` 已实现为薄命令执行接口，`ShellCommandTool` 已依赖该接口注入执行器。
+- `src/pca/runtime/docker_runtime.py`：`DockerRuntime` 已实现为最小 adapter；Docker CLI 或 daemon 不可用时返回 `fallback="docker_unavailable"` 和 `sandboxed=False`，不会静默回退到宿主机 shell；但尚未接入默认主链，也不是完整 Docker sandbox。
 
 当前仍是占位：
 
@@ -46,8 +63,6 @@ flowchart LR
 - `src/pca/memory`
 - `src/pca/mcp`
 - `src/pca/observability`
-- `src/pca/runtime/checkpoints.py`
-- `src/pca/runtime/docker_runtime.py`
 - `src/pca/cli.py`
 
 ## 目标架构
@@ -156,7 +171,7 @@ evaluation -> all public interfaces
 
 - 配置入口：后续新增 `src/pca/config.py`，从文件、环境变量和 CLI 参数加载。
 - 密钥：只从环境变量读取；不写入 message history、logs、memory 或 docs。
-- 工具执行：默认 workspace scoped；`run_command` 已经过最小 shell gate，`DENY` / `ASK` 不进入真实 shell runtime；破坏性文件操作、人工审批 UI、audit 和 sandbox 后续补齐。
+- 工具执行：默认 workspace scoped；`run_command` 已经过最小 shell gate，`DENY` / `ASK` 不进入真实 shell runtime；`ShellCommandTool` 已依赖 `CommandRuntime` 接口注入执行器；`DockerRuntime` 已有最小 graceful fallback adapter，但默认主链仍使用 `ShellRuntime`，完整 sandbox 尚未完成；覆盖写入和删除式编辑已经过文件风险 gate；`FileCheckpoint` 已接入文件工具允许执行后的失败恢复路径；人工审批恢复、audit 自动接入、shell/Docker/Git rollback 主链接入和 sandbox 后续补齐。
 - 输出：stdout/stderr、文件内容、检索结果和 memory recall 都必须支持截断。
 - Git：commit/push 默认需要用户确认；自动 commit 只能在显式配置下启用。
 

@@ -10,56 +10,57 @@
 - 每 2 周实现后安排 1 周工业级加固；加固周不新增大模块。
 - 文档不能宣称源码没有实现的能力。
 
-## 当前 Sprint：Week 5 - Workspace / Sandbox / Checkpoint
+## 当前 Sprint：Week 6 - Tool Runtime 加固周
+
+当前进度：Week 5 已完成并归档 Day 7 面试题；当前推进 Week 6 Day 1 现状评估。
 
 ### 1. 本周主题
 
-为文件和命令副作用建立受控 workspace 生命周期：workspace 抽象、checkpoint、rollback 和 sandbox adapter 雏形。
+将 Week 4-5 的 permission、workspace、checkpoint、runtime 和 rollback 做到可解释、可测、可审计。
 
 ### 2. 本周工业级目标
 
-- 文件和命令副作用可以在授权 workspace 内被隔离和预览。
-- 本地文件状态可以在危险修改前创建 checkpoint。
-- 失败或用户撤销时可以 rollback 本地 workspace 文件状态。
-- sandbox/runtime 接口先抽象清楚，Docker 依赖不提前变成硬要求。
+- 按 9 个工业级维度评估当前真实状态。
+- 优先补 P0 缺口：安全性、健壮性、可观测性。
+- 建立 safety regression matrix 和真实小 repo 安全验证报告。
+- 不新增大模块；只加固已有工具运行时、安全边界和文档真实性。
 
 ### 3. 核心概念
 
-- workspace root
-- snapshot
-- checkpoint
-- rollback
-- runtime interface
-- sandbox adapter
+- error taxonomy
+- retry / timeout
+- audit completeness
+- safety regression
+- resource caps
+- real-world validation
 
 ### 4. 参考项目
 
-- OpenHands runtime / sandbox / workspace。
-- mini-SWE-agent sandbox / environment。
-- Aider git workflow。
+- OpenHands evaluation / runtime。
+- Cline approval UX。
+- mini-SWE-agent environment / trajectory。
 
 ### 5. 代码模块
 
-- `src/pca/runtime/workspace.py`
-- `src/pca/runtime/checkpoints.py`
-- `src/pca/runtime/docker_runtime.py`
-- `src/pca/runtime/shell_runtime.py`
+- `src/pca/permissions/*`
+- `src/pca/runtime/*`
+- `src/pca/tools/*`
 
 ### 6. 测试任务
 
-- workspace 路径解析和越界拒绝测试。
-- checkpoint create / restore 测试。
-- dirty workspace rollback 测试。
-- sandbox adapter 不可用时 graceful fallback 测试。
-- permission denied / failed edit 后 rollback 集成测试。
+- 基线全量测试和示例。
+- error code 测试。
+- retry policy 单元测试。
+- audit matrix test。
+- `tests/safety/` 安全回归测试。
+- 真实小 repo safe task 验证。
 
 ### 7. 文档任务
 
-- 更新 `docs/09_NEXT_ACTIONS.md`。
-- 更新 `docs/07_IMPLEMENTATION_LOG.md`。
-- 新增 workspace / checkpoint / sandbox 取舍 ADR。
-- 更新当前能力边界，不能宣称已有完整 Docker sandbox。
-- Week 5 完成后生成面试题。
+- Week 6 加固报告。
+- `docs/07_IMPLEMENTATION_LOG.md`。
+- `docs/09_NEXT_ACTIONS.md`。
+- 必要时更新 `EVALUATION.md`、学习笔记和 ADR。
 
 ### 8. 验收标准
 
@@ -69,34 +70,36 @@ python examples\01_minimal_agent.py
 python examples\02_tool_agent.py
 python examples\03_observed_tool_run.py
 python examples\04_permission_agent.py
+python examples\05_checkpoint_rollback.py
 python -m compileall src examples -q
 ```
 
-后续新增示例：
+Week 6 后续新增 safety suite 后，必须追加：
 
 ```powershell
-python examples\05_checkpoint_rollback.py
+E:\python\Scripts\pytest.exe tests\safety -q
 ```
 
 ### 9. 常见风险
 
-- 在本机真实项目中误删或覆盖文件。
-- 把 checkpoint 误当成能恢复外部网络/API 副作用。
-- 过早依赖 Docker，导致没有 Docker 的开发机无法运行测试。
-- 文件工具和 shell runtime 各自维护路径规则，导致边界漂移。
+- 加固时顺手新增大模块，导致边界继续膨胀。
+- 只写报告不补测试，无法证明加固有效。
+- audit 记录完整命令、文件内容或 secret，造成二次泄漏。
+- retry 重试不可重试的危险副作用。
+- 把 Docker adapter 误写成完整 sandbox。
 
 ### 10. 本周完成后新增能力
 
-受控 workspace 生命周期雏形：路径边界统一、文件修改可创建 checkpoint、本地文件状态可 rollback，并为后续 sandbox/runtime 替换打基础。
+安全执行基础达到阶段标准：已有 permission/runtime/checkpoint 能力有清晰错误语义、安全回归测试、audit 完整性检查和真实验证报告。
 
 ## 当前周每日安排
 
 | Day | 学习目标 | 代码任务 | 测试任务 | 文档任务 | 完成标准 |
 |---|---|---|---|---|---|
-| 1 | Workspace 抽象 | `Workspace(root)`、路径解析统一迁移计划 | resolve/inside tests | ADR 草稿 | workspace 单测通过 |
-| 2 | Checkpoint | `FileCheckpoint` 保存文件快照 | create/restore 测试 | 学习笔记 | restore 通过 |
-| 3 | Git checkpoint | `GitCheckpoint` 用 diff 记录 | dirty tree 测试 | 决策记录 | diff 测试通过 |
-| 4 | Runtime interface | `CommandRuntime` Protocol | fake runtime 测试 | 架构图 | interface 测试通过 |
-| 5 | Sandbox adapter | `DockerRuntime` 占位升级为可检测 adapter | docker unavailable graceful 测试 | 说明限制 | graceful pass |
-| 6 | Rollback 集成 | permission denied/failed edit 后 rollback | rollback integration test | 实现日志 | 集成通过 |
-| 7 | 验收 | `examples/05_checkpoint_rollback.py` | 全量+安全测试 | 面试题 | 示例可运行 |
+| 1 | 现状评估 | 不写功能，列 9 维差距 | 基线测试 | 加固报告初版 | 差距清单完成 |
+| 2 | 错误分类 | `ToolErrorCode`、permission error code | error code 测试 | ADR 更新 | 测试通过 |
+| 3 | Retry/timeout | 对临时失败定义 retry policy | retry unit tests | 学习笔记 | 测试通过 |
+| 4 | Audit 完整性 | audit 覆盖 file/shell/git/memory placeholder | audit matrix test | 更新 EVALUATION | matrix 通过 |
+| 5 | Safety suite | 新建 `tests/safety/` | rm/curl/outside/secret cases | 安全报告 | safety 通过 |
+| 6 | 真实验证 | 构造 `tmp/demo_repo` 修改任务 | e2e safe task | 真实验证报告 | 报告完成 |
+| 7 | 放行复盘 | 修缺口 | 全量+compileall | 面试题 | 阶段放行 |

@@ -183,6 +183,47 @@
 - mini-SWE-agent GitHub：https://github.com/SWE-agent/mini-swe-agent
 - 建议阅读顺序：先复习 `Path.resolve()`、`Path.parents` 和路径读写，再看 OpenHands 如何把 workspace/runtime/sandbox 分层，最后对照 mini-SWE-agent 的环境边界理解为什么 Coding Agent 需要统一 workspace 抽象。
 
+### Week 5 Day 2 FileCheckpoint 文件快照资料
+
+- Python `pathlib` 官方文档：https://docs.python.org/3/library/pathlib.html
+- Python `shutil` 官方文档：https://docs.python.org/3/library/shutil.html
+- Python `tempfile` 官方文档：https://docs.python.org/3/library/tempfile.html
+- pytest `tmp_path` 官方文档：https://docs.pytest.org/en/stable/how-to/tmp_path.html
+- Git `git stash` 文档：https://git-scm.com/docs/git-stash
+- 建议阅读顺序：先复习 `Path.exists()`、`Path.is_file()`、`Path.read_bytes()` 和 `Path.write_bytes()` 如何表达文件状态，再看 `shutil` / `tempfile` 如何做临时副本，最后对照 `git stash` 理解 checkpoint 的本质是保存执行前状态，而不是恢复所有外部副作用。
+
+### Week 5 Day 3 GitCheckpoint diff 快照资料
+
+- Git diff 官方文档：https://git-scm.com/docs/git-diff
+- Git apply 官方文档：https://git-scm.com/docs/git-apply
+- Git stash 官方文档：https://git-scm.com/docs/git-stash
+- Aider Git 集成文档：https://aider.chat/docs/git.html
+- 建议阅读顺序：先看 `git diff` 如何表达 tracked 文件改动，再看 `git apply -R` 如何反向应用 patch，最后对照 Aider 的 git 工作流理解为什么 Coding Agent 需要在真实修改前留下可恢复证据。
+
+### Week 5 Day 4 Runtime interface 资料
+
+- Python `typing.Protocol` 官方文档：https://docs.python.org/3/library/typing.html#typing.Protocol
+- Python `subprocess` 官方文档：https://docs.python.org/3/library/subprocess.html
+- OpenHands Docs：https://docs.openhands.dev/
+- mini-SWE-agent GitHub：https://github.com/SWE-agent/mini-swe-agent
+- 建议阅读顺序：先理解 `Protocol` 如何表达结构化接口，再复习当前 `subprocess` 结果语义，最后对照 OpenHands / mini-SWE-agent 理解为什么 runtime interface 要先于 Docker adapter 稳定。
+
+### Week 5 Day 5 DockerRuntime graceful fallback 资料
+
+- Python `subprocess` 官方文档：https://docs.python.org/3/library/subprocess.html
+- Docker CLI 官方文档：https://docs.docker.com/reference/cli/docker/
+- OpenHands Docs：https://docs.openhands.dev/
+- mini-SWE-agent 文档：https://mini-swe-agent.com/latest/
+- 建议阅读顺序：先复习 `subprocess.run(...)` 的 `args`、`timeout`、`capture_output` 和异常语义，再看 Docker CLI 的 `docker run` / `docker version` 入口，最后对照 OpenHands 与 mini-SWE-agent 理解 sandbox adapter 为什么不能在 Docker 不可用时静默回退到宿主机 shell。
+
+### Week 6 Day 1 Tool Runtime 加固评估资料
+
+- 项目工业级标准：`docs/INDUSTRIAL_STANDARDS.md`
+- OpenTelemetry Observability Primer：https://opentelemetry.io/docs/concepts/observability-primer/
+- OpenHands Docs：https://docs.openhands.dev/
+- Cline Auto Approve & YOLO Mode：https://docs.cline.bot/features/auto-approve
+- 建议阅读顺序：先按项目 9 维标准列出当前差距，再用 OpenTelemetry 理解可观测性证据，用 OpenHands/Cline 对照 runtime、permission、approval 和 safety 边界。
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |
@@ -207,6 +248,11 @@
 | `agent tool permission approval checkpoint rollback` | 学习权限 gate 和后续恢复机制如何分层 |
 | `agent workspace sandbox checkpoint rollback` | 学习 workspace、sandbox、checkpoint 的边界 |
 | `python pathlib safe path resolution` | 学习安全路径解析和越界拒绝 |
+| `file checkpoint rollback python pathlib shutil` | 学习文件快照保存和恢复 |
+| `git diff apply rollback python subprocess` | 学习 git diff 快照和反向应用 |
+| `coding agent git checkpoint rollback` | 学习 Coding Agent 如何用 git 保护工作区 |
+| `python typing Protocol interface tutorial` | 学习用 Protocol 定义可替换 runtime 接口 |
+| `coding agent runtime sandbox adapter` | 学习本地 runtime 和 sandbox adapter 如何分层 |
 
 ## 长期资料池
 

@@ -127,8 +127,49 @@ def test_permission_agent_example_reports_allow_deny_and_ask_paths():
     assert report["capability_boundary"] == {
         "interactive_approval": False,
         "approval_resume": False,
-        "checkpoint": False,
-        "rollback": False,
+        "file_checkpoint_api": True,
+        "git_checkpoint_api": True,
+        "command_runtime_interface": True,
+        "docker_runtime_adapter": True,
+        "checkpoint_auto_wired": False,
+        # 修改前旧代码：
+        # "rollback_auto_wired": False,
+        #
+        # 问题：Day 6 新增的是文件工具允许执行失败路径的局部 rollback，
+        # 不能继续只用全局 rollback_auto_wired=False 表达所有 rollback 状态。
+        "file_tool_rollback_on_allowed_failure": True,
+        "rollback_auto_wired": False,
         "sandbox": False,
         "audit_auto_wired": False,
+    }
+
+
+def test_checkpoint_rollback_example_reports_restored_file_state_and_boundaries():
+    """测试 Week 5 Day 7 示例能展示 checkpoint、失败修改和本地文件 rollback 边界。"""
+    repo_root = Path(__file__).resolve().parents[1]
+
+    completed = subprocess.run(
+        [sys.executable, "examples/05_checkpoint_rollback.py"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+
+    report = json.loads(completed.stdout)
+
+    assert report["file_name"] == "demo.txt"
+    assert report["original_content"] == "stable workspace content\n"
+    assert report["temporary_failed_content"] == "partial failed edit\n"
+    assert report["content_after_rollback"] == "stable workspace content\n"
+    assert report["restored"] is True
+    assert report["simulated_error"] == "simulated failure after local file change"
+    assert report["capability_boundary"] == {
+        "workspace_file_state_restored": True,
+        "network_or_api_side_effects_restored": False,
+        "package_install_side_effects_restored": False,
+        "background_processes_restored": False,
+        "outside_workspace_side_effects_restored": False,
+        "shell_or_docker_or_git_auto_rollback": False,
     }
