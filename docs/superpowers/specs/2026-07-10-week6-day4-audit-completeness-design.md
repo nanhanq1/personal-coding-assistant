@@ -18,7 +18,7 @@ flowchart LR
 
 ## 选择的方案
 
-复用 `pca.permissions.audit` 中的 `PermissionAuditEvent` 与 `append_audit_event(...)`，在 `shell_tools.py` 和 `file_tools.py` 的 gate 决策之后调用一个最小的审计辅助函数。该辅助函数统一从 `PermissionDecision` 与 `RiskAssessment` 构造事件；具体工具不自行拼装 JSONL。
+复用 `pca.permissions.audit` 中的 `PermissionAuditEvent` 与 `append_audit_event(...)`，在 `shell_tools.py` 和 `file_tools.py` 的 gate 决策之后调用一个最小的审计辅助函数。该辅助函数统一从 `PermissionDecision` 与 `RiskAssessment` 构造事件；具体工具不自行拼装 JSONL。调用方可注入 `audit_path`；未注入的 shell 使用进程工作目录 `.pca/permission-audit.jsonl`，避免未验证的 `workspace_root` 改变 runtime 校验语义。
 
 相较于在两个 gate 中重复写入逻辑，这一方案保留现有 JSONL 事件格式并降低分支漂移。相比新增 `AuditSink` 协议，它不引入新的可观测性抽象，符合 Day 4 的范围。
 

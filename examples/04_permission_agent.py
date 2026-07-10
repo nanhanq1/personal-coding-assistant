@@ -100,7 +100,12 @@ def main() -> None:
             "file_tool_rollback_on_allowed_failure": True,
             "rollback_auto_wired": False,
             "sandbox": False,
-            "audit_auto_wired": False,
+            # 修改前旧代码：
+            # "audit_auto_wired": False,
+            #
+            # 问题：Week 6 Day 4 已让 shell/file permission gate 自动写入摘要
+            # audit，继续标记为 false 会让示例错误描述当前能力。
+            "audit_auto_wired": True,
         },
     }
     print(json.dumps(report, ensure_ascii=False, indent=2))

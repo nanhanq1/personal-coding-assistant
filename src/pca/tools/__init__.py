@@ -1,8 +1,9 @@
 """工具抽象与内置 coding 工具模块包。"""
 
-from pca.tools.base import Tool, ToolParameter, ToolResult
+from pca.tools.base import Tool, ToolErrorCode, ToolParameter, ToolResult
 from pca.tools.file_tools import EditFileTool, ReadFileTool, WriteFileTool
 from pca.tools.registry import ToolRegistry
+from pca.tools.retry import RetryDecision, RetryPolicy, should_retry
 from pca.tools.shell_tools import ShellCommandTool
 
 
@@ -19,11 +20,15 @@ def create_coding_tool_registry() -> ToolRegistry:
 __all__ = [
     "EditFileTool",
     "ReadFileTool",
+    "RetryDecision",
+    "RetryPolicy",
     "ShellCommandTool",
     "Tool",
+    "ToolErrorCode",
     "ToolParameter",
     "ToolResult",
     "ToolRegistry",
     "WriteFileTool",
     "create_coding_tool_registry",
+    "should_retry",
 ]

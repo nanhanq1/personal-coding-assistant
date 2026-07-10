@@ -37,6 +37,7 @@ build/
 
 # Local runtime files
 .tmp/
+.pca/
 *.log
 *.sqlite
 *.sqlite3

@@ -1,8 +1,13 @@
 import json
 from datetime import datetime, timezone
 
-from pca.permissions.audit import PermissionAuditEvent, append_audit_event
-from pca.permissions.policy import DecisionAction
+from pca.permissions.audit import (
+    PermissionAuditEvent,
+    append_audit_event,
+    record_permission_decision,
+)
+from pca.permissions.policy import DecisionAction, PermissionDecision
+from pca.permissions.risk import RiskAssessment, RiskLevel
 
 
 def test_audit_event_keeps_permission_fact_fields() -> None:
@@ -68,3 +73,41 @@ def test_append_audit_event_writes_one_json_object_per_line(tmp_path) -> None:
     lines = audit_path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     assert json.loads(lines[0]) == event.to_dict()
+
+
+def test_record_permission_decision_keeps_only_summary_fields(tmp_path) -> None:
+    """gate 审计只保留策略摘要，不能混入原始工具参数。"""
+    audit_path = tmp_path / "permission_audit.jsonl"
+    assessment = RiskAssessment(
+        level=RiskLevel.ASK,
+        reason="Network command requires approval.",
+        matched_rule="network_access",
+    )
+    decision = PermissionDecision(
+        action=DecisionAction.ASK,
+        reason="Ask risk assessments require approval before execution.",
+        assessment=assessment,
+    )
+
+    record_permission_decision(
+        audit_path,
+        tool_name="run_command",
+        decision=decision,
+        executed=False,
+    )
+
+    payload = json.loads(audit_path.read_text(encoding="utf-8"))
+    assert set(payload) == {
+        "timestamp",
+        "tool_name",
+        "action",
+        "risk_level",
+        "matched_rule",
+        "reason",
+        "executed",
+    }
+    assert payload["tool_name"] == "run_command"
+    assert payload["action"] == "ask"
+    assert payload["risk_level"] == "ask"
+    assert payload["matched_rule"] == "network_access"
+    assert payload["executed"] is False

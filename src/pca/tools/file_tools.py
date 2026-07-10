@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any, Callable
 
+from pca.permissions.audit import record_permission_decision
 from pca.permissions.file_risk import classify_file_change
 from pca.permissions.policy import DecisionAction, PermissionPolicy
 from pca.runtime.checkpoints import FileCheckpoint
@@ -56,8 +57,13 @@ class ReadFileTool(Tool):
 class WriteFileTool(Tool):
     """写入工作区内的文件内容。"""
 
-    def __init__(self, permission_policy: PermissionPolicy | None = None) -> None:
+    def __init__(
+        self,
+        permission_policy: PermissionPolicy | None = None,
+        audit_path: Path | None = None,
+    ) -> None:
         self._permission_policy = permission_policy or PermissionPolicy()
+        self._audit_path = audit_path
         super().__init__(
             name="write_file",
             description=(
@@ -110,6 +116,7 @@ class WriteFileTool(Tool):
             tool_name=self.name,
             path=path,
             permission_policy=self._permission_policy,
+            audit_path=self._resolve_audit_path(arguments),
         )
 
         # 修改前旧代码：
@@ -124,12 +131,23 @@ class WriteFileTool(Tool):
         )
         return "ok"
 
+    def _resolve_audit_path(self, arguments: dict[str, Any]) -> Path:
+        """返回当前调用的审计文件；测试可注入临时路径隔离写入。"""
+        if self._audit_path is not None:
+            return self._audit_path
+        return _resolve_workspace_root(arguments) / ".pca" / "permission-audit.jsonl"
+
 
 class EditFileTool(Tool):
     """对工作区内已有文件执行一次精确局部替换。"""
 
-    def __init__(self, permission_policy: PermissionPolicy | None = None) -> None:
+    def __init__(
+        self,
+        permission_policy: PermissionPolicy | None = None,
+        audit_path: Path | None = None,
+    ) -> None:
         self._permission_policy = permission_policy or PermissionPolicy()
+        self._audit_path = audit_path
         super().__init__(
             name="edit_file",
             description=(
@@ -195,6 +213,7 @@ class EditFileTool(Tool):
             permission_policy=self._permission_policy,
             old_text=old_text,
             new_text=new_text,
+            audit_path=self._resolve_audit_path(arguments),
         )
         content = path.read_text(encoding="utf-8")
         occurrences = content.count(old_text)
@@ -216,6 +235,12 @@ class EditFileTool(Tool):
             ),
         )
         return "ok"
+
+    def _resolve_audit_path(self, arguments: dict[str, Any]) -> Path:
+        """返回当前调用的审计文件；测试可注入临时路径隔离写入。"""
+        if self._audit_path is not None:
+            return self._audit_path
+        return _resolve_workspace_root(arguments) / ".pca" / "permission-audit.jsonl"
 
 
 def _resolve_workspace_path(arguments: dict[str, Any]) -> Path:
@@ -280,6 +305,7 @@ def _ensure_file_permission(
     permission_policy: PermissionPolicy,
     old_text: str | None = None,
     new_text: str | None = None,
+    audit_path: Path,
 ) -> None:
     """在文件写盘前执行最小 permission gate。"""
     assessment = classify_file_change(
@@ -289,6 +315,19 @@ def _ensure_file_permission(
         new_text=new_text,
     )
     decision = permission_policy.decide(assessment)
+
+    # 审计在副作用前记录。ALLOW 需要可持久化的证据才能进入 checkpoint/写盘；
+    # ASK/DENY 已经阻止副作用，因此审计不可用时仍保留原来的 permission 语义。
+    try:
+        record_permission_decision(
+            audit_path,
+            tool_name=tool_name,
+            decision=decision,
+            executed=decision.action is DecisionAction.ALLOW,
+        )
+    except OSError:
+        if decision.action is DecisionAction.ALLOW:
+            raise
 
     if decision.action is DecisionAction.ALLOW:
         return

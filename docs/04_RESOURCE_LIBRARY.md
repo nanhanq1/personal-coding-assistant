@@ -229,6 +229,22 @@
 - Cline Auto Approve & YOLO Mode：https://docs.cline.bot/features/auto-approve
 - 建议阅读顺序：先按项目 9 维标准列出当前差距，再用 OpenTelemetry 理解 trace 和可观测性证据，用 Python logging 理解结构化日志入口，用 pytest fixtures 设计安全回归测试夹具，用 Git diff 理解 checkpoint 证据，最后用 OpenHands/Cline 对照 runtime、permission、approval 和 safety 边界。
 
+### Week 6 Day 2 Tool Runtime 错误分类资料
+
+- Python `enum` 官方文档：https://docs.python.org/3/library/enum.html
+- Python `dataclasses` 官方文档：https://docs.python.org/3/library/dataclasses.html
+- Python 内置异常文档：https://docs.python.org/3/library/exceptions.html
+- pytest `monkeypatch` 官方文档：https://docs.pytest.org/en/stable/how-to/monkeypatch.html
+- 建议阅读顺序：先用 `Enum` 理解为什么错误码应是稳定枚举而不是自由字符串，再复习 `dataclass` 字段兼容性，然后对照 Python 内置异常理解 `PermissionError` / `ValueError` / `RuntimeError` 的粒度不足，最后用 `monkeypatch` 构造 rollback 失败等边界测试。
+
+### Week 6 Day 3 Retry / timeout policy 资料
+
+- Python `time` 官方文档：https://docs.python.org/3/library/time.html
+- Python `enum` 官方文档：https://docs.python.org/3/library/enum.html
+- pytest `monkeypatch` 官方文档：https://docs.pytest.org/en/stable/how-to/monkeypatch.html
+- Tenacity retry library 文档：https://tenacity.readthedocs.io/en/latest/
+- 建议阅读顺序：先看 `time.monotonic()` / `perf_counter()` 如何支持稳定耗时和等待测试，再用 `Enum` 复习稳定策略值，随后用 `monkeypatch` 构造 fake runtime 调用次数，最后参考 Tenacity 的 retry 概念，但 Day 3 不直接引入依赖。
+
 ## 视频搜索关键词
 
 | 关键词 | 学习目的 |

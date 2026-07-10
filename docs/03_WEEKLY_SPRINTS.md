@@ -12,7 +12,7 @@
 
 ## 当前 Sprint：Week 6 - Tool Runtime 加固周
 
-当前进度：Week 5 已完成并归档 Day 7 面试题；当前推进 Week 6 Day 1 现状评估。
+当前进度：Week 6 Day 1 现状评估、Day 2 错误分类、Day 3 Retry / timeout policy、Day 4 Audit 完整性均已完成并归档面试题；Day 5 Safety suite 已完成实现与验证，面试题待回答和归档。
 
 ### 1. 本周主题
 
@@ -100,6 +100,6 @@ E:\python\Scripts\pytest.exe tests\safety -q
 | 2 | 错误分类 | `ToolErrorCode`、permission error code | error code 测试 | ADR 更新 | 测试通过 |
 | 3 | Retry/timeout | 对临时失败定义 retry policy | retry unit tests | 学习笔记 | 测试通过 |
 | 4 | Audit 完整性 | audit 覆盖 file/shell/git/memory placeholder | audit matrix test | 更新 EVALUATION | matrix 通过 |
-| 5 | Safety suite | 新建 `tests/safety/` | rm/curl/outside/secret cases | 安全报告 | safety 通过 |
+| 5 | Safety suite | 新建 `tests/safety/` | rm/curl/outside/secret cases | 安全报告 | safety `9 passed`，面试题待回答 |
 | 6 | 真实验证 | 构造 `tmp/demo_repo` 修改任务 | e2e safe task | 真实验证报告 | 报告完成 |
 | 7 | 放行复盘 | 修缺口 | 全量+compileall | 面试题 | 阶段放行 |

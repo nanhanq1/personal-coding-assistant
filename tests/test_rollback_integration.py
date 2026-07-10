@@ -3,6 +3,8 @@ from pathlib import Path
 import pytest
 
 from pca.permissions.policy import DecisionAction, PermissionDecision
+from pca.tools import base as tool_base
+from pca.tools.registry import ToolRegistry
 from pca.tools import file_tools
 
 
@@ -111,3 +113,40 @@ def test_deny_file_change_does_not_create_checkpoint(tmp_path, monkeypatch):
         )
 
     assert target.exists() is False
+
+
+def test_registry_classifies_file_rollback_failure_with_stable_error_code(
+    tmp_path,
+    monkeypatch,
+):
+    """写盘失败且 rollback 失败时，ToolResult 应暴露稳定 rollback 错误码。"""
+    target = tmp_path / "module.py"
+    original = "def greet():\n    return 'hello'\n"
+    target.write_text(original, encoding="utf-8")
+
+    def fail_restore(self):
+        raise RuntimeError("simulated rollback failure")
+
+    def fail_write(path, content):
+        raise RuntimeError("simulated operation failure")
+
+    monkeypatch.setattr(file_tools.FileCheckpoint, "restore", fail_restore)
+    monkeypatch.setattr(file_tools, "_write_text_file", fail_write)
+
+    registry = ToolRegistry()
+    registry.register(file_tools.EditFileTool())
+
+    result = registry.run(
+        "edit_file",
+        {
+            "path": "module.py",
+            "old_text": "return 'hello'",
+            "new_text": "return 'hi'",
+            "workspace_root": str(tmp_path),
+        },
+    )
+
+    assert result.ok is False
+    assert result.error_type == "RuntimeError"
+    assert result.error_code is tool_base.ToolErrorCode.ROLLBACK_FAILED
+    assert "rollback failed" in result.error_message

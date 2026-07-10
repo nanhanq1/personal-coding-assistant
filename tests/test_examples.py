@@ -140,7 +140,7 @@ def test_permission_agent_example_reports_allow_deny_and_ask_paths():
         "file_tool_rollback_on_allowed_failure": True,
         "rollback_auto_wired": False,
         "sandbox": False,
-        "audit_auto_wired": False,
+        "audit_auto_wired": True,
     }
 
 

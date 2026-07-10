@@ -748,19 +748,70 @@
 - 用户回答：我会先保持分层，不做一个“万能 rollback”。执行顺序上，先解析 workspace 和风险分类，再由 `PermissionPolicy` 判断；只有 `ALLOW` 或未来审批通过后，才创建合适的 checkpoint，然后执行真实副作用。多文件 patch 如果有明确文件列表，可以创建一个覆盖所有目标文件的 `FileCheckpoint`；如果是 git repo 级代码修改，可以创建 `GitCheckpoint` 保存 tracked dirty diff；shell/Docker runtime 只有在能声明或隔离副作用范围时才承诺 rollback。失败报告要结构化，至少包含原始执行错误、rollback 是否尝试、哪些文件或阶段恢复成功、哪些失败、是否存在半恢复状态，以及用户下一步应该怎么处理。审计记录应包含 trace id、工具名、风险等级、策略动作、checkpoint 类型、是否执行、rollback 尝试和结果，但不能记录完整文件内容、secret 或完整 stdout/stderr。测试矩阵要覆盖：多文件全部恢复、部分写入失败、restore 自身失败、`ASK/DENY` 不创建 checkpoint、GitCheckpoint tracked diff 恢复、untracked/staged 不被误承诺、Docker 不可用 fallback 不调用宿主机 shell、shell 未知副作用不承诺恢复，以及 audit 字段完整且脱敏。
 - 标准回答：正确。统一 rollback 应该是分层编排，而不是单个全能函数。推荐顺序是：workspace 边界校验 -> permission 分类和策略 -> 审批通过或 `ALLOW` -> 创建对应 checkpoint -> 执行 runtime/tool -> 失败时恢复 -> 写入结构化 audit。多文件 patch 可用 `FileCheckpoint` 或未来 patch plan；仓库级 tracked 修改可用 `GitCheckpoint`；shell/Docker 需要先解决副作用范围、sandbox 隔离和 audit 事实记录，不能默认承诺恢复所有外部状态。失败报告不能只返回“rollback failed”，而要说明阶段、原始错误、恢复错误、路径摘要、半恢复风险和人工处理建议。测试要从行为出发，证明文件真的恢复、未授权路径不创建 checkpoint、恢复失败可观察、Docker fallback 不静默降级、Git untracked/staged 边界不被误说成已支持、审计不泄漏敏感信息。
 
-## 第 36 天：2026-07-04
+## 第 37 天：2026-07-09
 
-### 面试题 1：`FileCheckpoint` 能恢复什么状态？为什么不能把它宣传成能恢复网络/API、包安装或后台进程副作用？
+### 面试题 1：为什么 Week 6 Day 1 只做 9 维现状评估，而不是直接开始写 retry、audit 或 sandbox 代码？
 
-- 用户回答：`FileCheckpoint` 能恢复的是显式传入路径在 workspace 内的本地文件状态。它会记录文件在 checkpoint 创建时是否存在；如果存在，会保存原始 bytes 内容；如果不存在，会记录不存在状态。恢复时，它能把被修改的文件写回原始内容，能把被删除的文件重新创建出来，也能删除 checkpoint 之后新建的被跟踪文件。它不能恢复网络/API、包安装或后台进程副作用，因为这些副作用不一定表现为 workspace 内某个已跟踪文件的 bytes 内容变化。网络请求可能已经影响远端系统，包安装可能改动全局环境或依赖缓存，后台进程可能持续运行或产生外部状态，这些都不在 `FileCheckpoint` 的数据模型中。把它宣传成完整事务系统会误导用户，以为所有副作用都可撤销；正确表述应该是：它只保证显式跟踪的本地 workspace 文件状态可以恢复。
-- 标准回答：正确。`FileCheckpoint` 的恢复范围是“显式文件列表 + workspace 内 + 文件 bytes 状态”。它可以覆盖三类本地文件语义：快照后内容被修改时写回旧内容，快照后文件被删除时重建文件，快照时不存在但后来被创建时删除这个被跟踪路径。它不记录远端 API 调用、数据库写入、pip/npm 安装、系统环境变化、后台进程、workspace 外文件或 Docker 外部副作用。因此它不是通用 rollback、不是事务系统、也不是 sandbox。工业级表达必须把能力和边界同时说清楚：本地文件状态可恢复，外部副作用只能通过 sandbox、审计、补偿操作或人工处理。
+- 用户回答：Week 6 是加固周，Day 1 的目标是先按工业级 9 个维度把现状、证据、缺口和优先级讲清楚。当前 Week 4-5 已经有 permission gate、Workspace、FileCheckpoint、GitCheckpoint、CommandRuntime、DockerRuntime fallback 和文件 rollback，但这些能力不是完整工业级链路。如果不先评估就直接写 retry、audit 或 sandbox，很容易把未来能力和当前能力混在一起，或者修错优先级。正确顺序是先确认 P0 缺口：安全性、健壮性、可观测性，再把后续 Day 2-Day 7 拆成可测试的小加固项。这样 Day 2 写错误分类、Day 4 写 audit、Day 5 写 safety suite 都有明确依据，而不是凭感觉扩展范围。
+- 标准回答：正确。现状评估的价值是建立“事实地图”：哪些能力已经有测试证据，哪些只是独立 API，哪些尚未接入主链，哪些不能对外承诺。加固周不新增大模块，而是把已有 runtime、安全边界和 rollback 做到可解释、可测、可审计。直接写 retry、audit 或 sandbox 会跳过优先级判断，可能把 P1/P2 问题放到 P0 前面，也可能把 Docker adapter 误说成完整 sandbox。Day 1 先产出 9 维差距和 P0/P1/P2 排序，是为了让后续加固都能用测试和文档证明，而不是只靠口号。
 
-### 面试题 2：从 `examples/05_checkpoint_rollback.py` 追到 `Workspace.resolve_path(...)` 和 `FileCheckpoint.restore()`，请说明路径边界和文件恢复分别在哪一层完成。
+### 面试题 2：请沿着 `run_command` 的执行路径说明：一次命令从 `ToolRegistry.run(...)` 到 `ShellRuntime.run(...)` 会经过哪些对象？`ASK` 和 `DENY` 为什么不会进入真实 shell？
 
-- 用户回答：在 `examples/05_checkpoint_rollback.py` 中，示例先创建临时 workspace 和 `demo.txt`，然后构造 `Workspace(workspace_path)`，再调用 `FileCheckpoint.create(workspace, [file_name])`。路径边界不由示例自己判断，也不由 checkpoint 重新写一套规则，而是在 `FileCheckpoint.create(...)` 内部对每个 path 调用 `workspace.resolve_path(...)` 完成。`Workspace.resolve_path(...)` 会把相对路径基于 root 解析成绝对路径，并确认解析后的路径仍等于 root 或者位于 root 的 parents 链内，否则抛出越界错误。文件恢复发生在 `FileCheckpoint.restore()`：它遍历保存的 snapshot，如果快照时文件存在，就通过 `_restore_existing_file(...)` 写回原始 bytes；如果快照时文件不存在，就通过 `_restore_missing_file(...)` 删除后来创建的被跟踪文件。也就是说，`Workspace` 负责“这个路径是否属于授权工作区”，`FileCheckpoint` 负责“这个文件状态如何保存和恢复”。
-- 标准回答：正确。示例层只负责构造一个可运行场景，不直接承担安全边界。路径边界由 `Workspace.resolve_path(...)` 完成：它校验输入类型和空路径，把相对路径拼到 workspace root 下并 `.resolve()`，再用 `path == root or root in path.parents` 判断解析后路径是否仍在工作区内。`FileCheckpoint.create(...)` 必须复用这个路径边界，避免 checkpoint 和工具各自维护规则导致漂移。恢复层由 `FileCheckpoint.restore()` 完成，它根据 `_FileSnapshot.existed` 分成“写回原 bytes”与“删除快照时不存在的文件”两条路径。这个分层很重要：Workspace 是路径归属事实源，FileCheckpoint 是文件状态恢复机制。
+- 用户回答：执行路径是：`ToolRegistry.run("run_command", arguments)` 先检查参数是否是 dict，并通过 `get(name)` 找到 `ShellCommandTool`；然后进入 `Tool.run(arguments)`，按 `ToolParameter` 做基础参数校验；接着进入 `ShellCommandTool._run(...)`。在 `_run(...)` 里先调用 `classify_command(arguments["command"])` 得到 `RiskAssessment`，再调用 `PermissionPolicy.decide(assessment)` 得到 `PermissionDecision`。如果结果是 `DecisionAction.DENY`，直接抛 `PermissionError`；如果是 `DecisionAction.ASK`，在没有审批恢复流程前也抛 `PermissionError`；只有 `DecisionAction.ALLOW` 才调用 `self._runtime.run(arguments)`。默认 runtime 是 `ShellRuntime()`，所以真实 shell 只发生在 ALLOW 之后。`ASK` 和 `DENY` 被 `ToolRegistry.run(...)` 捕获后会变成失败的 `ToolResult`，不会继续进入 `ShellRuntime.run(...)`。
+- 标准回答：正确。当前主链是 `ToolRegistry.run(...) -> Tool.run(...) -> ShellCommandTool._run(...) -> classify_command(...) -> PermissionPolicy.decide(...) -> CommandRuntime.run(...) / ShellRuntime.run(...)`。`ToolRegistry` 负责工具查找、异常包装、统计和输出截断；`Tool.run(...)` 负责基础 schema 校验；`ShellCommandTool._run(...)` 是 shell 执行前 gate；permission 层只做风险和策略判断，不执行命令。`ASK` 表示需要人工批准但当前尚未接入审批恢复，因此必须失败返回；`DENY` 表示明确阻断。两者都在调用 runtime 之前抛出 `PermissionError`，所以不会触发真实 subprocess。
 
-### 面试题 3：如果未来要把 rollback 扩展到多文件 patch、GitCheckpoint 和 shell/Docker runtime，你会如何设计执行顺序、失败报告、审计记录和测试矩阵？
+### 面试题 3：如果要把 audit 自动接入 shell/file gate，你会把写 audit 的逻辑放在哪一层？请说明哪些字段必须记录、哪些字段绝对不能记录、audit 写入失败时如何处理，以及如何测试 allow / ask / deny 三种路径。
 
-- 用户回答：我会先保持分层，不做一个“万能 rollback”。执行顺序上，先解析 workspace 和风险分类，再由 `PermissionPolicy` 判断；只有 `ALLOW` 或未来审批通过后，才创建合适的 checkpoint，然后执行真实副作用。多文件 patch 如果有明确文件列表，可以创建一个覆盖所有目标文件的 `FileCheckpoint`；如果是 git repo 级代码修改，可以创建 `GitCheckpoint` 保存 tracked dirty diff；shell/Docker runtime 只有在能声明或隔离副作用范围时才承诺 rollback。失败报告要结构化，至少包含原始执行错误、rollback 是否尝试、哪些文件或阶段恢复成功、哪些失败、是否存在半恢复状态，以及用户下一步应该怎么处理。审计记录应包含 trace id、工具名、风险等级、策略动作、checkpoint 类型、是否执行、rollback 尝试和结果，但不能记录完整文件内容、secret 或完整 stdout/stderr。测试矩阵要覆盖：多文件全部恢复、部分写入失败、restore 自身失败、`ASK/DENY` 不创建 checkpoint、GitCheckpoint tracked diff 恢复、untracked/staged 不被误承诺、Docker 不可用 fallback 不调用宿主机 shell、shell 未知副作用不承诺恢复，以及 audit 字段完整且脱敏。
-- 标准回答：正确。统一 rollback 应该是分层编排，而不是单个全能函数。推荐顺序是：workspace 边界校验 -> permission 分类和策略 -> 审批通过或 `ALLOW` -> 创建对应 checkpoint -> 执行 runtime/tool -> 失败时恢复 -> 写入结构化 audit。多文件 patch 可用 `FileCheckpoint` 或未来 patch plan；仓库级 tracked 修改可用 `GitCheckpoint`；shell/Docker 需要先解决副作用范围、sandbox 隔离和 audit 事实记录，不能默认承诺恢复所有外部状态。失败报告不能只返回“rollback failed”，而要说明阶段、原始错误、恢复错误、路径摘要、半恢复风险和人工处理建议。测试要从行为出发，证明文件真的恢复、未授权路径不创建 checkpoint、恢复失败可观察、Docker fallback 不静默降级、Git untracked/staged 边界不被误说成已支持、审计不泄漏敏感信息。
+- 用户回答：我会把 audit 写入放在具体 gate 附近：shell 侧放在 `ShellCommandTool._run(...)` 做完 `PermissionPolicy.decide(...)` 后，file 侧放在 `_ensure_file_permission(...)` 或它的调用边界附近。这样 audit 能记录真实策略判断，同时不让 `ToolRegistry` 理解 shell/file 的业务风险。必须记录的字段包括 timestamp、trace_id 或后续 request id、tool_name、action、risk_level、matched_rule、reason 摘要、executed、是否创建 checkpoint 或 rollback 结果。绝对不能记录完整命令输出、完整文件内容、secret、token、完整 env 值和大 stdout/stderr。audit 写入失败不能伪装成成功，P0 安全路径更保守：至少要返回可观察的失败或降级字段，避免用户以为已经留证；如果是只读安全命令，未来可以按策略降级，但必须让调用方知道 audit_failed。测试要覆盖 ALLOW 会记录 executed=true 并进入 runtime，ASK 记录 executed=false 且不执行，DENY 记录 executed=false 且不执行；还要测 audit 文件内容脱敏、写入失败语义和不会记录完整文件内容。
+- 标准回答：正确。audit 应靠近“事实产生点”，也就是 permission gate 做出 allow / ask / deny 决策的地方，而不是放到低层 runtime 或泛化的 registry 里。runtime 只知道怎么执行，不应该决定安全语义；registry 只知道工具成功失败，不了解 matched_rule 和 executed 的真实含义。必须记录的是可追溯事实：时间、工具名、风险等级、匹配规则、策略动作、是否执行、路径或命令摘要、trace/request id、失败或 rollback 摘要。不能记录完整文件内容、完整 stdout/stderr、secret、token、密码、完整 env、过大的命令输出或用户隐私。audit 写失败时要有明确错误语义，不能静默吞掉；后续可以按策略区分 fail-closed 和 degraded，但必须可测试、可观察。测试应分别构造 ALLOW、ASK、DENY，并断言 audit 事件字段、runtime 是否被调用、敏感内容是否被排除，以及 audit 写失败时调用方能看到稳定错误。
+
+## 第 38 天：2026-07-09
+
+### 面试题 1：为什么 `error_type="PermissionError"` 不足以支撑 retry、audit 和 safety regression？`ToolErrorCode` 解决了什么稳定性问题？
+
+- 用户回答：`error_type="PermissionError"` 只能说明 Python 异常类型，不能稳定表达业务语义。同样是 `PermissionError`，可能是 `DENY`，也可能是未审批的 `ASK`；同样是 `RuntimeError`，可能是普通 runtime 失败，也可能是 checkpoint 或 rollback 失败。如果 retry、audit 或 safety regression 依赖自然语言 `error_message`，后续文案一改测试和策略就会漂移。`ToolErrorCode` 把工具失败变成稳定枚举，例如 `PERMISSION_DENIED`、`PERMISSION_APPROVAL_REQUIRED`、`UNKNOWN_TOOL`、`CHECKPOINT_FAILED`、`ROLLBACK_FAILED`。这样上层可以基于稳定错误码做判断，而不用解析异常名和字符串。
+- 标准回答：正确。`error_type` 是语言层异常名，粒度太粗；`error_message` 是给人看的描述，容易随文案和实现细节变化。工业级系统需要机器可依赖的错误语义：是否需要用户审批、是否被策略拒绝、是否是坏参数、是否是未知工具、是否是 runtime 环境失败、是否是 checkpoint 或 rollback 失败。`ToolErrorCode` 把这些失败路径固定成可测试、可审计、可用于策略判断的枚举，同时保留旧 `error_type` / `error_message` 给调试和兼容使用。
+
+### 面试题 2：请说明 `ToolRegistry.run(...)` 捕获异常后如何通过 `ToolResult.from_exception(...)` 得到 `error_code`；ASK、DENY、未知工具、rollback 失败分别映射成什么？
+
+- 用户回答：`ToolRegistry.run(...)` 会先记录开始时间，然后执行参数检查、`get(name)`、`Tool.run(arguments)` 和具体工具逻辑。如果中间抛异常，`except` 分支计算 `duration_ms`，调用 `ToolResult.from_exception(exc, duration_ms=duration_ms)`。`from_exception(...)` 保存原来的 `error_type=type(exc).__name__` 和 `error_message=str(exc)`，同时通过错误分类函数把异常映射成 `error_code`。当前 `ASK` 的错误消息包含 `approval required`，映射为 `ToolErrorCode.PERMISSION_APPROVAL_REQUIRED`；`DENY` 包含 `permission denied`，映射为 `PERMISSION_DENIED`；未知工具是 `KeyError`，映射为 `UNKNOWN_TOOL`；rollback 失败的 `RuntimeError` 消息包含 `rollback failed`，映射为 `ROLLBACK_FAILED`。
+- 标准回答：正确。当前统一入口是 `ToolRegistry.run(...)`，它不让异常直接冒泡到 AgentLoop，而是包装成 `ToolResult`。`ToolResult.from_exception(...)` 保留旧字段用于兼容：`error_type` 仍是异常类名，`error_message` 仍是异常文本；新增的 `error_code` 则由异常类型和当前稳定消息标记映射得到。`PermissionError + approval required` 对应 `PERMISSION_APPROVAL_REQUIRED`，`PermissionError + permission denied` 对应 `PERMISSION_DENIED`，`KeyError` 对应 `UNKNOWN_TOOL`，rollback 失败消息对应 `ROLLBACK_FAILED`。这让后续策略层不必直接解析完整自然语言。
+
+### 面试题 3：如果 Day 3 要基于错误码实现 retry policy，哪些错误可以考虑重试，哪些绝对不能重试？请说明边界、反例和测试方式。
+
+- 用户回答：可以考虑重试的应该是明确临时性的 runtime 失败，例如未来定义的超时、Docker daemon 临时不可用、文件锁或外部依赖短暂不可用，但前提是操作没有危险副作用，或者是只读/幂等操作。绝对不能重试的包括 `PERMISSION_DENIED`，因为策略已经禁止；`PERMISSION_APPROVAL_REQUIRED`，因为必须先等用户审批，不能偷偷重试；`INVALID_ARGUMENT` 和 `UNKNOWN_TOOL`，因为参数或工具名本身不对，重复执行不会变好；`ROLLBACK_FAILED` 也不能自动重试，因为系统可能已经处于半恢复状态。`CHECKPOINT_FAILED` 通常也不能直接重试真实副作用，应该先修复 checkpoint 前置条件。测试上应构造 fake runtime 统计调用次数，证明可重试错误按次数重试；同时断言 permission、坏参数、未知工具、rollback 失败都只调用一次或不进入副作用路径，并且不会创建额外 checkpoint。
+- 标准回答：正确。retry policy 必须先区分“临时失败”和“策略/输入/安全失败”。可重试候选只应是低风险、幂等、明确临时的失败，例如只读命令超时、临时 runtime unavailable 或未来显式标记的 transient error。不能重试的包括：`PERMISSION_DENIED`（安全策略禁止）、`PERMISSION_APPROVAL_REQUIRED`（需要人类决策）、`INVALID_ARGUMENT`（输入错误）、`UNKNOWN_TOOL`（路由错误）、`ROLLBACK_FAILED`（可能半恢复，继续自动动作会扩大风险）、大多数 `CHECKPOINT_FAILED`（保护机制未建立，不能继续执行副作用）。测试矩阵应覆盖重试次数、幂等操作、非幂等操作不重试、permission 不绕过、rollback failure fail-closed、以及 retry 过程中的 audit/trace 事实记录。
+
+## 第 39 天：2026-07-10
+
+### 面试题 1：为什么 `PERMISSION_DENIED`、`PERMISSION_APPROVAL_REQUIRED` 和 `INVALID_ARGUMENT` 不应该通过 retry 解决？
+
+- 用户回答：这三类失败不是临时运行环境问题，重复执行不会改变根因。`PERMISSION_DENIED` 表示策略明确禁止执行，retry 会绕过安全边界；`PERMISSION_APPROVAL_REQUIRED` 表示需要用户审批，不能由系统偷偷重复尝试；`INVALID_ARGUMENT` 表示输入本身错误，应该修正参数而不是重复执行同一个坏调用。retry 只适合明确临时、低风险、最好是幂等的 runtime 失败。
+- 标准回答：正确。retry 解决的是“同一个动作稍后再试可能成功”的临时失败，不解决策略拒绝、用户审批和输入错误。`PERMISSION_DENIED` 是安全策略的最终拒绝，重试会把安全规则变成可绕过规则；`PERMISSION_APPROVAL_REQUIRED` 是 human-in-the-loop 边界，必须暂停等待用户决策；`INVALID_ARGUMENT` 是调用方构造参数有问题，需要修正工具调用。工业级系统必须把这些失败 fail-closed，而不是通过 retry 制造重复副作用。
+
+### 面试题 2：请沿着 `ToolRegistry.run(...) -> ToolResult.from_exception(...) -> ToolResult.error_code -> RetryPolicy.decide(...)` 说明一次工具失败如何变成 retry 决策。
+
+- 用户回答：一次工具调用先进入 `ToolRegistry.run(...)`。如果工具查找、参数校验或具体 handler/runtime 抛异常，`ToolRegistry.run(...)` 会捕获异常并调用 `ToolResult.from_exception(...)`。`from_exception(...)` 保留 `error_type` 和 `error_message`，同时用异常类型和稳定消息标记生成 `ToolErrorCode`，写入 `ToolResult.error_code`。随后调用方把这个 `ToolResult` 交给 `RetryPolicy.decide(...)`。`RetryPolicy` 不解析自然语言，而是读取 `error_code`：如果是 `RUNTIME_FAILED`，返回可重试候选；如果是 permission、参数、未知工具、checkpoint 或 rollback 失败，则返回不可重试并给出原因。
+- 标准回答：正确。当前链路把“异常”分两步变成“策略输入”：第一步在 `ToolRegistry.run(...)` 边界把异常包装成 `ToolResult`，避免异常直接打断 AgentLoop；第二步在 `ToolResult.from_exception(...)` 中把粗粒度异常映射为稳定 `ToolErrorCode`。`RetryPolicy.decide(...)` 只消费 `ToolResult`，以 `error_code` 做判断：成功结果不需要 retry，`RUNTIME_FAILED` 是临时失败候选，权限、审批、参数、未知工具、checkpoint 和 rollback 失败默认不可重试。这个设计让 retry policy 不依赖脆弱的错误文本。
+
+### 面试题 3：如果未来要把 retry 真正接入执行链，你会把 attempt loop 放在哪一层？请说明如何避免重复执行危险副作用、如何处理 timeout/backoff、如何记录 audit，以及如何测试 `ROLLBACK_FAILED` 必须 fail-closed。
+
+- 用户回答：我不会把 attempt loop 放进具体工具函数，也不会直接塞进 `ToolResult`。更合适的位置是 `ToolRegistry` 上方或一个独立 `ToolExecutor` / runtime orchestration 层，因为那里能看到工具名、参数、权限结果、幂等性、retry policy、trace 和 audit。为了避免重复危险副作用，执行前必须先判断工具是否只读或显式幂等，写文件、shell、Docker、网络/API、包安装等默认不可自动 retry，除非有 checkpoint、sandbox 或用户确认。timeout/backoff 应该有最大尝试次数、总耗时预算、指数退避或固定退避，并且每次 attempt 都要有独立结果和耗时记录。audit 要记录 trace_id、tool_name、attempt_index、error_code、retry_decision、是否执行、是否被 permission 阻断和最终结果，但不能记录完整 secret、文件内容或大输出。测试上要构造 fake tool 统计调用次数，证明 `RUNTIME_FAILED` 可按策略重试，permission/参数/未知工具不会重试；还要构造 `ROLLBACK_FAILED`，断言 attempt loop 立刻停止、只调用一次、返回 fail-closed，并写出可观察的 audit/reason。
+- 标准回答：正确。自动 retry 应该属于执行编排层，而不是单个工具或结果对象。推荐未来新增 `ToolExecutor` 或在 `ToolRegistry` 外包一层 orchestration：它可以读取工具元数据、`ToolResult.error_code`、幂等性、安全级别、trace 和 audit 配置。危险副作用默认不自动 retry；只有只读、幂等、低风险且明确 transient 的失败才允许进入 attempt loop。timeout/backoff 要有 per-attempt timeout、总时间预算、最大次数、退避策略和中断条件。audit 必须记录每次尝试的事实，但保持摘要化和脱敏。`ROLLBACK_FAILED` 的测试必须证明 fail-closed：不再发起下一次 attempt，不创建额外 checkpoint，不继续执行副作用，并返回清晰错误原因。
+
+## 第 40 天：2026-07-10
+
+### 面试题 1：permission policy 与 audit 的职责分别是什么？为什么 `ASK` 和 `DENY` 即使不进入真实执行器，也必须保留审计证据？
+
+- 用户回答：permission policy 负责根据风险评估决定 `ALLOW`、`ASK` 或 `DENY`，属于策略判断；audit 负责记录已经发生的策略事实，属于可追溯证据，不能反过来决定是否允许执行。`ASK` 和 `DENY` 虽然没有进入真实执行器，但它们仍然发生了工具请求、风险匹配和策略决策。如果没有审计，就无法证明系统确实拦截过危险操作，也无法区分“用户请求过但被拒绝”和“工具根本没有被调用”。
+- 标准回答：正确。policy 的输入是 `RiskAssessment`，输出是 `PermissionDecision`，它回答“这次调用能否进入副作用路径”；audit 记录决策时间、工具、风险、匹配规则、理由和是否进入执行路径，回答“系统事实上做了什么判断”。`ASK` 与 `DENY` 是安全边界的重要事实：它们可以用于追责、调试、回放、安全回归和发现反复尝试的危险请求。审计不能替代 policy，也不能因为调用未执行就丢失证据。
+
+### 面试题 2：请沿着一次 `run_command` 的 `ALLOW` 路径，说明 `classify_command(...)`、`PermissionPolicy.decide(...)`、`record_permission_decision(...)`、`ShellRuntime.run(...)` 的顺序；为什么 audit 写入失败时 runtime 不得被调用？
+
+- 用户回答：调用先进入 `ShellCommandTool._run(...)`，它调用 `classify_command(...)` 得到 `RiskAssessment`，再把评估交给 `PermissionPolicy.decide(...)` 得到 `ALLOW`。随后调用 `record_permission_decision(...)` 写入摘要 JSONL；只有写入成功后才调用 `ShellRuntime.run(...)`。如果 audit 写入失败仍然调用 runtime，就可能产生真实副作用但没有可追溯证据，安全系统无法证明这次执行是否经过授权，所以当前 `ALLOW` 路径采用 fail-closed。`ASK` 和 `DENY` 则写入 `executed=false` 后继续返回原有 `PermissionError`。
+- 标准回答：正确。当前顺序是：风险分类识别 `RiskLevel.SAFE` 和 `matched_rule`；policy 把它映射为 `DecisionAction.ALLOW`；audit helper 仅使用决策摘要构造 `PermissionAuditEvent`；JSONL 成功追加后才进入 `CommandRuntime` / `ShellRuntime`。fail-closed 的原因是把“允许产生副作用”和“至少已有授权事实”绑定起来：审计不可写时继续执行会形成无法解释的安全盲区。该保证只覆盖副作用开始之前的审计写入，不宣称 JSONL 与 shell 本身具备跨系统原子事务。
+
+### 面试题 3：当前 `ALLOW` 能做到 audit fail-closed，但不能让 JSONL、shell 与文件写盘成为一个原子事务。若要继续提高可靠性，你会如何设计事件状态或存储方案？请比较 write-ahead event、事务型数据库/队列、outbox 三种思路，并说明如何测试“副作用成功但完成审计失败”的边界。
+
+- 用户回答：write-ahead event 可以在副作用前先写入“准备执行”事件，优点是简单、适合 fail-closed，缺点是后续执行结果可能缺失，需要补偿或超时扫描；事务型数据库或队列能提供更强的持久化和重试能力，但引入服务依赖、事务边界和运维成本，仍不能天然把本地 shell 与数据库做成一个原子事务；outbox 可以把“待执行/执行结果”放到可靠本地表或队列，再由投递器发送，适合最终一致性，但需要幂等键、状态机和死信处理。当前项目应先保留 write-ahead 摘要事件，未来若需要更强可靠性再引入 outbox 或事务存储。测试要模拟：预写成功后副作用失败、预写失败时副作用不发生、副作用成功后完成事件写入失败、重复投递，以及恢复扫描能把未完成事件标记为 unknown/recovery_required，而不是伪造成功。
+- 标准回答：正确。三种方案的核心差异是持久化强度与复杂度：write-ahead event 先记录 intent，再执行副作用，适合当前 fail-closed，但必须接受“执行结果缺失”并设计 reconciliation；事务型数据库/队列提供更强的持久化、重试和查询能力，却不能自动覆盖本地 shell、文件系统和远程 API 的全部原子性；outbox 把待投递事实与业务状态放在同一可靠存储中，再异步投递，适合最终一致性，但必须设计幂等键、状态机、重试上限和死信。测试至少要覆盖 intent 写入失败时零副作用、intent 成功后副作用失败、执行成功但 completion audit 失败、进程崩溃恢复、重复事件去重，以及任何未知状态都不能被标记为成功。当前 Day 4 只实现副作用前的 JSONL fail-closed，未宣称跨系统原子事务。

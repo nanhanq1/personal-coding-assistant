@@ -2,77 +2,66 @@
 
 本文件只保留当前活跃任务。历史任务归档在 `docs/archive/daily_tasks/`。完整 24 周每日计划见 `docs/14_24_WEEK_PLAN.md`。
 
-## 2026-07-04
+## 2026-07-10：Week 6 Day 5
 
-日期：2026-07-09（任务于 2026-07-04 创建，2026-07-09 执行）
-当前阶段：Week 6 Day 1
-当前模块：Tool Runtime 加固周 - 现状评估
+日期：2026-07-10
+当前阶段：Week 6 Tool Runtime 加固周
+当前模块：Safety suite
 预计用时：1-2 小时
-执行状态：评估报告和基线验证已完成，等待用户回答 Day 1 面试题；未归档，未推进 Week 6 Day 2。
+执行状态：代码、测试和验证已完成；Week 6 Day 5 面试题待生成、回答和归档。Week 6 Day 4 面试题已按用户确认归档为第 40 天记录。
 
 ### 1. 今日学习目标
 
-- 按 `docs/INDUSTRIAL_STANDARDS.md` 的 9 个维度评估 Week 4-5 的 permission、workspace、checkpoint、runtime 和 rollback 当前状态。
-- 区分“已实现能力”“部分达标能力”和“仍未接入主链的工业级缺口”。
-- 产出 Week 6 加固报告初版，为后续 Day 2-Day 7 的加固顺序排序。
+- 把 permission、workspace、audit 的安全边界转成可重复运行的回归测试。
+- 覆盖 destructive command、network/inline code、workspace 外路径和 secret redaction。
+- 保持 Safety suite 只验证已有行为，不新增大型安全平台或审批恢复流程。
 
 ### 2. 今日前置知识
 
-- Week 4 已完成风险分类、策略判断、审批对象、shell/file gate 和独立 audit 事件。
-- Week 5 已完成 `Workspace(root)`、`FileCheckpoint`、`GitCheckpoint`、`CommandRuntime`、`DockerRuntime` graceful fallback、文件工具允许执行失败 rollback 和 Day 7 rollback 验收示例。
-- Week 6 是加固周，不新增大模块，先用 9 维标准找差距。
+- Week 4 已完成风险分类、策略判断、shell/file gate 和权限审计事件。
+- Week 5 已完成 Workspace、checkpoint、rollback 和 runtime 边界。
+- Week 6 Day 4 已完成 shell/file gate audit matrix、摘要字段、隐私边界和 fail-closed 测试。
 
 ### 3. 今日代码任务
 
-- 不写新功能代码。
-- 已新增 `docs/17_WEEK6_HARDENING_REPORT.md` 作为 Week 6 加固报告初版。
-- 不改变 shell/file/runtime 主链行为。
+- 新建 `tests/safety/` 测试目录及最小测试配置。
+- 将 destructive command、network command、inline code、outside workspace、overwrite/delete-like edit、secret redaction 组织为安全回归用例。
+- 每个用例断言：真实副作用是否发生、错误码是否稳定、审计是否存在且不泄漏敏感值。
+- 不实现新的风险分类规则；发现缺口时先记录，不在 Day 5 顺手扩张模块。
 
 ### 4. 今日测试任务
 
 ```powershell
+E:\python\Scripts\pytest.exe tests\safety -q
 E:\python\Scripts\pytest.exe -q
-python examples\01_minimal_agent.py
-python examples\02_tool_agent.py
-python examples\03_observed_tool_run.py
-python examples\04_permission_agent.py
-python examples\05_checkpoint_rollback.py
-python -m compileall src examples -q
 ```
 
-执行结果：2026-07-09 已完成；全量测试 `168 passed, 1 skipped`，5 个示例和 `compileall` 均通过。
+完成后补跑五个示例、`python -m compileall src examples -q` 和 `git diff --check`。
+
+本次实际验证：`tests/safety` 为 `9 passed`；全量为 `199 passed, 1 skipped`；五个示例、compileall 和 diff check 均通过。
 
 ### 5. 今日阅读任务
 
 - `docs/INDUSTRIAL_STANDARDS.md`
-- `docs/12_IMPLEMENTED_ARCHITECTURE_AND_INDUSTRIAL_GAPS.md`
+- `docs/17_WEEK6_HARDENING_REPORT.md`
 - `ARCHITECTURE.md`
-- `docs/06_ARCHITECTURE_DECISIONS.md` 中 ADR-0014 到 ADR-0024
+- `docs/03_WEEKLY_SPRINTS.md` 中 Week 6 Safety suite 约束
 
 ### 6. 今日文档任务
 
-- 已建立 Week 6 加固报告初版。
-- 已更新 `docs/07_IMPLEMENTATION_LOG.md`。
-- 已更新 `docs/09_NEXT_ACTIONS.md`。
-- 已更新 `docs/04_RESOURCE_LIBRARY.md`，补充 Day 1 资料和视频入口。
-
-### 附：本次文档维护
-
-- 新增 `docs/16_TEACHING_WORKFLOW.md`，固化教学顺序、用户先写代码流程和每日收口门禁。
-- 更新 `docs/15_MEMORY_SYSTEM.md`，明确仓库协作记忆、Codex 外部记忆和未来运行时记忆三层边界。
-- 更新 `docs/CODEX_PROJECT_BRIEF.md`、`DOC_RULES.md` 和 `docs/INDEX.md`，减少教学流程和记忆规则分散。
+- 更新 `docs/07_IMPLEMENTATION_LOG.md`，记录安全回归矩阵和真实失败边界。
+- 更新 `docs/09_NEXT_ACTIONS.md` 与 `docs/17_WEEK6_HARDENING_REPORT.md`。
+- 如新增安全测试约定，再更新 `EVALUATION.md`。
 
 ### 7. 今日复盘问题
 
-1. Week 4-5 当前在哪些维度已经部分达标？
-2. 哪些缺口属于 P0：安全性、健壮性、可观测性？
-3. 哪些能力不能在 Week 6 继续跳过，否则会影响进入 Week 7 Coding Agent？
-4. 为什么加固周不应该新增大模块？
-5. 如何用测试和真实验证证明加固不是文档口号？
+1. 安全回归测试与普通 permission 单元测试的边界是什么？
+2. 为什么安全测试必须断言“副作用没有发生”，不能只断言异常类型？
+3. secret redaction 测试如何避免把 secret 本身写进测试失败输出或审计日志？
 
 ### 8. 今日完成标准
 
-- Week 6 加固报告初版完成。
-- 9 个维度都有当前状态、差距和优先级。
-- 不新增大模块，不夸大当前能力。
-- 基线测试、示例和编译验证有记录。
+- `tests/safety` 已覆盖计划中的危险命令、网络/inline code、越界路径、覆盖/删除式编辑和 secret 脱敏。
+- 安全测试与全量测试已通过。
+- 失败路径均有稳定错误语义、无未授权副作用、无敏感数据泄漏。
+- 已记录真实网络/删除、审批恢复、完整 sandbox 和自动 rollback 等未覆盖边界；下一步生成 Day 5 面试题并等待回答。

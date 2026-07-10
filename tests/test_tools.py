@@ -4,6 +4,7 @@ from typing import Any
 import pytest
 from pca.tools import base as tool_base
 from pca.tools import create_coding_tool_registry
+from pca import tools as tools_package
 from pca.tools.base import Tool, ToolParameter, ToolResult
 from pca.tools.registry import ToolRegistry
 
@@ -288,6 +289,7 @@ def test_tool_result_success_carries_result_and_duration():
     assert result.trace_id is None
     assert result.tool_call_id is None
     assert result.output_truncated is False
+    assert result.error_code is None
 
 
 def test_tool_result_failure_carries_error_and_duration():
@@ -306,6 +308,85 @@ def test_tool_result_failure_carries_error_and_duration():
     assert result.trace_id is None
     assert result.tool_call_id is None
     assert result.output_truncated is False
+    assert result.error_code is tool_base.ToolErrorCode.RUNTIME_FAILED
+
+
+def test_tool_result_failure_can_carry_stable_error_code_without_changing_text():
+    """测试失败结果能携带稳定错误码，同时旧文本输出保持兼容。"""
+    result = ToolResult.failure(
+        error_type="PermissionError",
+        error_message="approval required",
+        duration_ms=3,
+        error_code=tool_base.ToolErrorCode.PERMISSION_APPROVAL_REQUIRED,
+    )
+
+    assert result.error_code is tool_base.ToolErrorCode.PERMISSION_APPROVAL_REQUIRED
+    assert str(result) == "Tool execution failed: PermissionError: approval required"
+
+
+def test_tool_result_direct_failed_construction_gets_default_error_code():
+    """测试旧的 dataclass 直接构造失败结果仍保持兼容。"""
+    result = ToolResult(
+        ok=False,
+        error_type="RuntimeError",
+        error_message="boom",
+    )
+
+    assert result.error_code is tool_base.ToolErrorCode.RUNTIME_FAILED
+
+
+def test_tool_error_code_is_exported_from_tools_package():
+    """测试 ToolErrorCode 和 ToolResult 一样属于工具结果公开契约。"""
+    assert tools_package.ToolErrorCode is tool_base.ToolErrorCode
+
+
+def test_tool_result_rejects_string_error_code_to_keep_contract_stable():
+    """测试 error_code 必须是 ToolErrorCode，避免散落自由字符串。"""
+    with pytest.raises(TypeError, match="error_code"):
+        ToolResult.failure(
+            error_type="RuntimeError",
+            error_message="boom",
+            duration_ms=0,
+            error_code="runtime_failed",  # type: ignore[arg-type]
+        )
+
+
+def test_tool_result_from_exception_maps_builtin_failures_to_error_codes():
+    """测试常见异常会映射为稳定错误码，供后续 retry/audit/safety 使用。"""
+    assert (
+        ToolResult.from_exception(ValueError("bad argument"), duration_ms=0).error_code
+        is tool_base.ToolErrorCode.INVALID_ARGUMENT
+    )
+    assert (
+        ToolResult.from_exception(TypeError("bad type"), duration_ms=0).error_code
+        is tool_base.ToolErrorCode.INVALID_ARGUMENT
+    )
+    assert (
+        ToolResult.from_exception(KeyError("missing"), duration_ms=0).error_code
+        is tool_base.ToolErrorCode.UNKNOWN_TOOL
+    )
+    assert (
+        ToolResult.from_exception(RuntimeError("boom"), duration_ms=0).error_code
+        is tool_base.ToolErrorCode.RUNTIME_FAILED
+    )
+
+
+def test_tool_result_from_exception_maps_checkpoint_failures_to_error_code():
+    """测试 checkpoint/git checkpoint 失败能区别于普通参数或 runtime 失败。"""
+    assert (
+        ToolResult.from_exception(
+            ValueError("workspace is not a git repository: repo"),
+            duration_ms=0,
+        ).error_code
+        is tool_base.ToolErrorCode.CHECKPOINT_FAILED
+    )
+    assert (
+        ToolResult.from_exception(
+            RuntimeError("git executable is not available"),
+            duration_ms=0,
+        ).error_code
+        is tool_base.ToolErrorCode.CHECKPOINT_FAILED
+    )
 
 
 def test_tool_result_old_factories_keep_text_compatibility():
@@ -373,6 +454,7 @@ def test_tool_registry_run_returns_structured_failure_when_handler_raises():
     assert result.result is None
     assert result.error_type == "RuntimeError"
     assert result.error_message == "boom"
+    assert result.error_code is tool_base.ToolErrorCode.RUNTIME_FAILED
     assert result.duration_ms >= 0
 
 
@@ -402,6 +484,7 @@ def test_tool_registry_run_returns_structured_failure_for_bad_arguments():
     assert result.result is None
     assert result.error_type == "ValueError"
     assert "Missing required argument: path" in result.error_message
+    assert result.error_code is tool_base.ToolErrorCode.INVALID_ARGUMENT
     assert result.duration_ms >= 0
 
 
@@ -485,6 +568,7 @@ def test_tool_registry_stats_records_unknown_tool_failures():
     stats = registry.get_stats()
     assert result.ok is False
     assert result.error_type == "KeyError"
+    assert result.error_code is tool_base.ToolErrorCode.UNKNOWN_TOOL
     assert stats["missing_tool"]["calls"] == 1
     assert stats["missing_tool"]["successes"] == 0
     assert stats["missing_tool"]["failures"] == 1

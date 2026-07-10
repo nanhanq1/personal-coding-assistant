@@ -1,5 +1,113 @@
 # Architecture Decisions
 
+## ADR-0027：Week 6 Day 4 在 permission gate 自动写入摘要审计，ALLOW 路径 fail-closed
+
+日期：2026-07-10
+
+### 背景
+
+`PermissionAuditEvent` 与 JSONL 追加函数已经存在，但 shell/file gate 不会自动调用它。因而 `ALLOW`、`ASK`、`DENY` 虽有策略结果，却缺少可测试的统一证据；更严重的是，允许路径如果不能持久化审计，就无法证明副作用曾获授权。
+
+### 决策
+
+- 新增 `record_permission_decision(...)`，只从 `PermissionDecision` 构造摘要事件。
+- shell、write_file、edit_file 在 `PermissionPolicy.decide(...)` 后、真实副作用前写入审计。
+- 事件仅含 `timestamp`、`tool_name`、`action`、`risk_level`、`matched_rule`、`reason`、`executed`；禁止写入命令、路径、文件内容、env、token、secret、stdout、stderr。
+- `executed=True` 表示 permission gate 已允许进入副作用路径，不表示 runtime 或写盘必然成功。
+- `ALLOW` 的 audit 写入失败必须阻止 runtime/checkpoint/写盘；`ASK` 与 `DENY` 的写入失败仍保留原始 `PermissionError`，且绝不执行。
+- 调用方可注入 `audit_path` 以隔离测试或指定存储；shell 默认写到进程工作目录 `.pca/permission-audit.jsonl`，避免从未验证或只读的 `workspace_root` 派生路径而改变 runtime 校验语义。
+- `.pca/` 是本地运行时审计目录，加入 `.gitignore`。
+
+### 理由
+
+- 把审计放在 gate 边界，能同时覆盖 shell/file 的 allow、ask、deny，而不让 runtime、checkpoint 或 policy 承担混合职责。
+- 允许路径先落审计再产生副作用，提供最小 fail-closed 保证。
+- `ASK` 与 `DENY` 不产生副作用；保留它们原有错误语义比把存储故障伪装成策略结果更清晰。
+- 默认 audit 不依赖用户传入的工作区，可保持 `workspace_root`、`cwd` 的既有校验顺序和错误契约。
+
+### 暂不采用
+
+- 暂不实现跨 JSONL、shell、文件系统的原子事务；副作用开始后的失败仍由现有 runtime/checkpoint 边界表达。
+- 暂不实现审批通过后恢复执行、审计查询 API、远程后端或 trace 关联。
+- 暂不新增文件 `DENY` 风险规则；测试通过注入策略覆盖该 gate 分支。
+
+## ADR-0026：Week 6 Day 3 RetryPolicy 只表达可重试语义，不自动重复执行工具
+
+日期：2026-07-10
+
+### 背景
+
+Week 6 Day 2 已经在 `ToolResult` 边界新增 `ToolErrorCode`，让工具失败不再只依赖 `error_type` 和自然语言 `error_message`。Day 3 需要在这个稳定错误码之上定义 retry policy，但当前工具系统已经具备文件写盘、shell 执行、permission gate 和 rollback 等副作用路径。
+
+如果直接在 `ToolRegistry.run(...)` 中自动重试，会让 `write_file`、`edit_file` 或 `run_command` 这类工具可能重复执行危险副作用；如果继续让上层只读错误消息，又无法稳定区分临时 runtime 失败和绝对不可重试的权限、参数或 rollback 失败。
+
+### 决策
+
+- 新增 `src/pca/tools/retry.py`。
+- 定义 `RetryDecision(retryable: bool, reason: str)`，让策略输出同时包含布尔判断和解释原因。
+- 定义 `RetryPolicy.decide(result: ToolResult) -> RetryDecision`。
+- 定义便捷函数 `should_retry(result, policy=None) -> bool`。
+- `RetryPolicy` 只接受 `ToolResult`，拒绝含糊对象。
+- 成功结果不可重试。
+- `RUNTIME_FAILED` 作为可重试候选，表达“可能是临时失败”。
+- `INVALID_ARGUMENT`、`UNKNOWN_TOOL`、`PERMISSION_DENIED`、`PERMISSION_APPROVAL_REQUIRED`、`CHECKPOINT_FAILED` 和 `ROLLBACK_FAILED` 默认不可重试。
+- `CHECKPOINT_FAILED` 默认不可重试，因为恢复保护不可用时继续执行会扩大风险。
+- `ROLLBACK_FAILED` 必须 fail-closed，不能自动再次扩大副作用。
+- 从 `pca.tools` 包入口导出 `RetryDecision`、`RetryPolicy` 和 `should_retry`。
+
+### 理由
+
+- retry policy 属于策略判断，不属于 `ToolResult` 结果信封，也不属于 `ToolRegistry` 执行循环。
+- 独立模块能让 Day 3 focused tests 直接证明策略边界，不改变现有工具行为。
+- 以 `ToolErrorCode` 为输入，避免解析自然语言错误消息。
+- 返回 `RetryDecision` 比只返回布尔值更适合后续 audit、debug 和面试讲解。
+- 当前只做“是否可重试”的语义判断，给后续 timeout/backoff/executor 留接口，但不提前实现自动循环。
+
+### 暂不采用
+
+- 暂不在 `ToolRegistry.run(...)` 中自动 retry。
+- 暂不重复执行 `write_file`、`edit_file`、`run_command` 或任何带副作用工具。
+- 暂不实现 backoff、sleep、最大尝试次数、jitter 或 circuit breaker。
+- 暂不把 retry 决策自动写入 audit JSONL。
+- 暂不把 timeout policy 从 `ShellRuntime` 中抽象为全局运行时策略。
+
+## ADR-0025：Week 6 Day 2 在 ToolResult 边界增加稳定错误码
+
+日期：2026-07-09
+
+### 背景
+
+Week 4-5 已经接入 shell/file permission gate、`CommandRuntime`、`DockerRuntime` graceful fallback、`FileCheckpoint`、`GitCheckpoint` 和文件工具局部 rollback。但工具失败仍主要依赖 `error_type` 和自然语言 `error_message`，例如 `PermissionError`、`ValueError` 或 `RuntimeError`。
+
+这种表达对人类调试够用，但对后续 retry policy、audit matrix、safety regression 和真实验证不够稳定：同一个 `PermissionError` 既可能表示 `DENY`，也可能表示 `ASK` 等待审批；同一个 `RuntimeError` 也可能是普通 runtime 失败、checkpoint 失败或 rollback 失败。
+
+### 决策
+
+- 在 `src/pca/tools/base.py` 中新增 `ToolErrorCode`。
+- 在 `ToolResult` 中新增 `error_code: ToolErrorCode | None`。
+- 成功结果必须保持 `error_code=None`。
+- 失败结果必须携带 `ToolErrorCode`；旧的直接 dataclass 构造如果未传 `error_code`，默认补为 `RUNTIME_FAILED`，保持兼容。
+- `ToolResult.failure(...)` 默认使用 `RUNTIME_FAILED`，调用方可显式传入更具体错误码。
+- `ToolResult.from_exception(...)` 负责把当前工具链的异常映射为稳定错误码。
+- 当前先覆盖 `INVALID_ARGUMENT`、`UNKNOWN_TOOL`、`PERMISSION_DENIED`、`PERMISSION_APPROVAL_REQUIRED`、`RUNTIME_FAILED`、`CHECKPOINT_FAILED`、`ROLLBACK_FAILED`。
+- 从 `pca.tools` 包入口导出 `ToolErrorCode`，让它和 `ToolResult` 一样属于公开工具结果契约。
+
+### 理由
+
+- `ToolResult` 是工具执行结果进入 Agent Loop 和测试断言的统一信封，适合承载稳定错误语义。
+- 保留 `error_type` / `error_message` 和 `ToolResult.__str__()` 可以避免破坏旧示例、旧测试和 message history 文本。
+- 错误码先由当前异常和错误消息映射得到，避免在 Day 2 重写 permission、runtime、checkpoint 或 rollback 主链。
+- 区分 `PERMISSION_DENIED` 和 `PERMISSION_APPROVAL_REQUIRED` 能让后续审批恢复、audit 和 safety 测试不再解析自然语言。
+- 区分 checkpoint / rollback 失败，能为后续半恢复报告和审计证据留下稳定入口。
+
+### 暂不采用
+
+- 暂不实现 retry policy；Day 3 单独处理。
+- 暂不自动接入 audit JSONL；Day 4 单独处理。
+- 暂不改变 `AgentLoop` 的 tool message 文本格式。
+- 暂不把所有 runtime 返回值改成 `ToolResult`。
+- 暂不实现完整错误层级、用户建议字段、可恢复性枚举或 API 文档目录。
+
 ## ADR-0024：Week 5 Day 6 只在文件工具允许执行失败路径接入 FileCheckpoint rollback
 
 日期：2026-07-02

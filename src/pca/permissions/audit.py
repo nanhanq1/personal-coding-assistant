@@ -12,11 +12,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pca.permissions.policy import DecisionAction
+from pca.permissions.policy import DecisionAction, PermissionDecision
 
 
 @dataclass(frozen=True)
@@ -52,4 +52,28 @@ def append_audit_event(path: Path, event: PermissionAuditEvent) -> None:
         file.write("\n")
 
 
-__all__ = ["PermissionAuditEvent", "append_audit_event"]
+def record_permission_decision(
+    path: Path,
+    tool_name: str,
+    decision: PermissionDecision,
+    *,
+    executed: bool,
+) -> None:
+    """把一次 gate 决策写为摘要审计事件，不接收原始工具参数。"""
+    event = PermissionAuditEvent(
+        timestamp=datetime.now(timezone.utc),
+        tool_name=tool_name,
+        action=decision.action,
+        risk_level=decision.assessment.level.value,
+        matched_rule=decision.assessment.matched_rule,
+        reason=decision.reason,
+        executed=executed,
+    )
+    append_audit_event(path, event)
+
+
+__all__ = [
+    "PermissionAuditEvent",
+    "append_audit_event",
+    "record_permission_decision",
+]

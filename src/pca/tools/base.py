@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
 
 
@@ -13,6 +14,18 @@ JSON_TYPE_TO_PYTHON_TYPES: dict[str, tuple[type[Any], ...]] = {
 }
 
 DEFAULT_MAX_OUTPUT_CHARS = 4000
+
+
+class ToolErrorCode(Enum):
+    """工具失败的稳定错误码，供 retry、audit 和 safety 测试复用。"""
+
+    INVALID_ARGUMENT = "invalid_argument"
+    UNKNOWN_TOOL = "unknown_tool"
+    PERMISSION_DENIED = "permission_denied"
+    PERMISSION_APPROVAL_REQUIRED = "permission_approval_required"
+    RUNTIME_FAILED = "runtime_failed"
+    CHECKPOINT_FAILED = "checkpoint_failed"
+    ROLLBACK_FAILED = "rollback_failed"
 
 
 def truncate_output(
@@ -48,11 +61,12 @@ class ToolResult:
     # duration_ms: int = 0
     #
     # 问题：结果信封只能表达成功/失败内容和耗时，无法把一次 Agent
-    # 运行、一次工具调用和输出截断状态稳定挂到同一个结果对象上。
+    # 运行、一次工具调用、输出截断状态和稳定错误语义挂到同一个结果对象上。
     ok: bool
     result: Any = None
     error_type: str | None = None
     error_message: str | None = None
+    error_code: ToolErrorCode | None = None
     duration_ms: int = 0
     trace_id: str | None = None
     tool_call_id: str | None = None
@@ -77,13 +91,21 @@ class ToolResult:
         if not isinstance(self.output_truncated, bool):
             raise TypeError("tool result output_truncated must be a boolean")
         if self.ok:
-            if self.error_type is not None or self.error_message is not None:
+            if (
+                self.error_type is not None
+                or self.error_message is not None
+                or self.error_code is not None
+            ):
                 raise ValueError("successful tool result cannot contain error fields")
         else:
             if not isinstance(self.error_type, str) or self.error_type.strip() == "":
                 raise ValueError("failed tool result must contain error_type")
             if not isinstance(self.error_message, str):
                 raise TypeError("failed tool result error_message must be a string")
+            if self.error_code is None:
+                object.__setattr__(self, "error_code", ToolErrorCode.RUNTIME_FAILED)
+            if not isinstance(self.error_code, ToolErrorCode):
+                raise TypeError("failed tool result error_code must be a ToolErrorCode")
 
     @classmethod
     def success(
@@ -112,6 +134,7 @@ class ToolResult:
         error_message: str,
         duration_ms: int,
         *,
+        error_code: ToolErrorCode = ToolErrorCode.RUNTIME_FAILED,
         trace_id: str | None = None,
         tool_call_id: str | None = None,
         output_truncated: bool = False,
@@ -122,6 +145,7 @@ class ToolResult:
             result=None,
             error_type=error_type,
             error_message=error_message,
+            error_code=error_code,
             duration_ms=duration_ms,
             trace_id=trace_id,
             tool_call_id=tool_call_id,
@@ -139,9 +163,11 @@ class ToolResult:
         output_truncated: bool = False,
     ) -> "ToolResult":
         """把异常转换成结构化失败结果。"""
+        error_message = str(exc)
         return cls.failure(
             error_type=type(exc).__name__,
-            error_message=str(exc),
+            error_message=error_message,
+            error_code=classify_tool_exception(exc, error_message),
             duration_ms=duration_ms,
             trace_id=trace_id,
             tool_call_id=tool_call_id,
@@ -162,6 +188,7 @@ class ToolResult:
                 and self.result == other.result
                 and self.error_type == other.error_type
                 and self.error_message == other.error_message
+                and self.error_code == other.error_code
                 and self.duration_ms == other.duration_ms
                 and self.trace_id == other.trace_id
                 and self.tool_call_id == other.tool_call_id
@@ -176,6 +203,45 @@ class ToolResult:
         if not isinstance(self.result, dict):
             raise TypeError("tool result payload is not subscriptable")
         return self.result[key]
+
+
+def classify_tool_exception(
+    exc: Exception,
+    error_message: str | None = None,
+) -> ToolErrorCode:
+    """把当前工具链的异常映射为稳定错误码。"""
+    message = str(exc) if error_message is None else error_message
+    lowered_message = message.lower()
+    checkpoint_failure_markers = (
+        "checkpoint",
+        "not a git repository",
+        "git executable is not available",
+        "git command failed",
+    )
+
+    if isinstance(exc, PermissionError):
+        if "approval required" in lowered_message:
+            return ToolErrorCode.PERMISSION_APPROVAL_REQUIRED
+        if "permission denied" in lowered_message:
+            return ToolErrorCode.PERMISSION_DENIED
+        return ToolErrorCode.PERMISSION_DENIED
+
+    if isinstance(exc, KeyError):
+        return ToolErrorCode.UNKNOWN_TOOL
+
+    if isinstance(exc, (TypeError, ValueError)):
+        if any(marker in lowered_message for marker in checkpoint_failure_markers):
+            return ToolErrorCode.CHECKPOINT_FAILED
+        return ToolErrorCode.INVALID_ARGUMENT
+
+    if isinstance(exc, RuntimeError):
+        if "rollback failed" in lowered_message:
+            return ToolErrorCode.ROLLBACK_FAILED
+        if any(marker in lowered_message for marker in checkpoint_failure_markers):
+            return ToolErrorCode.CHECKPOINT_FAILED
+        return ToolErrorCode.RUNTIME_FAILED
+
+    return ToolErrorCode.RUNTIME_FAILED
 
 
 @dataclass(frozen=True)

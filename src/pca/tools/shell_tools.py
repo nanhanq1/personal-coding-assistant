@@ -1,5 +1,7 @@
+from pathlib import Path
 from typing import Any
 
+from pca.permissions.audit import record_permission_decision
 from pca.permissions.policy import DecisionAction, PermissionPolicy
 from pca.permissions.risk import classify_command
 from pca.runtime.interface import CommandRuntime
@@ -14,6 +16,7 @@ class ShellCommandTool(Tool):
         self,
         runtime: CommandRuntime | None = None,
         permission_policy: PermissionPolicy | None = None,
+        audit_path: Path | None = None,
     ) -> None:
         # 修改前旧代码：
         # runtime: ShellRuntime | None = None
@@ -22,6 +25,7 @@ class ShellCommandTool(Tool):
         # runtime，但接口层没有显式表达“只依赖 run(arguments)”这个契约。
         self._runtime = runtime or ShellRuntime()
         self._permission_policy = permission_policy or PermissionPolicy()
+        self._audit_path = audit_path
         super().__init__(
             name="run_command",
             description=(
@@ -70,6 +74,19 @@ class ShellCommandTool(Tool):
         assessment = classify_command(arguments["command"])
         decision = self._permission_policy.decide(assessment)
 
+        # 审计在副作用前记录。ALLOW 写入失败必须阻止 runtime；ASK/DENY 本来
+        # 就不会执行，因此保留原始 permission 结果，避免把审批语义改成存储错误。
+        try:
+            record_permission_decision(
+                self._resolve_audit_path(arguments),
+                tool_name=self.name,
+                decision=decision,
+                executed=decision.action is DecisionAction.ALLOW,
+            )
+        except OSError:
+            if decision.action is DecisionAction.ALLOW:
+                raise
+
         if decision.action is DecisionAction.DENY:
             raise PermissionError(
                 "Permission denied before shell execution: "
@@ -89,6 +106,14 @@ class ShellCommandTool(Tool):
             )
 
         return self._runtime.run(arguments)
+
+    def _resolve_audit_path(self, arguments: dict[str, Any]) -> Path:
+        """返回当前调用的审计文件；测试可注入临时路径隔离写入。"""
+        if self._audit_path is not None:
+            return self._audit_path
+        # 不能从尚未通过 runtime 校验的 workspace_root 派生路径，否则 audit 会
+        # 抢先创建不存在的工作区，或在只读工作区改变原有参数错误语义。
+        return Path.cwd() / ".pca" / "permission-audit.jsonl"
 
 
 # 向后兼容的函数形式

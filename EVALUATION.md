@@ -19,6 +19,15 @@
 | Safety | `tests/safety/` | 验证拒绝和审批 | `rm -rf`、越界路径、secret 输出 |
 | Benchmark | `benchmarks/` | 衡量质量和性能 | coding task benchmark、retrieval quality、memory recall |
 
+### Safety suite 运行约定
+
+Week 6 Day 5 的 `tests/safety/` 只验证已有安全边界，不执行真实网络请求或真实删除命令：
+
+- shell 拒绝场景注入 `RecordingRuntime`，通过 `calls == []` 证明没有进入执行层。
+- 文件场景使用 pytest 临时工作区和真实 sentinel 文件，断言越界、覆盖和删除式编辑没有副作用。
+- secret redaction 只调用本地 `ShellRuntime` 的 list-command 路径；敏感值在失败信息和 audit JSONL 中都不得出现。
+- 每个失败路径优先断言 `ToolResult.error_code`，再断言固定风险规则和 audit 的 `executed` 状态。
+
 ## 模块评估
 
 ### Agent Core

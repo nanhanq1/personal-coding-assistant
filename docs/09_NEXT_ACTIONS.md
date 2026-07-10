@@ -4,36 +4,29 @@
 
 ## 当前状态
 
-- 路线阶段：24 周工业级路线，Week 6 Day 1 等待面试题回答。
-- 当前主题：Tool Runtime 加固周 - 现状评估已完成，等待用户回答后归档。
-- 真实已完成：Week 1 Agent Loop、Week 2 Tool Runtime 基线、Week 3 Agent Core + Tool Runtime 加固验收与 Day 7 面试题归档、Week 4 Permission System 风险分类、策略判断、审批对象、shell gate、文件风险、审计事件、权限验收示例与 Day 7 面试题归档、Week 5 Workspace / Sandbox / Checkpoint 全部 Day 1-Day 7 已完成并归档面试题。
-- 最新聚焦测试：2026-07-02，`E:\python\Scripts\pytest.exe tests\test_examples.py::test_checkpoint_rollback_example_reports_restored_file_state_and_boundaries -q` 先 RED 后为 `1 passed`；`E:\python\Scripts\pytest.exe tests\test_examples.py -q` 为 `5 passed`。
-- 最新全量测试：2026-07-09，`E:\python\Scripts\pytest.exe -q` 为 `168 passed, 1 skipped`；默认 `python -m pytest -q` 缺少 pytest。
-- 最新示例：2026-07-09，`examples\01_minimal_agent.py`、`examples\02_tool_agent.py`、`examples\03_observed_tool_run.py`、`examples\04_permission_agent.py`、`examples\05_checkpoint_rollback.py` 均通过；`examples\05_checkpoint_rollback.py` 输出 `restored=true`。
-- 最新编译验证：2026-07-09，`python -m compileall src examples -q` 无错误输出。
-- 阻塞项：等待用户回答 Week 6 Day 1 面试题；未回答前不得归档，不得推进 Week 6 Day 2。
-- 最新文档维护：2026-07-09 新增 `docs/17_WEEK6_HARDENING_REPORT.md`，并更新 `docs/02_DAILY_TASKS.md`、`docs/04_RESOURCE_LIBRARY.md`、`docs/07_IMPLEMENTATION_LOG.md`、`docs/09_NEXT_ACTIONS.md` 和 `docs/INDEX.md`。
+- 路线阶段：24 周工业级路线，Week 6 Day 5 实现已完成，等待面试题回答与归档。
+- 当前主题：Tool Runtime 加固周 - Safety suite。
+- 真实已完成：Week 1 Agent Loop、Week 2 Tool Runtime 基线、Week 3 Agent Core + Tool Runtime 加固验收与 Day 7 面试题归档、Week 4 Permission System、Week 5 Workspace / Sandbox / Checkpoint、Week 6 Day 1 现状评估、Day 2 错误分类、Day 3 RetryPolicy、Day 4 shell/file gate 审计完整性（均已归档面试题），以及 Day 5 Safety suite 实现与验证（面试题待归档）。
+- 最新聚焦测试：2026-07-10，audit matrix 为 `20 passed`；工具/permission/rollback 回归集为 `69 passed`；shell runtime 为 `25 passed`。
+- 最新安全测试：2026-07-10，`E:\python\Scripts\pytest.exe tests\safety -q` 为 `9 passed`。
+- 最新全量测试：2026-07-10，`E:\python\Scripts\pytest.exe -q` 为 `199 passed, 1 skipped`；默认 `python -m pytest -q` 缺少 pytest。
+- 最新示例：2026-07-10，五个示例均通过；permission 示例如实输出 `audit_auto_wired=true`，checkpoint 示例输出 `restored=true`。
+- 最新编译验证：2026-07-10，沙箱内 `python -m compileall src examples -q` 因 `__pycache__` 写权限失败；批准后外部重跑通过且无输出。
+- 阻塞项：Day 5 面试题等待用户回答；代码、测试和验证无阻塞。
+- 最新文档维护：Day 5 Safety suite 已同步实现日志、评估约定和加固报告；Day 5 面试题待生成并等待回答。
 
 ## 当前能力边界
 
-已实现：`Message`、`ToolCall`、`TraceContext`、`AgentEvent`、`ScriptedLLM`、`AgentLoop`、`Tool`、`ToolParameter`、`ToolRegistry`、`ToolRegistry.get_stats()`、工具调用统计、`ToolResult`、输出截断、文件资源限制、`write_file`、`edit_file`、`run_command` / `ShellRuntime`、`CommandRuntime` Protocol、`DockerRuntime` graceful fallback adapter、`workspace_root`、timeout、env 敏感输出脱敏、`RiskLevel`、`RiskAssessment`、`classify_command(...)`、`classify_file_change(...)`、`PermissionPolicy.decide(...)`、`ApprovalRequest`、`ApprovalDecision`、`PermissionAuditEvent`、`append_audit_event(...)`、shell/file 执行前 permission gate、`Workspace(root)`、`FileCheckpoint`、`GitCheckpoint`、文件工具允许执行失败路径的本地 rollback。
+已实现：`Message`、`ToolCall`、`TraceContext`、`AgentEvent`、`ScriptedLLM`、`AgentLoop`、`Tool`、`ToolParameter`、`ToolRegistry`、工具统计、`ToolResult`、`ToolErrorCode`、`RetryDecision`、输出截断、文件资源限制、file/shell runtime、risk/policy、approval 对象、`PermissionAuditEvent`、`record_permission_decision(...)`、shell/file gate 自动摘要审计、`Workspace(root)`、checkpoint 与文件局部 rollback。
 
-仍是占位或未接入主链：审批对象尚未接入交互式批准流程；shell/file gate 尚未支持审批通过后恢复执行；audit 尚未自动接入 shell/file gate；`Workspace(root)` 尚未迁移接入 shell runtime 主链；`GitCheckpoint` 尚未自动接入失败回滚链路；`GitCheckpoint` 尚不处理 untracked 文件、staged diff、stash、commit 或 sandbox 外副作用；`DockerRuntime` 尚未接入默认主链，尚不是完整 Docker sandbox；shell 命令、Docker、网络/API、包安装、后台进程和 workspace 外副作用尚不支持自动 rollback；`TraceContext` / `AgentEvent` 尚未由 `AgentLoop` 自动创建或透传到 `ToolRegistry`；`context`、`memory`、`mcp`、`observability`、`cli`。
+仍是占位或未接入主链：retry 不自动执行；审批不支持批准后恢复；audit 不含原子事务、远程后端、查询或 trace 关联；`Workspace(root)` 未成为 shell 主链唯一事实源；Git/Docker/网络等副作用未自动 rollback；trace 未自动透传；`context`、`memory`、`mcp`、完整 `observability`、`cli`。
 
 ## 下一步行动
 
-开始 Week 6 Day 1：Tool Runtime 加固周现状评估。
-
-### Day 1 任务
-
-1. 阅读 `docs/INDUSTRIAL_STANDARDS.md`。
-2. 对 Week 4-5 的 permission、workspace、checkpoint、runtime 和 rollback 做 9 维差距评估。
-3. 产出 Week 6 加固报告初版，列出 P0/P1/P2 优先级。
-4. 跑基线测试、示例和编译验证。
-5. 完成后生成 Week 6 Day 1 面试题，等待用户回答。
+完成 Week 6 Day 5 的面试题回答、归档和最终文档收口；之后再评估是否进入 Day 6 真实验证。
 
 ## 用户下次应发送
 
 ```text
-开始 Week 6 Day 1
+回答 Week 6 Day 5 面试题；当前不推进到 Day 6。
 ```
