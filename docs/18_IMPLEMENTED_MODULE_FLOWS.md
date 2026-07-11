@@ -59,7 +59,10 @@ flowchart LR
 flowchart TD
     A["AgentLoop.run(user_input)"] --> B["validate input; TraceContext.new()"]
     B --> C["messages = user Message"]
-    C --> D["llm.complete(messages)"]
+    C --> TB{"next turn available?"}
+    TB -->|"yes"| D["llm.complete(messages)"]
+    TB -->|"no"| M["loop / turn budget exhausted"]
+    M --> N["RuntimeError: exceeded max_turns"]
     D --> E["append assistant Message"]
     E --> F{"tool_calls?"}
     F -->|"no"| G["AgentLoopResult + trace_id"]
@@ -68,8 +71,7 @@ flowchart TD
     I --> J["ToolResult"]
     J --> K["_tool_result_to_message(...)"]
     K --> L["append tool Message"]
-    L --> D
-    D -->|"turn limit exceeded"| M["RuntimeError"]
+    L --> TB
 ```
 
 当前 trace 是 run 级关联字段，不是完整观测系统：`trace_id` 从 `AgentLoop` 传入 registry 并保存在 `ToolResult`，`tool_call_id` 区分同一 run 内的调用；`AgentEvent` 只是轻量数据模型，没有自动产生、持久化或查询链路。
@@ -203,8 +205,9 @@ flowchart TD
 
 ### 项目作用与工程作用
 
-- 项目作用：在授权工作区内执行命令，并为本地文件变更提供路径边界与最小恢复能力。
+- 项目作用：以授权工作区作为 `cwd` / 路径参数边界启动宿主机命令，并为本地文件变更提供路径边界与最小恢复能力。
 - 工程作用：`CommandRuntime` 将工具层与具体执行器解耦；`ShellRuntime` 规范化命令/cwd/timeout/env 并采集结构化输出；`DockerRuntime` 在 Docker 不可用时返回稳定且不降级到宿主机的结果；checkpoint 保存并恢复局部状态。
+- 边界说明：`ShellRuntime` 的 `workspace_root` / `cwd` 校验是进程启动前的参数边界，**不是**文件系统 sandbox 或系统调用 sandbox；命令启动后仍是宿主机进程。
 
 ### 输入与输出
 
