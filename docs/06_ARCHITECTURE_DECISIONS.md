@@ -1,5 +1,31 @@
 # Architecture Decisions
 
+## ADR-0028：Week 6 Day 7 在 AgentLoop 入口创建并透传 trace metadata
+
+日期：2026-07-10
+
+### 背景
+
+`TraceContext` 和 `ToolResult` 的 trace 字段已经存在，但此前没有接入 `AgentLoop` 主链。若每个工具自行生成 trace，同一次用户任务会被拆成多个无法关联的局部轨迹；若只依赖错误文本，也无法稳定区分同一 run 内的多个工具调用。
+
+### 决策
+
+- `AgentLoop.run(...)` 为一次运行创建一个 `TraceContext`，并在 `AgentLoopResult` 暴露 `trace_id`。
+- 每个 `ToolCall` 生成独立 `tool_call_id`。
+- `ToolRegistry.run(...)` 接受可选的 `trace_id` / `tool_call_id`，并将它们保留到成功或失败 `ToolResult`。
+- 保持旧的 `Message` 文本、错误码、直接调用 `ToolRegistry.run(name, arguments)` 的兼容性。
+
+### 理由
+
+- 入口层拥有完整的 run 生命周期，能把 LLM turn、工具路由和失败恢复关联到一条轨迹。
+- 调用级 id 可以在同一 trace 内区分连续或批量工具调用。
+- 这只是可观测性关联基础，不宣称已经具备结构化日志、trace 查询、远程 audit 或 P99 统计。
+
+### 暂不采用
+
+- 暂不在本 ADR 中实现自动 retry、结构化 logger、trace 查询 API 或 OpenTelemetry 导出。
+- 暂不修改 `Message` 为事件流或 JSON payload。
+
 ## ADR-0027：Week 6 Day 4 在 permission gate 自动写入摘要审计，ALLOW 路径 fail-closed
 
 日期：2026-07-10

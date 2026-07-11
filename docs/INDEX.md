@@ -8,7 +8,7 @@
 |---|---|
 | `AGENTS.md` | 核心执行规则 |
 | `docs/INDEX.md` | 本文件 |
-| `docs/09_NEXT_ACTIONS.md` | 当前状态、阻塞项和下一步 |
+| `docs/09_NEXT_ACTIONS.md` | 唯一实时状态源：当前能力边界摘要、课程门禁、测试基线、阻塞项和下一步 |
 
 ## 根目录保留入口
 
@@ -30,12 +30,14 @@
 | `docs/03_WEEKLY_SPRINTS.md` | 当前 Sprint |
 | `docs/05_LEARNING_NOTES.md` | 当前模块学习笔记 |
 | `docs/INDUSTRIAL_STANDARDS.md` | 工业级加固标准 |
-| `docs/12_IMPLEMENTED_ARCHITECTURE_AND_INDUSTRIAL_GAPS.md` | 已实现主线和工业级差距 |
+| `docs/12_IMPLEMENTED_ARCHITECTURE_AND_INDUSTRIAL_GAPS.md` | 已实现能力、工业级差距及详细源码与测试证据；不是实时状态源 |
 | `docs/13_REFERENCE_PROJECT_MAPPING.md` | 外部参考项目到本项目模块的映射 |
 | `docs/14_24_WEEK_PLAN.md` | 完整 24 周工业级路线和每日任务 |
-| `docs/15_MEMORY_SYSTEM.md` | 项目协作记忆与未来运行时记忆边界 |
+| `docs/15_MEMORY_SYSTEM.md` | 项目协作记忆、Codex 外部记忆、事实恢复、冲突裁决、结束回写及未来运行时记忆边界 |
 | `docs/16_TEACHING_WORKFLOW.md` | 教学协作流程、用户先写代码流程和每日收口门禁 |
 | `docs/17_WEEK6_HARDENING_REPORT.md` | Week 6 Tool Runtime 加固报告和 9 维差距评估 |
+| `docs/18_IMPLEMENTED_MODULE_FLOWS.md` | 有源码与测试证据的模块流程及工程作用；接线不完整时标“部分实现/未接入主链”，不保存实时数字 |
+| `docs/19_CODE_COMPLETION_AUDIT_2026-07-10.md` | 2026-07-10 代码完成度审计快照、当日证据和整改建议；不是实时状态源 |
 
 ## 代码实现时读取
 

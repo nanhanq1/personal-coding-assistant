@@ -100,3 +100,51 @@ def test_agent_loop_records_tool_error_and_allows_recovery():
     result = loop.run("please recover")
 
     assert result.final_message.content == "I recovered from the tool error."
+
+
+def test_agent_loop_propagates_trace_context_and_tool_call_id():
+    """测试 AgentLoop 为工具调用生成 run 级 trace 和调用级 id。"""
+
+    class RecordingRegistry(ToolRegistry):
+        def __init__(self):
+            super().__init__()
+            self.metadata = []
+
+        def run(self, name, arguments, *, trace_id=None, tool_call_id=None):
+            self.metadata.append((trace_id, tool_call_id))
+            return super().run(
+                name,
+                arguments,
+                trace_id=trace_id,
+                tool_call_id=tool_call_id,
+            )
+
+    class OneToolLLM:
+        def __init__(self):
+            self.calls = 0
+
+        def complete(self, messages):
+            self.calls += 1
+            if self.calls == 1:
+                return Message(
+                    role="assistant",
+                    content="call echo",
+                    tool_calls=[
+                        ToolCall(name="echo", arguments={}),
+                        ToolCall(name="echo", arguments={}),
+                    ],
+                )
+            return Message(role="assistant", content="done")
+
+    registry = RecordingRegistry()
+    registry.register(Tool(name="echo", description="回显", handler=lambda _: "ok"))
+
+    result = AgentLoop(llm=OneToolLLM(), tools=registry).run("trace me")
+
+    assert result.trace_id
+    assert len(registry.metadata) == 2
+    trace_ids = {metadata[0] for metadata in registry.metadata}
+    tool_call_ids = [metadata[1] for metadata in registry.metadata]
+    assert trace_ids == {result.trace_id}
+    assert all(tool_call_ids)
+    assert len(set(tool_call_ids)) == 2

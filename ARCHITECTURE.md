@@ -2,7 +2,7 @@
 
 ## 当前真实架构
 
-当前代码已经实现 `core + tools + runtime` 的最小可运行主链：
+当前代码已经实现 `core + tools` 的最小可运行主链，并接入 `permissions + runtime` 的部分能力：
 
 ```mermaid
 flowchart LR
@@ -10,15 +10,23 @@ flowchart LR
     H --> L["ScriptedLLM"]
     L --> A["assistant Message / ToolCall"]
     A --> Loop["AgentLoop"]
-    Loop --> R["ToolRegistry.run"]
+    Loop -->|"run trace_id + tool_call_id"| R["ToolRegistry.run"]
     R --> T["Tool.run"]
-    T --> F["File tools"]
+    T --> RF["read_file"]
+    T --> WF["write_file / edit_file"]
     T --> G["ShellCommandTool gate"]
     G --> P["classify_command + PermissionPolicy"]
-    P -->|ALLOW| S["ShellRuntime"]
-    P -->|ASK / DENY| TR
-    F --> Q["file risk gate"]
-    Q --> TR["ToolResult"]
+    P --> AU["permission decision audit"]
+    AU -->|ALLOW| S["ShellRuntime"]
+    AU -->|ASK / DENY| TR
+    RF --> RG["path + read resource guard"]
+    RG --> TR["ToolResult"]
+    WF --> Q["file risk + PermissionPolicy"]
+    Q --> FA["file permission audit"]
+    FA -->|ALLOW| Ck
+    FA -->|ASK / DENY| TR
+    Ck --> WE["write / edit"]
+    WE --> TR
     S --> TR
     TR --> M["AgentLoop._tool_result_to_message"]
     M --> H
@@ -29,6 +37,8 @@ flowchart LR
     CR -.-> S
     CR -.-> Dk["DockerRuntime adapter graceful fallback"]
 ```
+
+模块级流程、源码与测试证据见 [`docs/18_IMPLEMENTED_MODULE_FLOWS.md`](docs/18_IMPLEMENTED_MODULE_FLOWS.md)。
 
 真实已实现：
 
@@ -49,9 +59,10 @@ flowchart LR
 - `src/pca/permissions/file_risk.py`：`classify_file_change(...)`
 - `src/pca/permissions/audit.py`：`PermissionAuditEvent`、`append_audit_event(...)`
 
-当前部分实现但未接入主链：
+当前部分实现及其接线边界：
 
-- `src/pca/permissions`：风险分类和策略判断已接入 `ShellCommandTool` 执行前 gate；文件风险分类已接入 `WriteFileTool` / `EditFileTool` 写盘前 gate；审批对象已实现但尚未接入交互式批准流程；audit 已有独立 JSONL API 但尚未自动接入 shell/file gate。
+- `src/pca/permissions`：风险分类和策略判断已接入 `ShellCommandTool` 执行前 gate；文件风险分类已接入 `WriteFileTool` / `EditFileTool` 写盘前 gate；shell/file gate 已在副作用前自动写入摘要 audit。审批对象尚未接入交互式批准与恢复；audit 仍缺 trace 关联、最终执行结果生命周期和查询能力。
+- `src/pca/core` / `src/pca/tools`：`AgentLoop` 为每次 run 创建 `trace_id`，为每次工具调用创建 `tool_call_id`，并经 `ToolRegistry` 透传到成功或失败 `ToolResult`；尚未实现结构化日志、trace 查询、回放和 P99 等性能统计。
 - `src/pca/runtime/workspace.py`：`Workspace(root)` 已实现为独立边界对象，但文件工具和 shell runtime 主链仍使用原有局部路径解析逻辑，迁移留到后续 checkpoint/rollback 加固。
 - `src/pca/runtime/checkpoints.py`：`FileCheckpoint` 已实现为独立文件快照 API，且已接入 `WriteFileTool` / `EditFileTool` 在 permission 允许后的写盘失败恢复路径；`GitCheckpoint` 已实现为独立 git diff 快照 API，但尚未自动接入工具失败 rollback 链路。
 - `src/pca/runtime/interface.py`：`CommandRuntime` 已实现为薄命令执行接口，`ShellCommandTool` 已依赖该接口注入执行器。
@@ -171,7 +182,7 @@ evaluation -> all public interfaces
 
 - 配置入口：后续新增 `src/pca/config.py`，从文件、环境变量和 CLI 参数加载。
 - 密钥：只从环境变量读取；不写入 message history、logs、memory 或 docs。
-- 工具执行：默认 workspace scoped；`run_command` 已经过最小 shell gate，`DENY` / `ASK` 不进入真实 shell runtime；`ShellCommandTool` 已依赖 `CommandRuntime` 接口注入执行器；`DockerRuntime` 已有最小 graceful fallback adapter，但默认主链仍使用 `ShellRuntime`，完整 sandbox 尚未完成；覆盖写入和删除式编辑已经过文件风险 gate；`FileCheckpoint` 已接入文件工具允许执行后的失败恢复路径；人工审批恢复、audit 自动接入、shell/Docker/Git rollback 主链接入和 sandbox 后续补齐。
+- 工具执行：默认 workspace scoped；`run_command` 已经过最小 shell gate，`DENY` / `ASK` 不进入真实 shell runtime；`ShellCommandTool` 已依赖 `CommandRuntime` 接口注入执行器；`DockerRuntime` 已有最小 graceful fallback adapter，但默认主链仍使用 `ShellRuntime`，完整 sandbox 尚未完成；覆盖写入和删除式编辑已经过文件风险 gate；shell/file gate 会自动记录决策摘要；`FileCheckpoint` 已接入文件工具允许执行后的失败恢复路径。人工审批恢复、audit 与 trace/最终结果关联、shell/Docker/Git rollback 主链接入和 sandbox 仍待补齐。
 - 输出：stdout/stderr、文件内容、检索结果和 memory recall 都必须支持截断。
 - Git：commit/push 默认需要用户确认；自动 commit 只能在显式配置下启用。
 
@@ -179,4 +190,4 @@ evaluation -> all public interfaces
 
 作品集不宣称“生产级 SaaS”。准确表述为：
 
-> 一个本地优先、可审计、可测试的 Personal Coding Assistant Agent。它实现了 coding workflow、权限边界、上下文检索、长期记忆、评估和可观测性，并明确列出未覆盖的企业级能力。
+> 一个本地优先、可测试的 Personal Coding Assistant Agent 教学工程。当前已实现 `core`、`tools` 的阶段能力，以及 `permissions`、`runtime` 的部分能力；`context`、长期记忆、MCP 和完整 observability 仍按路线实现，并明确列出尚未闭环的工业级能力。

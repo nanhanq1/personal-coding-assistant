@@ -2,66 +2,69 @@
 
 本文件只保留当前活跃任务。历史任务归档在 `docs/archive/daily_tasks/`。完整 24 周每日计划见 `docs/14_24_WEEK_PLAN.md`。
 
-## 2026-07-10：Week 6 Day 5
+## Week 7 Day 1：Repo Scanner 文件清单
 
-日期：2026-07-10
-当前阶段：Week 6 Tool Runtime 加固周
-当前模块：Safety suite
+日期：Week 6 收口（2026-07-10）后下一工作日
+当前阶段：Week 7 Coding Agent
+当前模块：Repo Scanner / Repo Map
 预计用时：1-2 小时
-执行状态：代码、测试和验证已完成；Week 6 Day 5 面试题待生成、回答和归档。Week 6 Day 4 面试题已按用户确认归档为第 40 天记录。
+执行状态：已完成 Week 6 收口，等待开始 Day 1 实现。
 
-### 1. 今日学习目标
+### 1. 学习目标
 
-- 把 permission、workspace、audit 的安全边界转成可重复运行的回归测试。
-- 覆盖 destructive command、network/inline code、workspace 外路径和 secret redaction。
-- 保持 Safety suite 只验证已有行为，不新增大型安全平台或审批恢复流程。
+- 让 Agent 能扫描授权仓库并生成稳定的文件清单。
+- 理解 ignore 规则、文件大小上限和 workspace 安全边界为什么必须在扫描入口处理。
+- 为后续语言识别、文件摘要和 repo map 建立可测试的 `RepoScanner.scan(root)` 契约。
 
-### 2. 今日前置知识
+### 2. 前置知识
 
-- Week 4 已完成风险分类、策略判断、shell/file gate 和权限审计事件。
-- Week 5 已完成 Workspace、checkpoint、rollback 和 runtime 边界。
-- Week 6 Day 4 已完成 shell/file gate audit matrix、摘要字段、隐私边界和 fail-closed 测试。
+- Week 6 的 `Workspace(root)`、permission gate、audit、ToolResult 错误码和安全回归边界。
+- Python `pathlib.Path`、目录遍历、相对路径规范化和 `gitignore` 基本语义。
+- 当前边界：scanner 只读，不修改文件，不读取 workspace 外路径，不把 ignored 文件泄漏给上层。
 
-### 3. 今日代码任务
+### 3. 调用链与输入输出
 
-- 新建 `tests/safety/` 测试目录及最小测试配置。
-- 将 destructive command、network command、inline code、outside workspace、overwrite/delete-like edit、secret redaction 组织为安全回归用例。
-- 每个用例断言：真实副作用是否发生、错误码是否稳定、审计是否存在且不泄漏敏感值。
-- 不实现新的风险分类规则；发现缺口时先记录，不在 Day 5 顺手扩张模块。
+```mermaid
+flowchart LR
+    U["RepoScanner.scan(root)"] --> V["校验 root 与 workspace 边界"]
+    V --> I["遍历文件并应用 ignore 规则"]
+    I --> S["读取相对路径、suffix、size 元数据"]
+    S --> O["稳定排序后的 FileInventory"]
+```
 
-### 4. 今日测试任务
+- 输入：授权仓库根目录、可选 ignore 集合和文件大小限制。
+- 输出：只包含相对路径和安全元数据的稳定文件清单。
+- 错误：root 不存在、不是目录、越界或资源超限时返回明确失败，不继续扫描。
+- 副作用：只读文件系统；不得写入仓库、执行 shell 或读取 ignored 文件内容。
+
+### 4. 代码任务
+
+- 新增 `src/pca/coding/repo_scanner.py`，定义最小 `RepoScanner` / `FileEntry` 模型。
+- 先写测试，再实现：忽略 `.git`、`__pycache__`、`.venv`，稳定排序，拒绝 workspace 外 root，处理文件大小上限。
+- 不提前实现 AST symbol index、patch、git workflow 或完整 repo map。
+
+### 5. 阅读与资料
+
+- Python pathlib：https://docs.python.org/3/library/pathlib.html
+- Git ignore 规则：https://git-scm.com/docs/gitignore
+- Aider Repo Map：https://aider.chat/docs/repomap.html
+- MIT Missing Semester Version Control：https://missing.csail.mit.edu/2020/version-control/
+
+### 6. 测试任务
 
 ```powershell
-E:\python\Scripts\pytest.exe tests\safety -q
+E:\python\Scripts\pytest.exe tests\test_repo_scanner.py -q
 E:\python\Scripts\pytest.exe -q
 ```
 
-完成后补跑五个示例、`python -m compileall src examples -q` 和 `git diff --check`。
+### 7. 完成标准
 
-本次实际验证：`tests/safety` 为 `9 passed`；全量为 `199 passed, 1 skipped`；五个示例、compileall 和 diff check 均通过。
+- scanner 测试覆盖 ignore、稳定排序、大小限制、非法 root 和空仓库。
+- 测试不依赖网络，不扫描真实用户目录，不读取 ignored 文件内容。
+- 更新 `docs/07_IMPLEMENTATION_LOG.md`、`docs/09_NEXT_ACTIONS.md`；若新增架构决策，再更新 ADR。
 
-### 5. 今日阅读任务
+### 用户下次应发送
 
-- `docs/INDUSTRIAL_STANDARDS.md`
-- `docs/17_WEEK6_HARDENING_REPORT.md`
-- `ARCHITECTURE.md`
-- `docs/03_WEEKLY_SPRINTS.md` 中 Week 6 Safety suite 约束
-
-### 6. 今日文档任务
-
-- 更新 `docs/07_IMPLEMENTATION_LOG.md`，记录安全回归矩阵和真实失败边界。
-- 更新 `docs/09_NEXT_ACTIONS.md` 与 `docs/17_WEEK6_HARDENING_REPORT.md`。
-- 如新增安全测试约定，再更新 `EVALUATION.md`。
-
-### 7. 今日复盘问题
-
-1. 安全回归测试与普通 permission 单元测试的边界是什么？
-2. 为什么安全测试必须断言“副作用没有发生”，不能只断言异常类型？
-3. secret redaction 测试如何避免把 secret 本身写进测试失败输出或审计日志？
-
-### 8. 今日完成标准
-
-- `tests/safety` 已覆盖计划中的危险命令、网络/inline code、越界路径、覆盖/删除式编辑和 secret 脱敏。
-- 安全测试与全量测试已通过。
-- 失败路径均有稳定错误语义、无未授权副作用、无敏感数据泄漏。
-- 已记录真实网络/删除、审批恢复、完整 sandbox 和自动 rollback 等未覆盖边界；下一步生成 Day 5 面试题并等待回答。
+```text
+开始 Week 7 Day 1
+```

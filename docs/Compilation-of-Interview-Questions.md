@@ -815,3 +815,54 @@
 
 - 用户回答：write-ahead event 可以在副作用前先写入“准备执行”事件，优点是简单、适合 fail-closed，缺点是后续执行结果可能缺失，需要补偿或超时扫描；事务型数据库或队列能提供更强的持久化和重试能力，但引入服务依赖、事务边界和运维成本，仍不能天然把本地 shell 与数据库做成一个原子事务；outbox 可以把“待执行/执行结果”放到可靠本地表或队列，再由投递器发送，适合最终一致性，但需要幂等键、状态机和死信处理。当前项目应先保留 write-ahead 摘要事件，未来若需要更强可靠性再引入 outbox 或事务存储。测试要模拟：预写成功后副作用失败、预写失败时副作用不发生、副作用成功后完成事件写入失败、重复投递，以及恢复扫描能把未完成事件标记为 unknown/recovery_required，而不是伪造成功。
 - 标准回答：正确。三种方案的核心差异是持久化强度与复杂度：write-ahead event 先记录 intent，再执行副作用，适合当前 fail-closed，但必须接受“执行结果缺失”并设计 reconciliation；事务型数据库/队列提供更强的持久化、重试和查询能力，却不能自动覆盖本地 shell、文件系统和远程 API 的全部原子性；outbox 把待投递事实与业务状态放在同一可靠存储中，再异步投递，适合最终一致性，但必须设计幂等键、状态机、重试上限和死信。测试至少要覆盖 intent 写入失败时零副作用、intent 成功后副作用失败、执行成功但 completion audit 失败、进程崩溃恢复、重复事件去重，以及任何未知状态都不能被标记为成功。当前 Day 4 只实现副作用前的 JSONL fail-closed，未宣称跨系统原子事务。
+
+## 第 41 天：2026-07-10
+
+### 面试题 1：安全回归测试与普通 permission 单元测试的边界是什么？为什么 Day 5 还要新增 `tests/safety/`？
+
+- 用户回答：普通 permission 单元测试主要验证一个分类器或策略函数的局部映射，例如 `classify_command(...)` 是否把 `rm -rf` 判为 `DENY`，以及 `PermissionPolicy.decide(...)` 是否把风险等级映射为 `ALLOW`、`ASK` 或 `DENY`。安全回归测试验证的是跨层安全性质：工具请求经过 `ToolRegistry` 和 gate 后，是否真的没有进入 runtime、文件是否保持不变、audit 是否存在且没有 secret。Day 5 新增 `tests/safety/` 是为了把“决策正确”提升为“决策被执行边界正确地遵守”，防止未来重构时只保留异常断言却意外产生副作用。
+- 标准回答：普通 permission 单元测试验证单个风险分类或策略映射的输入输出契约；安全回归测试验证 permission、工具、runtime、workspace、checkpoint 和 audit 之间的组合安全性质。前者可以证明“命令应被拒绝”，后者还必须证明“被拒绝的命令没有调用 runtime、没有修改文件、留下了正确的摘要审计，并且没有泄漏敏感值”。Day 5 的 `tests/safety/` 是独立的回归层，不新增风险规则，而是把跨层安全不变量固定下来，防止调用链重构后出现 gate 绕过或错误地把失败包装成成功。
+
+### 面试题 2：为什么安全测试必须断言“副作用没有发生”，不能只断言异常类型或错误码？
+
+- 用户回答：异常类型和错误码只说明调用方观察到了失败，不说明失败发生在副作用之前。如果 gate 已经调用 runtime 或写盘，之后才抛出 `PermissionError`，系统表面上仍然是失败，但真实文件、网络或进程副作用已经发生。安全测试必须用 `RecordingRuntime.calls == []`、原文件内容、workspace 外 sentinel 和 audit 的 `executed` 字段共同证明失败路径在正确的边界停止。这样才能区分“安全拒绝”和“做完危险动作后才报告失败”。
+- 标准回答：错误码是控制流语义，副作用断言是安全事实，两者不能互相替代。一个实现完全可能先执行命令或写入文件，再构造错误结果；此时 `PERMISSION_DENIED` 仍可能出现在返回值中，但系统已经违反 fail-closed 约束。安全回归测试因此要观察执行器调用记录、真实临时文件和外部 sentinel 的内容，并检查 audit 的 `executed` 字段。只有同时证明稳定错误语义、零未授权副作用和正确审计事实，才能证明拒绝路径真正安全。
+
+### 面试题 3：secret redaction 测试如何避免把 secret 本身写进测试失败输出或审计日志？
+
+- 用户回答：测试使用运行时生成的临时 secret，不把固定密钥写进源码。命令只在本地 Python 进程中读取环境变量，不访问网络；断言成功输出等于固定的 `[REDACTED]`，失败时抛出不包含实际输出或 secret 的固定 `AssertionError`。audit 只序列化策略摘要字段，测试检查 JSONL 不包含 secret；如果发现泄漏，也只报告“audit contained a sensitive value”，不把 payload 或 secret 放进 pytest 失败信息。这样测试本身不会成为二次泄漏源。
+- 标准回答：secret redaction 测试必须同时保护被测输出、测试代码、audit 和失败报告。推荐使用运行时生成的临时值，避免真实凭据和稳定 token 进入仓库；使用本地、无网络的命令触发真实 `ShellRuntime` 脱敏；成功断言只比较固定脱敏结果；失败分支使用固定错误信息，不能把实际 stdout、stderr、audit payload 或 secret 插入异常消息。对于 audit，应验证它只包含工具名、动作、风险等级、匹配规则、理由和 `executed` 等摘要字段，并用“不包含敏感值”的布尔检查配合固定失败信息。即使实现回归导致泄漏，测试输出也必须保持脱敏。
+
+## 第 42 天：2026-07-10
+
+### 面试题 1：真实小 repo 验证与普通集成测试相比，额外证明了哪些边界？
+
+- 用户回答：真实小 repo 验证使用临时目录中的真实文件、真实工作目录和真实工具组合，证明了路径解析是否落在授权 workspace、修改前后的文件状态、`ReadFileTool`/`EditFileTool`/`ShellCommandTool`/`ToolRegistry` 能否串成闭环，以及测试命令是否真的反馈代码修改结果。普通集成测试通常只验证固定模块协作，未必证明真实 cwd、真实文件内容和实际 subprocess 反馈。它仍然不能证明网络、删除、Git、Docker 或 workspace 外副作用可回滚。
+- 标准回答：正确。E2E 额外验证的是跨层事实：真实临时仓库中的 cwd 和路径边界、文件确实发生了预期变化、工具链能完成读取—修改—验证闭环、失败和测试结果能回到 `ToolResult`。它比单元或普通集成更接近用户任务，但仍必须明确临时目录、无真实网络/删除，以及未覆盖的外部副作用边界。
+
+### 面试题 2：为什么局部文件修改成功并通过测试，不能证明 shell、网络和工作区外副作用可回滚？
+
+- 用户回答：`EditFileTool` 的 `FileCheckpoint` 只保存显式跟踪的 workspace 文件状态，能恢复文件内容或删除后来创建的文件；它不记录 shell 进程、网络/API 远端状态、包安装、Git/Docker 或 workspace 外文件。`ShellCommandTool` 只负责 permission gate 和调用 runtime，当前没有通用副作用 rollback。因此局部文件成功与 pytest 通过，只能证明这一条文件路径和测试闭环有效，不能外推到其他副作用。
+- 标准回答：正确。`FileCheckpoint` 的数据模型是本地文件快照，`ShellCommandTool` 的职责是命令风险判断和 runtime 转发，两者都没有跨系统事务或补偿操作。测试通过只说明当前仓库状态满足测试，不说明命令产生的进程、网络、环境和外部系统状态可逆。工业级系统必须依靠 sandbox、隔离 runtime、补偿事务或人工处置分别覆盖这些边界。
+
+### 面试题 3：permission 允许、文件写入失败且 rollback 也失败时，报告必须暴露哪些状态？
+
+- 用户回答：报告必须同时暴露原始写入错误和 rollback 错误，返回稳定的 `ROLLBACK_FAILED`，说明 rollback 已尝试但未确认恢复成功，并标记文件状态可能是半恢复或不确定。审计要记录工具、风险动作、是否进入副作用、checkpoint/rollback 尝试和结果摘要，但不能记录完整文件内容或 secret。用户可见结论不能写“已恢复”，而应给出受影响路径摘要、需要人工检查或从版本控制恢复的建议，并停止后续自动副作用。
+- 标准回答：正确。该状态必须是 fail-closed：原始错误、恢复错误、阶段、路径摘要、`executed`、checkpoint/rollback 状态和后续处置建议都要可观察；错误码应为 `ROLLBACK_FAILED`，不能降级成普通 runtime failure。系统必须明确“不保证当前文件一致性”，禁止自动 retry 或继续执行，并建议人工检查、对比 diff、从 Git/备份恢复。审计保持摘要化和脱敏，不能伪造成功状态。
+
+## 第 43 天：2026-07-10
+
+### 面试题 1：为什么 run 级 `trace_id` 应由 `AgentLoop` 创建，而不是由每个具体工具自行生成？沿着本次调用链说明它如何进入成功和失败 `ToolResult`。
+
+- 用户回答：run 级 `trace_id` 应由 `AgentLoop` 创建，因为一次 Agent 运行可能包含多轮 LLM、多个工具调用和多个失败/恢复分支，只有入口层创建才能保证整条轨迹共享同一个上下文。如果每个工具自己生成 trace，同一次任务会被拆成互不相干的 trace，无法还原完整调用链。当前链路是 `AgentLoop.run(...)` 创建 `TraceContext`，每个 `ToolCall` 再生成独立 `tool_call_id`，然后调用 `ToolRegistry.run(..., trace_id, tool_call_id)`。`ToolRegistry` 在成功时把两者传给 `ToolResult.success(...)`，在异常时把两者传给 `ToolResult.from_exception(...)`，所以成功和失败结果都能关联到同一 run trace，同时区分具体调用。
+- 标准回答：正确。trace 的生命周期应覆盖一次业务运行，而不是某个具体 handler。入口层创建 `TraceContext` 可以把 LLM turn、工具路由、权限判断、runtime 和最终回答挂到同一条链；调用层 id 则区分同一 trace 内的不同工具调用。当前实现沿 `AgentLoop -> ToolRegistry -> ToolResult` 透传 `trace_id`，并为每个 `ToolCall` 生成独立 `tool_call_id`，成功路径使用 `ToolResult.success(...)`，失败路径使用 `ToolResult.from_exception(...)`，且不改变旧的 message 文本和错误码兼容性。
+
+### 面试题 2：当前 trace 透传修补后，为什么仍不能宣称 D1 可观测性“完全达标”？还缺哪些日志、查询和统计证据？
+
+- 用户回答：当前只证明 trace 元数据能从 AgentLoop 传到 ToolResult，并不能证明系统能根据 trace 还原完整事实。还缺结构化 JSON 日志、每个核心对象的时间戳和唯一 id、工具输入输出摘要、耗时和状态记录、按 trace_id 查询完整链路，以及调用次数、成功率、失败率、平均耗时和 P99 等统计。当前 audit 也没有查询接口和远程后端，所以只能说 D1 部分达标。
+- 标准回答：正确。字段透传只是可观测性的关联基础，不是完整观测系统。D1 还要求结构化日志、操作时间、输入/输出摘要、耗时、状态、trace 查询、调用统计和 P99 证据；同时要明确敏感信息脱敏和本地 audit 的查询边界。当前项目已经具备部分 trace/error/audit 元数据，但没有完整日志记录器、链路查询和性能统计，因此不能把“有 trace_id”写成“可完整回放”。
+
+### 面试题 3：结合 Week 6 的 9 维证据，你是否允许阶段进入 Week 7 Coding Agent？请给出放行条件、明确阻塞项，以及如果选择放行如何防止后续把占位能力误当成完整 sandbox。
+
+- 用户回答：我允许项目进入 Week 7 的课程切片，但不把 Week 6 宣称为九维全部工业级达标。放行条件是当前全量、E2E、安全集、示例和 compileall 都有证据，permission、audit、workspace、checkpoint/rollback 和 trace 透传边界都写进文档，并把剩余缺口作为显式阻塞项。当前阻塞项包括 retry 还不会自动执行、ASK 不能批准后恢复、audit 没有原子事务和查询、结构化 observability 未完成、Workspace 还不是 shell/file 唯一事实源，以及 Git/Docker/网络副作用没有自动 rollback。后续每个 Coding Agent 模块都必须在文档、schema、示例和测试中明确“当前能力/未实现能力”，禁止把 Docker adapter、局部文件 rollback 或 permission gate 描述成完整 sandbox；涉及危险副作用时继续 fail-closed，并保留 safety/E2E 回归门禁。
+- 标准回答：正确。这里的“放行”是带边界的课程推进，不是工业级质量签字。Week 7 可以开始实现 repo scanner，但必须携带 Week 6 的 gap ledger、风险声明和回归测试门禁；未完成的 retry orchestration、审批恢复、审计查询/事务、完整 observability 和跨副作用 rollback 不能被隐式假设为存在。README、每日任务、实现日志、下一步状态和工具 schema 都要保持同一能力边界，任何新增工具先补测试和安全场景，危险动作默认不自动 retry、不绕过 approval，也不能把局部文件 checkpoint 外推成全系统 rollback。

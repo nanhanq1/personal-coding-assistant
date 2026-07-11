@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Protocol
+from uuid import uuid4
 
+from pca.core.events import TraceContext
 from pca.core.messages import Message
 from pca.tools.base import ToolResult
 from pca.tools.registry import ToolRegistry
@@ -19,8 +21,14 @@ class LLM(Protocol):
 class AgentLoopResult:
     """一次 AgentLoop 运行的最终答案和完整轨迹。"""
 
+    # 修改前旧代码：
+    # final_message: Message
+    # messages: list[Message]
+    #
+    # 问题：调用方无法把一次 Agent 运行中的工具结果关联到同一条追踪链。
     final_message: Message
     messages: list[Message]
+    trace_id: str | None = None
 
 
 class AgentLoop:
@@ -58,6 +66,11 @@ class AgentLoop:
         if not isinstance(user_input, str) or user_input.strip() == "":
             raise ValueError("user_input must be a non-empty string")
 
+        # 修改前旧代码：
+        # messages = [Message(role="user", content=user_input)]
+        #
+        # 问题：每次工具调用没有共享的 run 级 trace_id，失败结果难以串联。
+        trace_context = TraceContext.new()
         messages = [Message(role="user", content=user_input)]
 
         for _ in range(self._max_turns):
@@ -76,20 +89,33 @@ class AgentLoop:
                 return AgentLoopResult(
                     final_message=assistant_message,
                     messages=messages,
+                    trace_id=trace_context.trace_id,
                 )
 
             for tool_call in assistant_message.tool_calls:
+                # 每个 ToolCall 使用独立 id，便于同一 trace 内区分并行或连续调用。
+                tool_call_id = uuid4().hex
                 # AgentLoop 只负责按 ToolCall 路由，不关心具体工具函数如何实现。
                 # 修改前旧代码：
                 # tool_result = self._tools.run(tool_call.name, tool_call.arguments)
                 #
                 # 问题：工具失败会直接中断循环，LLM 看不到错误，也没有机会恢复。
                 try:
-                    tool_result = self._tools.run(tool_call.name, tool_call.arguments)
+                    tool_result = self._tools.run(
+                        tool_call.name,
+                        tool_call.arguments,
+                        trace_id=trace_context.trace_id,
+                        tool_call_id=tool_call_id,
+                    )
                 except Exception as exc:
                     # 工业级 Agent 不应因为一次工具失败直接丢失轨迹；
                     # 把错误写回 history，LLM 才有机会解释、重试或换策略。
-                    tool_result = ToolResult.from_exception(exc, duration_ms=0)
+                    tool_result = ToolResult.from_exception(
+                        exc,
+                        duration_ms=0,
+                        trace_id=trace_context.trace_id,
+                        tool_call_id=tool_call_id,
+                    )
                 messages.append(self._tool_result_to_message(tool_call.name, tool_result))
 
         raise RuntimeError("Agent loop exceeded max_turns.")

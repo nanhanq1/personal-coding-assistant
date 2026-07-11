@@ -208,6 +208,15 @@
 - mini-SWE-agent GitHub：https://github.com/SWE-agent/mini-swe-agent
 - 建议阅读顺序：先理解 `Protocol` 如何表达结构化接口，再复习当前 `subprocess` 结果语义，最后对照 OpenHands / mini-SWE-agent 理解为什么 runtime interface 要先于 Docker adapter 稳定。
 
+### Week 7 Day 1 Repo Scanner 资料
+
+- Python pathlib 官方文档：https://docs.python.org/3/library/pathlib.html
+- Git ignore 官方文档：https://git-scm.com/docs/gitignore
+- Aider Repo Map 文档：https://aider.chat/docs/repomap.html
+- mini-SWE-agent：https://github.com/SWE-agent/mini-swe-agent
+- MIT Missing Semester Version Control：https://missing.csail.mit.edu/2020/version-control/
+- 建议阅读顺序：先掌握 `Path.rglob`、相对路径和目录边界，再理解 ignore 规则，最后对照 Aider 的 repo map 预算思路。
+
 ### Week 5 Day 5 DockerRuntime graceful fallback 资料
 
 - Python `subprocess` 官方文档：https://docs.python.org/3/library/subprocess.html
@@ -244,6 +253,16 @@
 - pytest `monkeypatch` 官方文档：https://docs.pytest.org/en/stable/how-to/monkeypatch.html
 - Tenacity retry library 文档：https://tenacity.readthedocs.io/en/latest/
 - 建议阅读顺序：先看 `time.monotonic()` / `perf_counter()` 如何支持稳定耗时和等待测试，再用 `Enum` 复习稳定策略值，随后用 `monkeypatch` 构造 fake runtime 调用次数，最后参考 Tenacity 的 retry 概念，但 Day 3 不直接引入依赖。
+
+### Week 6 Day 6 真实安全验证资料
+
+- pytest `tmp_path` 官方文档：https://docs.pytest.org/en/stable/how-to/tmp_path.html
+- Python `tempfile` 官方文档：https://docs.python.org/3/library/tempfile.html
+- Python `subprocess` 官方文档：https://docs.python.org/3/library/subprocess.html
+- pytest fixtures 官方文档：https://docs.pytest.org/en/stable/how-to/fixtures.html
+- mini-SWE-agent GitHub：https://github.com/SWE-agent/mini-swe-agent
+- OpenHands Docs：https://docs.openhands.dev/
+- 建议阅读顺序：先用 `tmp_path` / `tempfile` 构造可清理的临时 repo，再复习 `subprocess` 的 cwd、returncode 和 timeout，最后对照 mini-SWE-agent / OpenHands 理解真实 coding task 验证为什么必须记录轨迹、失败边界和能力声明。
 
 ## 视频搜索关键词
 

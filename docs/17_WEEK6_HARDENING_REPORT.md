@@ -2,7 +2,7 @@
 
 ## 文档范围
 
-日期：2026-07-09
+日期：2026-07-09；Day 7 更新：2026-07-10
 阶段：Week 6 Day 1
 主题：Tool Runtime 加固周现状评估
 
@@ -50,11 +50,11 @@ flowchart LR
 | D2 健壮性 | 部分达标 | 参数校验、timeout、Docker graceful fallback、文件写盘失败 rollback 已存在 | 缺统一错误码；无 retry policy；GitCheckpoint restore 半恢复语义不够细；shell/Docker/Git rollback 未接主链 | P0 |
 | D3 安全性 | 部分达标 | shell/file permission gate、allow fail-closed audit、敏感 env 输出脱敏、安全回归矩阵已存在 | `ASK` 不能审批后恢复；audit 无跨副作用原子事务；Docker 不是默认 sandbox；真实网络/删除和外部系统边界未验证 | P0 |
 | D4 性能 | 未达标 | 文件读取有 1MiB 上限；工具输出有 4000 字符截断 | 无 benchmark / stress test；无 P99；无长时间运行内存观察 | P1 |
-| D5 可测试性 | 部分达标 | 当前 `199 passed, 1 skipped`，新增 `tests/safety/` 覆盖 shell/file gate、workspace sentinel、audit 隐私和 secret redaction | 无覆盖率证据；真实小 repo e2e 仍缺；真实网络/删除副作用未执行验证 | P1 |
+| D5 可测试性 | 部分达标 | 当前 `204 passed, 1 skipped`；新增 `tests/safety/` 和 `tests/e2e/` 覆盖 shell/file gate、workspace sentinel、audit 隐私、secret redaction 和临时 repo 闭环 | 无覆盖率证据；真实网络/删除副作用未执行验证 | P1 |
 | D6 接口清晰性 | 部分达标 | `CommandRuntime` Protocol、工具 schema、示例能力边界已存在 | 错误信息没有统一错误码和建议操作；缺 API 文档目录；审批恢复接口未定 | P1 |
 | D7 可扩展性 | 部分达标 | permission、runtime、tools 职责基本分层；runtime 可替换 | Workspace 尚未成为 shell/file 主链唯一事实源；audit/trace 扩展点未统一 | P2 |
 | D8 代码质量 | 部分达标 | 关键类和复杂逻辑已有中文注释和“修改前旧代码”说明 | 还未做复杂度/重复度工具检查；部分公开函数 docstring 不完整 | P2 |
-| D9 真实场景验证 | 未达标 | 示例可验证当前边界 | 尚未用真实小型 repo 执行安全修改任务；无真实验证报告 | P2 |
+| D9 真实场景验证 | 部分达标 | `tests/e2e/test_safe_edit_workflow.py` 在 pytest 临时 `demo_repo` 中完成读取、局部编辑、测试反馈、permission 拒绝、越界和 rollback 边界；有 `5 passed` 证据 | 仍未验证真实网络/删除/外部系统副作用；没有跨副作用事务和自动 rollback | P2 |
 
 ## P0 加固清单
 
@@ -95,7 +95,25 @@ flowchart LR
 - shell 拒绝场景使用 `RecordingRuntime`，通过 runtime 零调用证明 `ASK` / `DENY` 没有进入执行层；文件场景使用临时 sentinel 证明原文件没有变化。
 - 安全测试只运行本地命令和临时文件，不访问真实网络，不执行真实删除命令；audit JSONL 和失败信息不包含 secret。
 - 验证结果：`tests/safety` 为 `9 passed`，全量为 `199 passed, 1 skipped`；五个示例、compileall 和 diff check 均通过。
-- 当前仍未覆盖：审批后恢复、完整 sandbox、shell/Docker/Git 自动 rollback、真实小 repo 安全修改任务；Day 5 面试题尚未回答和归档。
+- 当前仍未覆盖：审批后恢复、完整 sandbox、shell/Docker/Git 自动 rollback、真实小 repo 安全修改任务。Day 5 面试题已按用户授权归档为第 41 天，下一步进入 Day 6 真实验证。
+
+## Day 6 真实安全验证进展
+
+- 在 pytest 临时目录构造 `demo_repo`，使用真实工具链完成初始失败、局部 edit、最终测试通过的安全修改闭环。
+- 覆盖四类边界：覆盖已有文件需要 approval；工作区外路径返回 `INVALID_ARGUMENT`；允许编辑写盘失败后恢复原文件；写盘和恢复同时失败时返回 `ROLLBACK_FAILED`。
+- audit 只保留摘要字段；测试确认修改后的源码和完整 pytest 命令不会进入 audit 文本。
+- 验证结果：E2E `5 passed`，Safety `9 passed`，全量 `204 passed, 1 skipped`，五个示例、compileall 和 diff check 通过。
+- D9 从“未达标”更新为“部分达标”：已具备临时 repo 真实证据，但不能外推为完整 sandbox、审批恢复或所有副作用自动 rollback。
+- Day 6 面试题已按用户授权归档为第 42 天记录，随后完成 Day 7 放行复盘。
+
+## Day 7 放行复盘进展
+
+- 以 TDD 新增 AgentLoop trace 透传和 ToolRegistry 成功/失败 metadata 回归测试；先确认旧实现会因缺少 `AgentLoopResult.trace_id` 和 metadata 参数而 RED。
+- `AgentLoop.run(...)` 为每次运行创建 `TraceContext`，为每个 `ToolCall` 生成独立 `tool_call_id`；`ToolRegistry` 将两者保留到成功或失败 `ToolResult`。
+- 验证结果：聚焦 `45 passed`，E2E `5 passed`，Safety `9 passed`，全量 `206 passed, 1 skipped`；五个示例和 compileall 通过。
+- D1 从“没有主链 trace 透传”改善为“有 run/tool metadata 透传”，但仍缺结构化日志、trace 查询、P99 统计，不能宣称完全达标。
+- 阶段结论：可以把当前结果作为进入 Week 7 Coding Agent 的安全 Tool Runtime 骨架，但不等于完整工业级 sandbox；retry 自动执行、审批恢复、跨副作用事务、Git/Docker/网络 rollback 仍需后续明确处理。
+- Day 7 三道面试题已按用户明确授权，将标准答案作为用户回答归档为第 43 天；Week 6 已带边界进入 Week 7 Day 1。
 
 ## P1 加固清单
 
@@ -107,7 +125,7 @@ flowchart LR
 
 1. 逐步把 `Workspace(root)` 迁移为 shell/file 主链唯一路径事实源。
 2. 做代码质量工具检查，记录复杂度和重复度基线。
-3. 构造真实小 repo 验证报告，记录成功、失败、边界和耗时。
+3. 继续补充真实小 repo 验证报告，尤其是网络、删除、Git/Docker 副作用和耗时基线；Day 6 已完成第一版证据。
 
 ## Day 1 结论
 

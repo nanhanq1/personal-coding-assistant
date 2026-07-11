@@ -438,6 +438,30 @@ def test_tool_registry_run_returns_structured_success_result():
     assert result.duration_ms >= 0
 
 
+def test_tool_registry_run_preserves_trace_metadata_on_success_and_failure():
+    """测试成功和失败结果都保留调用链 trace 元数据。"""
+    registry = ToolRegistry()
+    registry.register(Tool(name="echo", description="回显", handler=lambda _: "ok"))
+
+    success = registry.run(
+        "echo",
+        {},
+        trace_id="trace-1",
+        tool_call_id="call-1",
+    )
+    failure = registry.run(
+        "missing_tool",
+        {},
+        trace_id="trace-1",
+        tool_call_id="call-2",
+    )
+
+    assert success.trace_id == "trace-1"
+    assert success.tool_call_id == "call-1"
+    assert failure.trace_id == "trace-1"
+    assert failure.tool_call_id == "call-2"
+
+
 def test_tool_registry_run_returns_structured_failure_when_handler_raises():
     """测试 handler 抛异常时 ToolRegistry.run 返回结构化失败结果。"""
 

@@ -42,7 +42,14 @@ class ToolRegistry:
             raise KeyError(f"Unknown tool: {name}")
         return self._tools[name]
 
-    def run(self, name: str, arguments: dict[str, Any]) -> ToolResult:
+    def run(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        *,
+        trace_id: str | None = None,
+        tool_call_id: str | None = None,
+    ) -> ToolResult:
         """查找工具并执行，是 AgentLoop 面向工具系统的唯一入口。"""
         # 修改前旧代码：
         # tool = self.get(name)
@@ -57,7 +64,12 @@ class ToolRegistry:
             result = tool.run(arguments)
         except Exception as exc:
             duration_ms = int((perf_counter() - started_at) * 1000)
-            failure = ToolResult.from_exception(exc, duration_ms=duration_ms)
+            failure = ToolResult.from_exception(
+                exc,
+                duration_ms=duration_ms,
+                trace_id=trace_id,
+                tool_call_id=tool_call_id,
+            )
             self._record_stats(name=name, ok=False, duration_ms=duration_ms)
             return failure
         # 修改前旧代码：
@@ -70,6 +82,8 @@ class ToolRegistry:
         return ToolResult.success(
             result=result,
             duration_ms=duration_ms,
+            trace_id=trace_id,
+            tool_call_id=tool_call_id,
             output_truncated=output_truncated,
         )
 

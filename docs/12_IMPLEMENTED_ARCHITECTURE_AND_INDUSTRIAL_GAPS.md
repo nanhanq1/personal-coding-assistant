@@ -27,7 +27,7 @@
 - `src/pca/observability`
 
 这些目录虽然已经存在，但当前仍是占位或计划模块，本文只在后文“占位模块说明”中单列，不把它们画成当前已落地能力。
-`src/pca/permissions` 已有 Day 1-Day 6 的风险分类、策略判断、审批对象、文件风险分类和审计事件；Day 4-Day 5 已把风险分类和策略判断分别接入 `ShellCommandTool` 和文件工具写盘前 gate。`src/pca/runtime/workspace.py` 已实现独立 `Workspace(root)` 边界对象，`src/pca/runtime/checkpoints.py` 已实现独立 `FileCheckpoint` 文件快照 API 和独立 `GitCheckpoint` git diff 快照 API，`src/pca/runtime/interface.py` 已实现薄 `CommandRuntime` Protocol，`src/pca/runtime/docker_runtime.py` 已实现最小 `DockerRuntime` graceful fallback adapter；Week 5 Day 6 已把 `FileCheckpoint` 接入文件工具允许执行后的写盘失败恢复路径；Week 5 Day 7 已用 `examples/05_checkpoint_rollback.py` 验收本地文件 rollback 边界。但审批交互、审批恢复、audit 自动接入主链、shell/Docker/Git rollback 自动接入主链和完整 Docker sandbox 仍未完成。
+`src/pca/permissions` 已把风险分类、策略判断和摘要 audit 接入 `ShellCommandTool` 与文件工具的副作用前 gate；审批对象已实现，但审批交互与批准后恢复尚未接线。`AgentLoop` 已为每次 run 创建 trace，并经 `ToolRegistry` 透传到 `ToolResult`，但 trace 与 audit 尚未关联，也没有最终结果生命周期、查询、结构化日志或 P99 统计。`src/pca/runtime/workspace.py` 已实现独立 `Workspace(root)` 边界对象，`src/pca/runtime/checkpoints.py` 已实现 `FileCheckpoint` 与 `GitCheckpoint`，`src/pca/runtime/interface.py` 已实现薄 `CommandRuntime` Protocol，`src/pca/runtime/docker_runtime.py` 已实现最小 `DockerRuntime` graceful fallback adapter；文件工具失败路径已有局部 rollback，但 shell/Docker/Git 跨副作用 rollback 和完整 Docker sandbox 仍未完成。
 
 ### 2. 证据来源
 
@@ -37,6 +37,8 @@
 - `docs/07_IMPLEMENTATION_LOG.md`
 - `docs/06_ARCHITECTURE_DECISIONS.md`
 - `README.md`
+- [`docs/18_IMPLEMENTED_MODULE_FLOWS.md`](18_IMPLEMENTED_MODULE_FLOWS.md)：当前模块流程、源码与测试证据
+- [`docs/19_CODE_COMPLETION_AUDIT_2026-07-10.md`](19_CODE_COMPLETION_AUDIT_2026-07-10.md)：日期化完成度审计快照，不作为实时状态源
 - 已实现源码：`src/pca/core`、`src/pca/tools`、`src/pca/runtime/shell_runtime.py`、`src/pca/runtime/interface.py`、`src/pca/runtime/docker_runtime.py`、`src/pca/runtime/workspace.py`、`src/pca/runtime/checkpoints.py`、`src/pca/permissions/risk.py`、`src/pca/permissions/policy.py`、`src/pca/permissions/approval.py`、`src/pca/permissions/file_risk.py`、`src/pca/permissions/audit.py`
 
 ### 3. 阅读方式
@@ -97,24 +99,31 @@ flowchart LR
     B --> C["ScriptedLLM / mock LLM"]
     C --> D["Assistant Message / ToolCall"]
     D --> E["AgentLoop"]
-    E --> F["ToolRegistry.run(...)"]
+    E -->|"trace_id + tool_call_id"| F["ToolRegistry.run(...)"]
     F --> G["Tool.run(...)"]
     G --> H{"Concrete tool"}
-    H --> I["read_file / write_file / edit_file"]
+    H --> I["read_file"]
+    H --> IW["write_file / edit_file"]
     H --> J["run_command / ShellCommandTool gate"]
     W["Workspace(root) independent boundary"]
     Ck["FileCheckpoint API"]
     W --> Ck
-    Ck --> F["file tool rollback on allowed failure"]
+    Ck --> IO["write / edit"]
     Gk["GitCheckpoint independent diff API"]
     W --> Gk
     Dk["DockerRuntime graceful fallback adapter"]
     CR["CommandRuntime Protocol"] -.-> Dk
     J --> J2["classify_command + PermissionPolicy"]
-    J2 --> J3["ALLOW -> ShellRuntime"]
-    J2 --> J4["ASK / DENY -> failed ToolResult"]
-    I --> I2["file resource guard / file risk gate"]
-    I2 --> K["truncate_output"]
+    J2 --> JA["permission decision audit"]
+    JA --> J3["ALLOW -> ShellRuntime"]
+    JA --> J4["ASK / DENY -> failed ToolResult"]
+    I --> IR["path + read resource guard"]
+    IR --> K["truncate_output"]
+    IW --> IP["file risk + PermissionPolicy"]
+    IP --> IA["permission decision audit"]
+    IA -->|"ALLOW"| Ck
+    IA -->|"ASK / DENY"| K
+    IO --> K
     J3 --> K
     J4 --> K
     K --> L["ToolResult"]
@@ -128,7 +137,7 @@ flowchart LR
 - 当前真实闭环已经存在：`User -> Message history -> mock LLM -> ToolCall -> AgentLoop -> ToolRegistry -> Tool -> FileTool/ShellRuntime -> ToolResult -> tool Message -> LLM`
 - 当前主链仍以 **mock LLM + 本地工具 + 文本 message history** 为中心，不包含真实模型 API、RAG、MCP、长期记忆或可观测平台
 - Permission System 的风险分类和策略判断已接入 `ShellCommandTool` 与文件工具写盘前 gate，当前 `run_command`、覆盖写入和删除式编辑会在执行前拦截 `ASK` / `DENY`
-- Permission audit 已有独立事件与 JSONL 写入 API，但尚未自动接入 shell/file gate
+- Permission audit 已在 shell/file gate 的副作用前自动写入决策摘要；仍缺 trace 关联、最终执行结果生命周期和查询
 - `Workspace(root)` 已有独立路径边界 API，但尚未迁移接入 shell runtime 主链
 - `FileCheckpoint` 已有独立文件快照 API，并已接入文件工具允许执行后的写盘失败 rollback 路径
 - `GitCheckpoint` 已有独立 git diff 快照 API，但尚未自动接入工具执行失败后的 rollback 链路，也不处理 untracked 文件或 staged diff
@@ -141,9 +150,9 @@ flowchart LR
 
 ### 与工业级项目相比的差异
 
-- 真实工业级系统通常会把 LLM adapter、权限策略、上下文构建、审计日志、trace、checkpoint 和回滚纳入同一主链；当前项目只完成了 shell/file gate 的最小接入和独立 audit API，还没进入完整审批、审计自动接入和隔离执行
+- 真实工业级系统通常会把 LLM adapter、权限策略、上下文构建、审计日志、trace、checkpoint 和回滚纳入同一主链；当前项目已有 shell/file gate 决策摘要 audit 和工具结果 trace 透传，但两者尚未关联，也没有完整审批、最终结果生命周期、查询和隔离执行
 - 当前 message history 是纯内存 list，没有持久化会话、恢复点和长上下文压缩
-- 工具执行仍在本机进行；shell/file gate 已能阻止 `ASK` / `DENY` 静默执行，但还没有隔离 runtime、审批恢复和审计自动链路
+- 工具执行仍在本机进行；shell/file gate 已能阻止 `ASK` / `DENY` 静默执行并记录决策摘要，但还没有隔离 runtime、审批恢复和完整审计生命周期
 - 当前整体架构更像“教学型最小 Agent Harness”，不是“生产型 Agent Platform”
 
 ## 模块拆解
@@ -241,7 +250,7 @@ flowchart TD
 - 当前循环模型极简，没有 planning、todo、并发工具、观察压缩和中断恢复
 - `max_turns` 只是最小兜底，没有基于成本、时间、权限或状态机的停止条件
 - 工具异常虽然已回写，但没有错误分级、恢复策略矩阵和用户审批插入点
-- 当前 `AgentLoopResult` 只返回最终消息和轨迹，没有 trace、统计和可回放元数据
+- 当前 `AgentLoopResult` 已返回 run 级 `trace_id`，工具调用也有独立 `tool_call_id`；仍没有结构化事件、查询索引、性能统计和可回放元数据
 
 ## 3. `Tool / ToolParameter / ToolRegistry`
 
@@ -293,7 +302,7 @@ flowchart TD
 
 - 当前 schema 仍是接近 JSON Schema 的轻量实现，不是完整规范实现
 - `ToolRegistry` 已有最小 stats 和输出截断边界，但还没有权限标签、危险级别、幂等性标记、审计钩子和供应商工具定义映射
-- `ToolResult` 虽已统一返回，并支持 `trace_id`、`tool_call_id` 和 `output_truncated`，但 registry 还没有自动生成 trace id、工具调用 id、参数摘要脱敏等元数据
+- `AgentLoop` 已生成 run 级 `trace_id` 和调用级 `tool_call_id`，`ToolRegistry` 会把它们写入成功或失败 `ToolResult`；仍缺参数摘要脱敏、结构化日志、查询和 P99 等统计
 - 当前工具层重点是“最小结构契约 + 统一入口”，还不是“完整工具平台”
 
 ## 4. `read_file / write_file / edit_file`
@@ -341,7 +350,7 @@ flowchart TD
 - `read_file` 只支持小型文本文件，读取前会拒绝超过 1MiB 的文件和含 NUL 字节的明显二进制文件
 - 当前仍不处理完整编码探测、大文件分块、图片/压缩包等二进制资源和文件锁冲突治理
 - `edit_file` 只支持精确单次替换，不支持 patch/diff、冲突合并、预览和撤销
-- 文件变更已有最小写盘前风险 gate，覆盖写入和删除式编辑不会静默执行；仍没有审批恢复、审计自动接入、快照和自动 diff 展示
+- 文件变更已有写盘前风险 gate、决策摘要 audit 和失败路径 `FileCheckpoint` 恢复；仍没有审批恢复、audit 与最终结果关联、多文件事务和自动 diff 展示
 - `workspace_root` 已经建立基本边界，但还没有“不同目录不同权限”的精细策略
 
 ## 5. `run_command / ShellRuntime`
@@ -386,9 +395,9 @@ flowchart TD
 ### 与工业级项目相比的差异
 
 - 仍在宿主机同步执行命令，没有隔离沙箱、容器 runtime 和资源限制
-- 已有最小危险命令分类和 shell gate；仍没有交互式审批恢复、命令 allowlist/denylist、audit 自动接入和进程树治理
+- 已有最小危险命令分类、shell gate 和决策摘要 audit；仍没有交互式审批恢复、命令 allowlist/denylist、audit 与最终结果关联和进程树治理
 - 输出脱敏只覆盖显式 `env` 中一部分敏感 key，不是完整 secret 防泄漏系统
-- 通过 `ToolRegistry` 进入 `ToolResult` 时 stdout/stderr 会被截断，但底层 `ShellRuntime` 仍返回 raw 输出；当前还没有命令审计、trace、结构化日志和执行策略
+- 通过 `ToolRegistry` 进入 `ToolResult` 时 stdout/stderr 会被截断，且保留 `trace_id` / `tool_call_id`；底层 `ShellRuntime` 仍返回 raw 输出，permission audit 也尚未关联最终结果，当前还没有结构化日志、查询和完整执行策略
 
 ## 6. `ToolResult -> tool Message` 序列化边界
 
@@ -426,7 +435,7 @@ flowchart TD
 
 - 当前序列化目标仍是纯文本 `Message.content`，没有 JSON tool payload 和供应商专用适配
 - `ToolResult` 已支持 trace id、工具调用 id 和输出截断信息，但缺少权限决策结果、参数摘要和结构化序列化协议
-- 当前边界已经清楚，但还没有接入 observability、审计和回放体系
+- 当前边界已经清楚，并已有 trace 元数据与 permission audit 两条局部链路，但尚未统一为可查询、可回放的 observability 体系
 - 这一步解决了“内部结构化结果如何回到 LLM 轨迹”，但还没有解决“结果如何进入生产级监控平台”
 
 ## 已存在但当前仍是占位/计划模块
@@ -435,7 +444,7 @@ flowchart TD
 
 | 目录 | 当前状态 | 证据 | 计划周次 |
 | --- | --- | --- | --- |
-| `src/pca/permissions` | 部分实现并已接入 shell/file gate | `risk.py` 已实现 `RiskLevel`、`RiskAssessment`、`classify_command(...)`；`policy.py` 已实现 `DecisionAction`、`PermissionDecision`、`PermissionPolicy.decide(...)`；`approval.py` 已实现审批对象；`file_risk.py` 已实现文件风险分类；`audit.py` 已实现最小审计事件和 JSONL 写入；`ShellCommandTool` 与文件工具已在执行前调用分类和策略；交互式审批恢复和 audit 自动接入仍未实现 | Week 4 |
+| `src/pca/permissions` | 部分实现并已接入 shell/file gate | `risk.py`、`policy.py` 和 `file_risk.py` 已接入副作用前 gate；`audit.py` 的摘要事件已由 shell/file gate 自动写入；`approval.py` 仍只是审批对象。交互式审批恢复、trace 关联、最终结果生命周期和查询仍未实现 | Week 4 |
 
 ### 2. 目录现状
 
@@ -449,32 +458,27 @@ flowchart TD
 ### 3. 为什么不画进当前主链
 
 - 这些目录已经存在，但还没有在当前测试主链、README 主链和实现日志中形成真实闭环
-- `permissions/risk.py` 和 `permissions/policy.py` 已经挂到 `ShellCommandTool` 与文件工具写盘前 gate，但 `ApprovalRequest` / `ApprovalDecision` 还没有接入交互式审批恢复，audit 也尚未自动接入主链
+- `permissions/risk.py`、`permissions/policy.py` 与摘要 audit 已经挂到 `ShellCommandTool` 和文件工具写盘前 gate，但 `ApprovalRequest` / `ApprovalDecision` 还没有接入交互式审批恢复，audit 也未关联 trace 与最终执行结果
 - 如果把权限系统画成完整审批和审计链路，会把“计划结构”误说成“已实现结构”
 - 当前更准确的表达方式是：
   - 主链可以画已完成的 `core + tools + ShellCommandTool gate + runtime`
   - `permissions/risk.py`、`permissions/policy.py` 和 `permissions/file_risk.py` 可以画成 shell/file 执行前 gate
   - `approval.py` 只能画成已实现对象，不能画成已接入交互式审批流程
-  - `audit.py` 只能画成已实现独立事件和 JSONL 写入，不能画成已自动记录所有工具调用
+  - `audit.py` 可以画成 shell/file gate 的决策摘要记录，不能画成包含工具最终结果的完整审计生命周期
   - 未来目录在附录中标记为“占位/计划中”
 
 ## 当前阶段总结
 
 ### 1. 当前项目处于什么阶段
 
-当前项目处于：
-
-- 12 周路线里的**第 2 周 Tool System 已收口**
-- 第 3 周 Agent Core + Tool Runtime 工业级加固已完成
-- Week 4 Permission System 验收已完成并归档
-- Week 5 Workspace / Sandbox / Checkpoint 已完成 Day 1-Day 7，并归档 Day 7 面试题
-- 当前代码本质上是一个**教学型、可验证、边界逐步清晰的最小 Personal Coding Assistant Harness**
+实时课程阶段只维护在 `docs/09_NEXT_ACTIONS.md`。就代码能力而言，当前仍是一个**教学型、可验证、边界逐步清晰的最小 Personal Coding Assistant Harness**，不因占位目录存在而视为对应产品能力已完成。
 
 ### 2. 当前已经具备的稳定骨架
 
 - 标准 `Message` / `ToolCall`
 - 确定性 mock LLM：`ScriptedLLM`
 - 最小 `AgentLoop`
+- run 级 `trace_id` 与调用级 `tool_call_id` 经 `ToolRegistry` 透传到 `ToolResult`
 - `Tool` / `ToolParameter` / `ToolRegistry`
 - `ToolRegistry.get_stats()` 和最小工具调用统计
 - `truncate_output(...)` 和 `ToolRegistry` 输出截断边界
@@ -487,7 +491,7 @@ flowchart TD
 - `ApprovalRequest` / `ApprovalDecision`
 - `ShellCommandTool` 执行前 shell gate
 - `WriteFileTool` / `EditFileTool` 写盘前文件风险 gate
-- `PermissionAuditEvent` / `append_audit_event(...)`
+- `PermissionAuditEvent` / `record_permission_decision(...)`，已自动接入 shell/file gate 的副作用前决策摘要
 - `Workspace(root)` / `Workspace.resolve_path(...)` / `Workspace.contains(...)`
 - `FileCheckpoint.create(...)` / `FileCheckpoint.restore()`
 - `GitCheckpoint.create(...)` / `GitCheckpoint.restore()`
@@ -503,14 +507,14 @@ flowchart TD
 核心缺口仍集中在以下方向：
 
 - 真实 LLM adapter 与供应商协议适配
-- Permission System：交互式审批流、audit 自动接入、审批通过后恢复执行
+- Permission System：交互式审批流、审批通过后恢复执行、audit 与 trace/最终结果关联及查询
 - shell/Docker/Git rollback 自动接入、sandbox / docker runtime、GitCheckpoint untracked/staged 扩展
 - 上下文工程、上下文压缩、RAG
 - MCP client/server
 - 长期记忆系统
-- observability：trace、审计日志、replay、评估
+- observability：结构化日志、trace 查询、完整审计生命周期、replay、P99 统计与评估
 - 更完整的工具 schema、结果元数据和生产级错误分类
 
 ### 4. 一句话结论
 
-当前项目已经把“怎么调用工具”这条主链讲清楚、写出来、测出来了，并已把 Permission System 的风险分类和策略判断接入 shell/file gate，同时具备最小审计事件、JSONL 写入、独立 `Workspace(root)` 边界对象、独立 `FileCheckpoint` 文件快照 API、文件工具允许执行失败路径 rollback、独立 `GitCheckpoint` git diff 快照 API、薄 `CommandRuntime` 命令执行接口和最小 `DockerRuntime` graceful fallback adapter；但距离“工业级 Agent 能不能安全执行、可审计执行、可恢复执行、可扩展执行”还差交互式审批、audit 自动接入、shell/Docker/Git rollback 自动接入、完整 Docker sandbox 策略、Context、Memory 和 Observability 体系。
+当前项目已经把“怎么调用工具”这条主链讲清楚、写出来、测出来了：`AgentLoop` 生成 run 级 trace 并经 registry/result 透传，Permission System 的风险分类、策略判断和摘要 audit 已接入 shell/file gate，同时具备局部 workspace、checkpoint、rollback 与 runtime adapter 能力；但距离工业级安全、审计、恢复和扩展仍缺交互式审批、trace/audit/最终结果生命周期与查询、shell/Docker/Git 跨副作用 rollback、完整 sandbox，以及 Context、Memory、MCP 和完整 Observability 体系。

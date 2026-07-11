@@ -6,100 +6,57 @@
 
 - 每周交付一个可运行、可测试、可验收的能力切片。
 - 每周至少覆盖一个失败路径或安全边界。
-- 每周更新测试、文档、实现日志、下一步行动和面试题状态。
-- 每 2 周实现后安排 1 周工业级加固；加固周不新增大模块。
+- 每周同步测试、文档、实现日志、下一步行动和面试题状态。
 - 文档不能宣称源码没有实现的能力。
 
-## 当前 Sprint：Week 6 - Tool Runtime 加固周
+## 当前 Sprint：Week 7 - Repo Scanner / Repo Map
 
-当前进度：Week 6 Day 1 现状评估、Day 2 错误分类、Day 3 Retry / timeout policy、Day 4 Audit 完整性均已完成并归档面试题；Day 5 Safety suite 已完成实现与验证，面试题待回答和归档。
+Week 6 已完成带边界收口：permission、audit、workspace、checkpoint/rollback、safety、E2E 和 trace metadata 已有证据；结构化 observability、自动 retry、审批恢复和跨副作用 rollback 仍明确保留在 gap ledger 中。
 
 ### 1. 本周主题
 
-将 Week 4-5 的 permission、workspace、checkpoint、runtime 和 rollback 做到可解释、可测、可审计。
+代码库理解入口：从授权根目录生成稳定、可预算、不会泄漏 ignored 文件的 repo inventory 和 repo map。
 
-### 2. 本周工业级目标
+### 2. 工业级目标
 
-- 按 9 个工业级维度评估当前真实状态。
-- 优先补 P0 缺口：安全性、健壮性、可观测性。
-- 建立 safety regression matrix 和真实小 repo 安全验证报告。
-- 不新增大模块；只加固已有工具运行时、安全边界和文档真实性。
+- 扫描范围受 workspace 和资源上限约束。
+- 忽略 `.git`、`__pycache__`、`.venv` 等噪声目录。
+- 文件清单排序稳定、输出可测试、后续可扩展到语言识别和摘要。
 
 ### 3. 核心概念
 
-- error taxonomy
-- retry / timeout
-- audit completeness
-- safety regression
-- resource caps
-- real-world validation
+- file inventory
+- ignore rules
+- language detection
+- summary budget
 
-### 4. 参考项目
+### 4. 参考项目与资料
 
-- OpenHands evaluation / runtime。
-- Cline approval UX。
-- mini-SWE-agent environment / trajectory。
+- Aider Repo Map：https://aider.chat/docs/repomap.html
+- mini-SWE-agent：https://github.com/SWE-agent/mini-swe-agent
+- Git ignore：https://git-scm.com/docs/gitignore
 
 ### 5. 代码模块
 
-- `src/pca/permissions/*`
-- `src/pca/runtime/*`
-- `src/pca/tools/*`
+- `src/pca/coding/repo_scanner.py`
+- `src/pca/coding/repo_map.py`
+- `src/pca/coding/file_summary.py`
 
-### 6. 测试任务
-
-- 基线全量测试和示例。
-- error code 测试。
-- retry policy 单元测试。
-- audit matrix test。
-- `tests/safety/` 安全回归测试。
-- 真实小 repo safe task 验证。
-
-### 7. 文档任务
-
-- Week 6 加固报告。
-- `docs/07_IMPLEMENTATION_LOG.md`。
-- `docs/09_NEXT_ACTIONS.md`。
-- 必要时更新 `EVALUATION.md`、学习笔记和 ADR。
-
-### 8. 验收标准
-
-```powershell
-E:\python\Scripts\pytest.exe -q
-python examples\01_minimal_agent.py
-python examples\02_tool_agent.py
-python examples\03_observed_tool_run.py
-python examples\04_permission_agent.py
-python examples\05_checkpoint_rollback.py
-python -m compileall src examples -q
-```
-
-Week 6 后续新增 safety suite 后，必须追加：
-
-```powershell
-E:\python\Scripts\pytest.exe tests\safety -q
-```
-
-### 9. 常见风险
-
-- 加固时顺手新增大模块，导致边界继续膨胀。
-- 只写报告不补测试，无法证明加固有效。
-- audit 记录完整命令、文件内容或 secret，造成二次泄漏。
-- retry 重试不可重试的危险副作用。
-- 把 Docker adapter 误写成完整 sandbox。
-
-### 10. 本周完成后新增能力
-
-安全执行基础达到阶段标准：已有 permission/runtime/checkpoint 能力有清晰错误语义、安全回归测试、audit 完整性检查和真实验证报告。
-
-## 当前周每日安排
+### 6. 每日安排
 
 | Day | 学习目标 | 代码任务 | 测试任务 | 文档任务 | 完成标准 |
 |---|---|---|---|---|---|
-| 1 | 现状评估 | 不写功能，列 9 维差距 | 基线测试 | 加固报告初版 | 差距清单完成 |
-| 2 | 错误分类 | `ToolErrorCode`、permission error code | error code 测试 | ADR 更新 | 测试通过 |
-| 3 | Retry/timeout | 对临时失败定义 retry policy | retry unit tests | 学习笔记 | 测试通过 |
-| 4 | Audit 完整性 | audit 覆盖 file/shell/git/memory placeholder | audit matrix test | 更新 EVALUATION | matrix 通过 |
-| 5 | Safety suite | 新建 `tests/safety/` | rm/curl/outside/secret cases | 安全报告 | safety `9 passed`，面试题待回答 |
-| 6 | 真实验证 | 构造 `tmp/demo_repo` 修改任务 | e2e safe task | 真实验证报告 | 报告完成 |
-| 7 | 放行复盘 | 修缺口 | 全量+compileall | 面试题 | 阶段放行 |
+| 1 | 文件清单 | `RepoScanner.scan(root)` | ignore/size/boundary | ADR 草稿 | scanner 通过 |
+| 2 | 语言识别 | suffix/language metadata | py/md/toml | notes | metadata 通过 |
+| 3 | 文件摘要 | `FileSummary` | summary tests | docs | summary 通过 |
+| 4 | Repo map | `RepoMap.build` | stable order | Mermaid | map 通过 |
+| 5 | Budget | max files/max chars | truncation | eval note | 超预算语义明确 |
+| 6 | 示例 | `examples/06_repo_map.py` | example test | README | 示例可运行 |
+| 7 | 复盘 | 小重构 | 全量测试 | 面试题 | 放行 |
+
+### 7. 共同安全边界
+
+- 不扫描 workspace 外目录。
+- 不读取 ignored 文件内容。
+- 不执行 shell、网络或写盘副作用。
+- 预算或权限失败时 fail-closed，并返回可解释错误。
