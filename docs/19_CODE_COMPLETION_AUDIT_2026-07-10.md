@@ -22,9 +22,9 @@
 
 | 编号 | 优先级 | 模块 | 简述 | 批准状态 |
 |---|---|---|---|---|
-| F-01 | P0 | permissions / tools | shell 包装命令可绕过真实子命令风险分类 | 等待用户批准 |
-| F-02 | P1 | tools | 非字符串且不可哈希工具名破坏稳定 `ToolResult` 信封 | 等待用户批准 |
-| F-03 | P1 | permissions | 审批对象对错误类型产生不稳定异常语义 | 等待用户批准 |
+| F-01 | P0 | permissions / tools | shell 包装命令可绕过真实子命令风险分类 | 2026-07-12 已按最小 ASK 方案修复 |
+| F-02 | P1 | tools | 非字符串且不可哈希工具名破坏稳定 `ToolResult` 信封 | 2026-07-12 已修复 |
+| F-03 | P1 | permissions | 审批对象对错误类型产生不稳定异常语义 | 2026-07-12 已修复 |
 | F-04 | P1 | permissions / observability | audit 的 `executed` 不是最终执行成功事实 | 等待用户批准 |
 | F-05 | P1 | engineering | 缺少 lint、type-check 和 CI 质量门禁 | 等待用户批准 |
 | F-06 | P1 | tools / runtime | Workspace 路径边界逻辑重复 | 等待用户批准 |
@@ -41,7 +41,7 @@
 - **差距**：分类器判断的是包装器，而不是实际待执行子命令，无法满足“默认拒绝高风险操作”和所有 shell 操作有可靠策略边界的最终要求。
 - **影响**：攻击者或错误调用可以把删除、网络、内联代码等高风险动作藏在 `cmd /c`、`powershell -Command` 等包装层中，使 permission gate 在执行前错误放行。
 - **建议**：优先实现受支持 wrapper 的结构化展开并递归分类；无法可靠解析、嵌套层数超限、引号不平衡或遇到未知 wrapper 时默认 `ASK`，不得默认 `SAFE`。需新增 classification tests 和 safety tests，至少覆盖字符串/数组形式、大小写、完整可执行路径、嵌套 wrapper、引号、shell operator、危险子命令和未知 wrapper 的 fail-closed 行为。测试只调用分类器或 fake runtime，不执行破坏性命令。
-- **批准状态**：**等待用户批准**后修改代码和测试。
+- **整改状态（2026-07-12）**：用户已批准最小 ASK 方案。已知 `cmd` / `powershell` / `pwsh` wrapper 现统一返回 `ASK/shell_wrapper`；gate 返回 approval-required，记录 `executed=false` 且不调用 runtime。全量验证为 `218 passed, 1 skipped`，5 个示例与 compileall 通过。该整改关闭已知 wrapper 静默 `SAFE` 的 P0 路径，但不等同于完成内部/嵌套/编码命令解析。
 
 ### F-02：`ToolRegistry.run` 可能逃逸稳定结果信封
 
@@ -51,7 +51,7 @@
 - **差距**：`run(...)` 声明返回稳定 `ToolResult`，但失败记录本身可抛出第二个异常，错误信封不能覆盖坏工具名输入。
 - **影响**：AgentLoop 可能收到注册表异常而不是带 `INVALID_ARGUMENT` 的结果；统计、错误分类、retry 和审计看到的语义不一致。
 - **建议**：在计时/执行前验证并规范化工具名，或以稳定占位键记录无效调用；确保错误构造和统计路径不会被原始坏输入再次破坏。新增 list、dict、空值、空白字符串和未知合法字符串的回归测试，并断言返回 `ToolResult`、错误码及 stats 行为。
-- **批准状态**：**等待用户批准**后修改代码和测试。
+- **整改状态（2026-07-12）**：非法工具名现在统一返回 `INVALID_ARGUMENT` 的 `ToolResult` 并记录到保留键 `<invalid-tool-name>`；合法未知名称保持 `UNKNOWN_TOOL`。list/dict 不再从统计路径逃逸，非法 trace metadata 在 handler 前被拒绝且不会破坏失败信封。
 
 ### F-03：审批对象错误语义不稳定
 
@@ -61,7 +61,7 @@
 - **差距**：公开数据对象没有先做类型判断，坏输入泄漏实现细节异常，未形成可预测的 `TypeError`/`ValueError` 契约。
 - **影响**：API 调用方、审计层和未来 approval resume 无法稳定区分参数错误与内部故障，错误码映射也可能错误地归入 runtime failure。
 - **建议**：所有审批字符串字段先验证类型，再验证非空；同时验证 `approved` 必须为 bool、时间字段为可比较且时区语义明确。新增构造器、`approve(...)`、`reject(...)` 与过期判断的类型/边界测试。
-- **批准状态**：**等待用户批准**后修改代码和测试。
+- **整改状态（2026-07-12）**：approval 字符串字段、严格 bool、timezone-aware datetime 与 `is_expired(now)` 已形成稳定 `TypeError` / `ValueError` 契约；所有 aware datetime 转 UTC 后按绝对时刻比较，覆盖 DST fold；`approve(...)` / `reject(...)` 有效行为保持兼容。
 
 ### F-04：audit `executed` 混淆授权与执行结果
 
@@ -118,8 +118,8 @@
 | 模块 | 当前状态 | 主链证据 | 测试证据 | 符合当前阶段 | 距离最终目标 |
 |---|---|---|---|---|---|
 | core | 已实现当前阶段 | `AgentLoop`、`Message`、`ToolCall`、`ScriptedLLM`、run 级 `trace_id` 与工具结果回写已形成最小闭环 | 包含在当日全量 `206 passed, 1 skipped`；5 个示例覆盖最小 Agent/tool 路径 | 是，可支持 Week 6 带边界放行 | 缺真实 LLM adapter、自动恢复编排、完整结构化 trace/replay 和最终 E2E |
-| tools | 已实现基础/编排部分 | `Tool`、schema、`ToolRegistry`、文件/shell 工具、错误码、输出截断、stats、retry policy 候选已存在 | 工具、shell、安全与 E2E 测试包含在当日全量证据中 | 是，但必须保留已声明边界 | wrapper P0、稳定坏输入、自动 retry、更多工具、统一 workspace 与完整质量证据未完成 |
-| permissions | 部分实现 | 风险分类、policy、approval 数据对象、shell/file gate、摘要 audit 已接入或已提供 | permission/safety 回归包含在当日全量证据中 | 部分符合；足以教学验证，不足以最终验收 | wrapper 绕过、approval resume、稳定校验、完整 audit 生命周期、默认 fail-closed 扩展仍缺失 |
+| tools | 已实现基础/编排部分 | `Tool`、schema、`ToolRegistry`、文件/shell 工具、错误码、输出截断、stats、retry policy 候选已存在 | 工具、shell、安全与 E2E 测试包含在当日全量证据中 | 是，但必须保留已声明边界 | 已知 wrapper P0 已关闭；稳定坏输入、自动 retry、更多工具、统一 workspace 与完整质量证据未完成 |
+| permissions | 部分实现 | 风险分类、policy、approval 数据对象、shell/file gate、摘要 audit 已接入或已提供 | permission/safety 回归包含在当日全量证据中 | 部分符合；足以教学验证，不足以最终验收 | 已知 wrapper 已 fail-closed 为 ASK；内部语义解析、approval resume、稳定校验、完整 audit 生命周期仍缺失 |
 | runtime | 部分实现 | `ShellRuntime`、`CommandRuntime`、`Workspace`、`FileCheckpoint`、`GitCheckpoint`、`DockerRuntime` 与局部文件 rollback 已存在 | shell、workspace、checkpoint/rollback 与示例证据包含在当日验证中 | 部分符合；当前局部能力可用 | 统一 Workspace、默认隔离、跨副作用 rollback、资源/性能证据与生产级 sandbox 未完成 |
 
 ## 6. 纯占位模块：只列路线缺口
@@ -138,12 +138,12 @@
 
 | 顺序 | 整改项 | 目标证据 | 批准状态 |
 |---|---|---|---|
-| 1 | P0 wrapper 分类与 safety tests | wrapper 展开/默认 ASK；分类器与 fake runtime 安全回归，不执行破坏性命令 | 等待用户批准后修改代码 |
-| 2 | `ToolRegistry` / approval 稳定错误 | 所有坏输入返回或抛出约定错误，注册表不逃逸 `ToolResult` | 等待用户批准后修改代码 |
+| 1 | P0 wrapper 分类与 safety tests | 已知 wrapper 默认 ASK；分类器与 fake runtime 安全回归，不执行破坏性命令 | 2026-07-12 已完成最小 ASK 方案 |
+| 2 | `ToolRegistry` / approval 稳定错误 | 所有坏输入返回或抛出约定错误，注册表不逃逸 `ToolResult` | 2026-07-12 已完成 |
 | 3 | audit 生命周期 | authorized/started/succeeded/failed/rolled_back 可关联、可回放 | 等待用户批准后修改代码 |
 | 4 | lint / type-check / CI | 本地命令与干净 CI 环境均可复现并通过 | 等待用户批准后增加配置 |
 | 5 | 按路线实现 retry / approval / runtime 隔离 | 有界 retry、审批恢复、统一 Workspace、sandbox 与跨副作用补偿的集成/E2E 证据 | 等待用户批准后修改代码 |
 
 ## 8. 最终结论
 
-2026-07-10 的 `206 passed, 1 skipped`、5 个示例和 compileall 证明当前教学主链在现有覆盖范围内稳定，并支持 Week 6 带边界放行；它们不证明最终工业级产品完成。当前最先需要处理的是 P0 包装命令分类漏洞，其后是 `ToolRegistry`/approval 稳定错误、audit 生命周期和工程质量门禁。本文只给出审计建议，**不修改代码**；全部整改均**等待用户批准**，本报告不推进 Week 7 Day 1。
+2026-07-10 的审计快照证明当前教学主链在当时覆盖范围内稳定，并支持 Week 6 带边界放行；它不证明最终工业级产品完成。2026-07-12，F-01、F-02、F-03 已按批准方案关闭，并以 `243 passed, 1 skipped`、5 个示例和 compileall 复验。剩余优先项是 audit 生命周期和工程质量门禁；这些仍等待用户另行设计批准。本报告不推进 Week 7 Day 1。

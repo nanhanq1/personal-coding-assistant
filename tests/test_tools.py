@@ -599,6 +599,97 @@ def test_tool_registry_stats_records_unknown_tool_failures():
     assert stats["missing_tool"]["total_duration_ms"] >= result.duration_ms
 
 
+@pytest.mark.parametrize(
+    ("name", "expected_error_type"),
+    [
+        ([], "ValueError"),
+        ({}, "ValueError"),
+        (None, "ValueError"),
+        ("", "ValueError"),
+        ("   ", "ValueError"),
+    ],
+)
+def test_tool_registry_run_returns_stable_failure_for_invalid_tool_name(
+    name: Any,
+    expected_error_type: str,
+) -> None:
+    """非法工具名也必须留在 ToolResult 信封和有界统计桶中。"""
+    registry = ToolRegistry()
+
+    result = registry.run(
+        name,
+        {},
+        trace_id="trace-invalid-name",
+        tool_call_id="call-invalid-name",
+    )
+
+    assert result.ok is False
+    assert result.error_type == expected_error_type
+    assert result.error_code is tool_base.ToolErrorCode.INVALID_ARGUMENT
+    assert result.trace_id == "trace-invalid-name"
+    assert result.tool_call_id == "call-invalid-name"
+    assert registry.get_stats() == {
+        "<invalid-tool-name>": {
+            "calls": 1,
+            "successes": 0,
+            "failures": 1,
+            "total_duration_ms": result.duration_ms,
+        }
+    }
+
+
+@pytest.mark.parametrize(
+    ("trace_id", "tool_call_id"),
+    [
+        ("", "call-1"),
+        (None, "   "),
+        (1, "call-1"),
+    ],
+)
+def test_tool_registry_run_returns_stable_failure_for_invalid_trace_metadata(
+    trace_id: Any,
+    tool_call_id: Any,
+) -> None:
+    """坏 trace metadata 不能让 ToolResult 构造再次逃逸。"""
+    called = False
+
+    def handler(arguments: dict[str, Any]) -> str:
+        nonlocal called
+        called = True
+        return "ok"
+
+    registry = ToolRegistry()
+    registry.register(Tool(name="echo", description="回显", handler=handler))
+
+    result = registry.run(
+        "echo",
+        {},
+        trace_id=trace_id,
+        tool_call_id=tool_call_id,
+    )
+
+    assert called is False
+    assert result.ok is False
+    assert result.error_code is tool_base.ToolErrorCode.INVALID_ARGUMENT
+    assert result.trace_id is None or result.trace_id == "call-1"
+    assert result.tool_call_id is None or result.tool_call_id == "call-1"
+    assert registry.get_stats()["echo"]["failures"] == 1
+
+
+def test_tool_registry_rejects_reserved_invalid_stats_tool_name() -> None:
+    """固定非法统计桶不能与真实工具统计发生碰撞。"""
+    registry = ToolRegistry()
+
+    with pytest.raises(ValueError, match="reserved"):
+        registry.register(
+            Tool(
+                name="<invalid-tool-name>",
+                description="不应占用内部统计键",
+                handler=lambda arguments: "ok",
+            )
+        )
+
+
 def test_tool_registry_get_stats_returns_snapshot():
     """测试 get_stats 返回快照，外部修改不会污染注册表内部统计。"""
     registry = ToolRegistry()

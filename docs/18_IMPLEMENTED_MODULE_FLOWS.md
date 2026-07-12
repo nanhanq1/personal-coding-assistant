@@ -35,6 +35,8 @@ flowchart LR
 
 这条主链的真实含义是：`AgentLoop` 负责循环与 trace 透传，`ToolRegistry` 负责统一执行结果，具体 shell/file wrapper 在副作用前完成风险判断、策略与摘要审计；允许的 shell 调用进入 `CommandRuntime`，允许的文件写入进入 checkpoint 包裹的本地写盘。任何成功值或异常最终都在 registry 边界成为 `ToolResult`，再以文本 `tool Message` 回到 core。
 
+稳定错误边界：`ToolRegistry.run(...)` 遇到非法工具名时仍返回 `INVALID_ARGUMENT` 的 `ToolResult`，不可哈希或空白名称统一进入 `<invalid-tool-name>` 统计桶；合法未知名称返回 `UNKNOWN_TOOL`。Approval 数据对象在构造阶段严格区分字段类型、空白值、bool 与带时区时间。
+
 ## Core
 
 **状态：已实现最小 Agent 循环；真实 LLM、事件持久化、trace 查询与 planner 未实现。**
@@ -193,7 +195,8 @@ flowchart TD
 
 ### 当前缺口
 
-- 分类规则仍是最小启发式，不是 shell AST、系统调用或语义级策略；file gate 只覆盖当前 `write_file` / `edit_file` 风险。
+- 已知 `cmd` / `powershell` / `pwsh` wrapper（含 `.exe`、大小写和完整路径形式）统一返回 `ASK/shell_wrapper`，阻止默认 `SAFE` 后进入 runtime。
+- 分类规则仍是最小启发式，不解析 wrapper 内部、嵌套、编码或动态构造的命令，也不是 shell AST、系统调用或语义级策略；file gate 只覆盖当前 `write_file` / `edit_file` 风险。
 - 没有 approval UI、请求持久化、身份/权限主体、批准签名、过期后的统一处理或 approval resume。
 - 审计事件没有 `trace_id`、`tool_call_id`、审批引用、checkpoint id 或最终 `ToolResult`；`executed=true` 表示允许进入执行路径，不等于执行最终成功。
 - 审计追加不是与副作用绑定的原子事务，没有远程不可篡改后端、完整性校验、轮转、查询 API 或 trace/audit 联合检索。

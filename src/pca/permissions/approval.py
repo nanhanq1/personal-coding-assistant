@@ -14,6 +14,22 @@ from datetime import datetime, timezone
 from pca.permissions.policy import PermissionDecision
 
 
+def _validate_non_empty_string(field_name: str, value: object) -> None:
+    """为公开 approval 字符串字段提供稳定的类型与空值语义。"""
+    if not isinstance(value, str):
+        raise TypeError(f"{field_name} must be a string")
+    if value.strip() == "":
+        raise ValueError(f"{field_name} must be a non-empty string")
+
+
+def _validate_aware_datetime(field_name: str, value: object) -> None:
+    """拒绝错误类型和无时区时间，避免比较阶段泄漏偶然异常。"""
+    if not isinstance(value, datetime):
+        raise TypeError(f"{field_name} must be a datetime")
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"{field_name} must be timezone-aware")
+
+
 @dataclass(frozen=True)
 class ApprovalRequest:
     """一次需要人工确认的工具执行请求。"""
@@ -26,21 +42,29 @@ class ApprovalRequest:
     expires_at: datetime
 
     def __post_init__(self) -> None:
-        if self.request_id.strip() == "":
-            raise ValueError("request_id must be a non-empty string")
-        if self.tool_name.strip() == "":
-            raise ValueError("tool_name must be a non-empty string")
-        if self.command_summary.strip() == "":
-            raise ValueError("command_summary must be a non-empty string")
+        # 修改前旧代码：
+        # if self.request_id.strip() == "": ...
+        # if self.tool_name.strip() == "": ...
+        # if self.command_summary.strip() == "": ...
+        # if self.expires_at <= self.created_at: ...
+        #
+        # 问题：错误类型会泄漏 AttributeError 或 datetime 比较异常，
+        # naive/aware 时间混用也没有清晰契约。
+        _validate_non_empty_string("request_id", self.request_id)
+        _validate_non_empty_string("tool_name", self.tool_name)
+        _validate_non_empty_string("command_summary", self.command_summary)
         if not isinstance(self.decision, PermissionDecision):
             raise TypeError("decision must be a PermissionDecision")
-        if self.expires_at <= self.created_at:
+        _validate_aware_datetime("created_at", self.created_at)
+        _validate_aware_datetime("expires_at", self.expires_at)
+        if _as_utc(self.expires_at) <= _as_utc(self.created_at):
             raise ValueError("expires_at must be later than created_at")
 
     def is_expired(self, now: datetime | None = None) -> bool:
         """判断审批请求在给定时间点是否已经过期。"""
         current_time = now if now is not None else datetime.now(timezone.utc)
-        return current_time >= self.expires_at
+        _validate_aware_datetime("now", current_time)
+        return _as_utc(current_time) >= _as_utc(self.expires_at)
 
 
 @dataclass(frozen=True)
@@ -53,10 +77,17 @@ class ApprovalDecision:
     decided_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def __post_init__(self) -> None:
-        if self.request_id.strip() == "":
-            raise ValueError("request_id must be a non-empty string")
-        if self.user_reason.strip() == "":
-            raise ValueError("user_reason must be a non-empty string")
+        # 修改前旧代码：
+        # if self.request_id.strip() == "": ...
+        # if self.user_reason.strip() == "": ...
+        #
+        # 问题：非字符串触发 AttributeError，approved 和 decided_at
+        # 也会接受与公开契约不一致的整数或字符串。
+        _validate_non_empty_string("request_id", self.request_id)
+        if not isinstance(self.approved, bool):
+            raise TypeError("approved must be a boolean")
+        _validate_non_empty_string("user_reason", self.user_reason)
+        _validate_aware_datetime("decided_at", self.decided_at)
 
     @classmethod
     def approve(
@@ -90,3 +121,8 @@ class ApprovalDecision:
 
 
 __all__ = ["ApprovalRequest", "ApprovalDecision"]
+
+
+def _as_utc(value: datetime) -> datetime:
+    """按绝对时刻比较 aware datetime，避免同 tzinfo 的 fold 墙上时间陷阱。"""
+    return value.astimezone(timezone.utc)

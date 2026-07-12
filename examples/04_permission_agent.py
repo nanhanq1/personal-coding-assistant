@@ -31,10 +31,15 @@ def main() -> None:
     registry = create_coding_tool_registry()
     with TemporaryDirectory() as workspace_root:
         workspace = Path(workspace_root)
+        # 修改前旧代码：
+        # "command": ["cmd", "/c", "echo", "permission-safe"],
+        #
+        # 问题：cmd 是可以隐藏内部子命令的 shell wrapper；P0 修复后必须 ASK，
+        # 不能再承担示例中的 SAFE 路径。这里改用直接 Python 版本查询。
         safe_command = registry.run(
             "run_command",
             {
-                "command": ["cmd", "/c", "echo", "permission-safe"],
+                "command": [sys.executable, "--version"],
                 "workspace_root": str(workspace),
                 "timeout_seconds": 5,
             },
@@ -51,6 +56,14 @@ def main() -> None:
             "run_command",
             {
                 "command": ["python", "-c", "print('approval-required')"],
+                "workspace_root": str(workspace),
+                "timeout_seconds": 5,
+            },
+        )
+        wrapper_approval_required_command = registry.run(
+            "run_command",
+            {
+                "command": ["cmd", "/c", "echo", "blocked-wrapper"],
                 "workspace_root": str(workspace),
                 "timeout_seconds": 5,
             },
@@ -80,6 +93,9 @@ def main() -> None:
         "safe_command": _serialize_tool_result(safe_command),
         "denied_command": _serialize_tool_result(denied_command),
         "approval_required_command": _serialize_tool_result(approval_required_command),
+        "wrapper_approval_required_command": _serialize_tool_result(
+            wrapper_approval_required_command
+        ),
         "new_file_write": _serialize_tool_result(new_file_write),
         "overwrite_file": _serialize_tool_result(overwrite_file),
         "file_after_overwrite_attempt": file_after_overwrite_attempt,

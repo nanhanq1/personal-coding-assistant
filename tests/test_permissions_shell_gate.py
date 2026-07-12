@@ -1,6 +1,8 @@
 import json
 from typing import Any
 
+import pytest
+
 from pca.tools import shell_tools
 from pca.tools import base as tool_base
 from pca.tools.registry import ToolRegistry
@@ -75,6 +77,42 @@ def test_shell_gate_requires_approval_for_ask_command_before_runtime(tmp_path) -
     assert "approval required" in result.error_message.lower()
     assert "network_access" in result.error_message
     assert runtime.calls == []
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "cmd /c del /s /q harmless-target",
+        ["powershell.exe", "-Command", "Get-ChildItem"],
+    ],
+)
+def test_shell_gate_requires_approval_for_shell_wrapper_before_runtime(
+    tmp_path,
+    command,
+) -> None:
+    """包装命令必须在 runtime 前转成待审批失败并留下摘要审计。"""
+    runtime = RecordingRuntime()
+    audit_path = tmp_path / "audit.jsonl"
+    registry = ToolRegistry()
+    registry.register(ShellCommandTool(runtime=runtime, audit_path=audit_path))
+
+    result = registry.run(
+        "run_command",
+        {
+            "command": command,
+            "workspace_root": str(tmp_path),
+            "timeout_seconds": 5,
+        },
+    )
+
+    event = _read_one_audit_event(audit_path)
+    assert result.ok is False
+    assert result.error_code is tool_base.ToolErrorCode.PERMISSION_APPROVAL_REQUIRED
+    assert "shell_wrapper" in result.error_message
+    assert runtime.calls == []
+    assert event["action"] == "ask"
+    assert event["matched_rule"] == "shell_wrapper"
+    assert event["executed"] is False
 
 
 def test_shell_gate_allows_safe_command_through_original_runtime_path(tmp_path) -> None:

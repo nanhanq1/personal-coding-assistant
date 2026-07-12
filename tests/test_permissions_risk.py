@@ -42,6 +42,32 @@ def test_classifies_network_and_inline_code_commands_as_ask() -> None:
 @pytest.mark.parametrize(
     "command",
     [
+        "cmd /c del /s /q harmless-target",
+        "powershell -Command Remove-Item harmless-target -Recurse -Force",
+        "pwsh -Command Get-ChildItem",
+        ["cmd.exe", "/c", "echo", "hello"],
+        ["PoWeRsHeLl.ExE", "-Command", "Get-ChildItem"],
+        [r"C:\Windows\System32\cmd.exe", "/c", "echo", "hello"],
+        [
+            r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            "-Command",
+            "Get-ChildItem",
+        ],
+        r'"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -Command Get-ChildItem',
+    ],
+)
+def test_classifies_shell_wrappers_as_ask(command) -> None:
+    """shell wrapper 可以隐藏内部行为，默认必须 ASK。"""
+    assessment = classify_command(command)
+
+    assert assessment.level is RiskLevel.ASK
+    assert assessment.matched_rule == "shell_wrapper"
+    assert assessment.reason
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
         "rm -rf /",
         "del /s /q *",
         "Remove-Item -Recurse -Force .",

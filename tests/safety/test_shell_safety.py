@@ -31,6 +31,18 @@ from pca.tools.shell_tools import ShellCommandTool
             "inline_code",
             "ask",
         ),
+        (
+            "cmd /c del /s /q harmless-target",
+            ToolErrorCode.PERMISSION_APPROVAL_REQUIRED,
+            "shell_wrapper",
+            "ask",
+        ),
+        (
+            ["powershell.exe", "-Command", "Remove-Item", "harmless-target"],
+            ToolErrorCode.PERMISSION_APPROVAL_REQUIRED,
+            "shell_wrapper",
+            "ask",
+        ),
     ],
 )
 def test_shell_safety_gate_blocks_before_runtime(

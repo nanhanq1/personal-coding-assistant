@@ -1,5 +1,42 @@
 # Architecture Decisions
 
+## ADR-0030：非法工具调用与审批对象采用严格稳定错误契约
+
+日期：2026-07-12
+
+### 决策
+
+- `ToolRegistry.run(...)` 对非字符串、空值和空白工具名继续返回 `INVALID_ARGUMENT` 的 `ToolResult`，并把失败统计统一放入 `<invalid-tool-name>`；合法未知名称仍使用原名统计并返回 `UNKNOWN_TOOL`。
+- `<invalid-tool-name>` 是保留内部统计键，禁止注册同名真实工具；trace metadata 在 handler 前校验，坏 metadata 不得触发副作用或破坏失败信封。
+- approval 的公开字符串字段按“非字符串 `TypeError`、空白 `ValueError`”校验；`approved` 必须是严格 `bool`。
+- approval 的创建、过期与决策时间必须是 timezone-aware `datetime`；错误类型和 naive datetime 在比较前被拒绝，时间关系统一转换到 UTC 后按绝对时刻比较。
+
+### 理由与边界
+
+- 错误记录本身不能因为不可哈希输入再次失败，也不能把任意原始输入写入高基数统计键。
+- 严格校验让调用方区分参数错误与内部故障，避免 `AttributeError` 或偶然的 datetime 比较异常泄漏。
+- 本决策不实现 approval resume、身份认证、持久化或 audit 生命周期。
+
+## ADR-0029：已知 shell wrapper 统一降级为 ASK
+
+日期：2026-07-12
+
+### 背景
+
+shell 风险分类此前只检查首个可执行 token。`cmd /c ...`、`powershell -Command ...`、`pwsh ...` 会把真实子命令隐藏在 wrapper 后，使危险语义可能落入 `SAFE/default_safe`。
+
+### 决策
+
+- 对 `cmd`、`cmd.exe`、`powershell`、`powershell.exe`、`pwsh`、`pwsh.exe`，无论字符串/数组、大小写、完整路径或带引号路径，统一返回 `ASK`。
+- 固定 `matched_rule="shell_wrapper"`，由既有 permission gate 生成 approval-required 失败并阻止 runtime。
+- 本切片不解析内部命令，也不声称识别嵌套、编码或动态拼接后的真实语义。
+
+### 理由
+
+- 先关闭已知 wrapper 的静默放行路径，安全边界清晰且易于测试。
+- 避免用不完整的 shell 解析器制造新的误判；更完整的结构化解析留给后续独立设计。
+- 保持直接危险命令 `DENY`、普通安全命令 `SAFE` 的既有契约。
+
 ## ADR-0028：Week 6 Day 7 在 AgentLoop 入口创建并透传 trace metadata
 
 日期：2026-07-10

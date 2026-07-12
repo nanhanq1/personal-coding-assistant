@@ -16,6 +16,15 @@ from typing import Sequence
 
 Command = str | Sequence[str]
 
+SHELL_WRAPPER_EXECUTABLES = {
+    "cmd",
+    "cmd.exe",
+    "powershell",
+    "powershell.exe",
+    "pwsh",
+    "pwsh.exe",
+}
+
 
 class RiskLevel(Enum):
     """命令执行前的粗粒度风险等级。"""
@@ -127,6 +136,20 @@ def _match_ask_rules(
 ) -> RiskAssessment | None:
     first = lowered_parts[0]
 
+    # 修改前旧代码：
+    # first = lowered_parts[0]
+    # if first in {"curl", "wget", "invoke-webrequest", "iwr"}:
+    #     ...
+    #
+    # 问题：cmd / PowerShell wrapper 会把真实子命令藏在后续 token 中，
+    # 只检查 first 会让包装后的危险命令落入 default_safe。
+    if _is_shell_wrapper(first):
+        return RiskAssessment(
+            level=RiskLevel.ASK,
+            reason="Shell wrapper commands can hide nested command behavior.",
+            matched_rule="shell_wrapper",
+        )
+
     if first in {"curl", "wget", "invoke-webrequest", "iwr"}:
         return RiskAssessment(
             level=RiskLevel.ASK,
@@ -149,6 +172,13 @@ def _match_ask_rules(
         )
 
     return None
+
+
+def _is_shell_wrapper(executable: str) -> bool:
+    """识别可能隐藏内部命令语义的已知 shell wrapper。"""
+    normalized = executable.strip().strip("\"'").replace("\\", "/")
+    basename = normalized.rsplit("/", 1)[-1].lower()
+    return basename in SHELL_WRAPPER_EXECUTABLES
 
 
 def _uses_inline_code(lowered_parts: tuple[str, ...]) -> bool:

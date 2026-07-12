@@ -98,7 +98,11 @@ def test_permission_agent_example_reports_allow_deny_and_ask_paths():
 
     assert report["safe_command"]["ok"] is True
     assert report["safe_command"]["result"]["returncode"] == 0
-    assert "permission-safe" in report["safe_command"]["result"]["stdout"]
+    safe_output = (
+        report["safe_command"]["result"]["stdout"]
+        + report["safe_command"]["result"]["stderr"]
+    )
+    assert "Python" in safe_output
 
     assert report["denied_command"]["ok"] is False
     assert report["denied_command"]["error_type"] == "PermissionError"
@@ -110,6 +114,14 @@ def test_permission_agent_example_reports_allow_deny_and_ask_paths():
     assert "action=ask" in report["approval_required_command"]["error_message"]
     assert "inline_code" in report["approval_required_command"]["error_message"]
 
+    assert report["wrapper_approval_required_command"]["ok"] is False
+    assert (
+        report["wrapper_approval_required_command"]["error_type"]
+        == "PermissionError"
+    )
+    assert "action=ask" in report["wrapper_approval_required_command"]["error_message"]
+    assert "shell_wrapper" in report["wrapper_approval_required_command"]["error_message"]
+
     assert report["new_file_write"]["ok"] is True
     assert report["overwrite_file"]["ok"] is False
     assert report["overwrite_file"]["error_type"] == "PermissionError"
@@ -117,9 +129,9 @@ def test_permission_agent_example_reports_allow_deny_and_ask_paths():
     assert "overwrite_existing_file" in report["overwrite_file"]["error_message"]
     assert report["file_after_overwrite_attempt"] == "created by permission example"
 
-    assert report["stats"]["run_command"]["calls"] == 3
+    assert report["stats"]["run_command"]["calls"] == 4
     assert report["stats"]["run_command"]["successes"] == 1
-    assert report["stats"]["run_command"]["failures"] == 2
+    assert report["stats"]["run_command"]["failures"] == 3
     assert report["stats"]["write_file"]["calls"] == 2
     assert report["stats"]["write_file"]["successes"] == 1
     assert report["stats"]["write_file"]["failures"] == 1
