@@ -371,6 +371,20 @@ def test_tool_result_from_exception_maps_builtin_failures_to_error_codes():
     )
 
 
+def test_tool_result_from_exception_maps_audit_failure_to_error_code():
+    from pca.permissions.audit import AuditPersistenceError, ToolExecutionPhase
+
+    result = ToolResult.from_exception(
+        AuditPersistenceError(
+            phase=ToolExecutionPhase.SUCCEEDED,
+            side_effect_state="completed",
+        ),
+        duration_ms=0,
+    )
+
+    assert result.error_code is tool_base.ToolErrorCode.AUDIT_FAILED
+
+
 def test_tool_result_from_exception_maps_checkpoint_failures_to_error_code():
     """测试 checkpoint/git checkpoint 失败能区别于普通参数或 runtime 失败。"""
     assert (

@@ -32,6 +32,13 @@ def _read_one_audit_event(audit_path) -> dict[str, Any]:
     return json.loads(lines[0])
 
 
+def _read_audit_events(audit_path) -> list[dict[str, Any]]:
+    return [
+        json.loads(line)
+        for line in audit_path.read_text(encoding="utf-8").splitlines()
+    ]
+
+
 def test_shell_gate_denies_destructive_command_before_runtime(tmp_path) -> None:
     """DENY 命令必须在 shell runtime 前被拦截。"""
     runtime = RecordingRuntime()
@@ -112,7 +119,7 @@ def test_shell_gate_requires_approval_for_shell_wrapper_before_runtime(
     assert runtime.calls == []
     assert event["action"] == "ask"
     assert event["matched_rule"] == "shell_wrapper"
-    assert event["executed"] is False
+    assert event["authorized"] is False
 
 
 def test_shell_gate_allows_safe_command_through_original_runtime_path(tmp_path) -> None:
@@ -147,15 +154,17 @@ def test_shell_gate_records_allow_before_entering_runtime(tmp_path) -> None:
 
     result = registry.run("run_command", arguments)
 
-    event = _read_one_audit_event(audit_path)
+    events = _read_audit_events(audit_path)
     assert result.ok is True
     assert runtime.calls == [arguments]
-    assert event["tool_name"] == "run_command"
-    assert event["action"] == "allow"
-    assert event["risk_level"] == "safe"
-    assert event["matched_rule"] == "default_safe"
-    assert event["executed"] is True
-    assert "top-secret" not in json.dumps(event)
+    assert [event.get("phase") for event in events] == [None, "started", "succeeded"]
+    assert len({event["operation_id"] for event in events}) == 1
+    assert events[0]["tool_name"] == "run_command"
+    assert events[0]["action"] == "allow"
+    assert events[0]["risk_level"] == "safe"
+    assert events[0]["matched_rule"] == "default_safe"
+    assert events[0]["authorized"] is True
+    assert "top-secret" not in json.dumps(events)
 
 
 def test_shell_gate_records_ask_without_entering_runtime(tmp_path) -> None:
@@ -179,7 +188,7 @@ def test_shell_gate_records_ask_without_entering_runtime(tmp_path) -> None:
     assert runtime.calls == []
     assert event["action"] == "ask"
     assert event["matched_rule"] == "network_access"
-    assert event["executed"] is False
+    assert event["authorized"] is False
 
 
 def test_shell_gate_records_deny_without_entering_runtime(tmp_path) -> None:
@@ -203,7 +212,62 @@ def test_shell_gate_records_deny_without_entering_runtime(tmp_path) -> None:
     assert runtime.calls == []
     assert event["action"] == "deny"
     assert event["matched_rule"] == "recursive_delete"
-    assert event["executed"] is False
+    assert event["authorized"] is False
+
+
+def test_shell_runtime_failure_records_failed_phase(tmp_path) -> None:
+    """runtime 异常必须产生 failed，且不得伪造 succeeded。"""
+    class FailingRuntime:
+        def run(self, arguments):
+            raise RuntimeError("runtime exploded")
+
+    audit_path = tmp_path / "audit.jsonl"
+    registry = ToolRegistry()
+    registry.register(ShellCommandTool(runtime=FailingRuntime(), audit_path=audit_path))
+
+    result = registry.run(
+        "run_command",
+        {
+            "command": "echo hello",
+            "workspace_root": str(tmp_path),
+            "timeout_seconds": 5,
+        },
+    )
+
+    events = _read_audit_events(audit_path)
+    assert result.error_code is tool_base.ToolErrorCode.RUNTIME_FAILED
+    assert [event.get("phase") for event in events] == [None, "started", "failed"]
+    assert len({event["operation_id"] for event in events}) == 1
+
+
+def test_shell_success_returns_audit_failed_when_outcome_cannot_persist(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """命令已经完成但 succeeded 写入失败时必须报告 AUDIT_FAILED。"""
+    runtime = RecordingRuntime()
+    registry = ToolRegistry()
+    registry.register(ShellCommandTool(runtime=runtime, audit_path=tmp_path / "audit.jsonl"))
+    original = shell_tools.record_tool_execution_event
+
+    def fail_succeeded(*args, phase, **kwargs):
+        if phase.value == "succeeded":
+            raise OSError("audit unavailable")
+        return original(*args, phase=phase, **kwargs)
+
+    monkeypatch.setattr(shell_tools, "record_tool_execution_event", fail_succeeded)
+    result = registry.run(
+        "run_command",
+        {
+            "command": "echo hello",
+            "workspace_root": str(tmp_path),
+            "timeout_seconds": 5,
+        },
+    )
+
+    assert runtime.calls
+    assert result.error_code is tool_base.ToolErrorCode.AUDIT_FAILED
+    assert "side_effect_state=completed" in result.error_message
 
 
 def test_shell_allow_fails_closed_when_audit_write_fails(tmp_path, monkeypatch) -> None:

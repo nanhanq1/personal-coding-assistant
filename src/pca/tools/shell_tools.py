@@ -1,7 +1,13 @@
 from pathlib import Path
 from typing import Any
 
-from pca.permissions.audit import record_permission_decision
+from pca.permissions.audit import (
+    AuditPersistenceError,
+    ToolExecutionPhase,
+    new_operation_id,
+    record_permission_decision,
+    record_tool_execution_event,
+)
 from pca.permissions.policy import DecisionAction, PermissionPolicy
 from pca.permissions.risk import classify_command
 from pca.runtime.interface import CommandRuntime
@@ -73,19 +79,25 @@ class ShellCommandTool(Tool):
         # 已经存在但没有接入执行前边界，危险命令仍可能被真实执行。
         assessment = classify_command(arguments["command"])
         decision = self._permission_policy.decide(assessment)
+        audit_path = self._resolve_audit_path(arguments)
+        operation_id = new_operation_id()
 
         # 审计在副作用前记录。ALLOW 写入失败必须阻止 runtime；ASK/DENY 本来
         # 就不会执行，因此保留原始 permission 结果，避免把审批语义改成存储错误。
         try:
             record_permission_decision(
-                self._resolve_audit_path(arguments),
+                audit_path,
+                operation_id=operation_id,
                 tool_name=self.name,
                 decision=decision,
-                executed=decision.action is DecisionAction.ALLOW,
+                authorized=decision.action is DecisionAction.ALLOW,
             )
-        except OSError:
+        except OSError as audit_error:
             if decision.action is DecisionAction.ALLOW:
-                raise
+                raise AuditPersistenceError(
+                    phase="permission_decision",
+                    side_effect_state="not_started",
+                ) from audit_error
 
         if decision.action is DecisionAction.DENY:
             raise PermissionError(
@@ -105,7 +117,54 @@ class ShellCommandTool(Tool):
                 f"reason={decision.reason} {assessment.reason}"
             )
 
-        return self._runtime.run(arguments)
+        # 修改前旧代码：
+        # return self._runtime.run(arguments)
+        #
+        # 问题：permission allow 之后没有 started/succeeded/failed 事实，
+        # executed=true 会被误读为命令已经成功完成。
+        try:
+            record_tool_execution_event(
+                audit_path,
+                operation_id=operation_id,
+                tool_name=self.name,
+                phase=ToolExecutionPhase.STARTED,
+            )
+        except OSError as audit_error:
+            raise AuditPersistenceError(
+                phase=ToolExecutionPhase.STARTED,
+                side_effect_state="not_started",
+            ) from audit_error
+
+        try:
+            result = self._runtime.run(arguments)
+        except Exception as runtime_error:
+            try:
+                record_tool_execution_event(
+                    audit_path,
+                    operation_id=operation_id,
+                    tool_name=self.name,
+                    phase=ToolExecutionPhase.FAILED,
+                )
+            except OSError as audit_error:
+                raise AuditPersistenceError(
+                    phase=ToolExecutionPhase.FAILED,
+                    side_effect_state="unknown",
+                ) from runtime_error
+            raise
+
+        try:
+            record_tool_execution_event(
+                audit_path,
+                operation_id=operation_id,
+                tool_name=self.name,
+                phase=ToolExecutionPhase.SUCCEEDED,
+            )
+        except OSError as audit_error:
+            raise AuditPersistenceError(
+                phase=ToolExecutionPhase.SUCCEEDED,
+                side_effect_state="completed",
+            ) from audit_error
+        return result
 
     def _resolve_audit_path(self, arguments: dict[str, Any]) -> Path:
         """返回当前调用的审计文件；测试可注入临时路径隔离写入。"""

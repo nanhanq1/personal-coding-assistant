@@ -16,6 +16,9 @@ NON_RETRYABLE_ERROR_REASONS: dict[ToolErrorCode, str] = {
         "checkpoint failure means recovery protection is unavailable"
     ),
     ToolErrorCode.ROLLBACK_FAILED: "rollback failure must fail closed",
+    ToolErrorCode.AUDIT_FAILED: (
+        "audit_failed may follow a completed side effect and is not retryable"
+    ),
 }
 
 

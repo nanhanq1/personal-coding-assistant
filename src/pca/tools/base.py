@@ -26,6 +26,7 @@ class ToolErrorCode(Enum):
     RUNTIME_FAILED = "runtime_failed"
     CHECKPOINT_FAILED = "checkpoint_failed"
     ROLLBACK_FAILED = "rollback_failed"
+    AUDIT_FAILED = "audit_failed"
 
 
 def truncate_output(
@@ -212,6 +213,13 @@ def classify_tool_exception(
     """把当前工具链的异常映射为稳定错误码。"""
     message = str(exc) if error_message is None else error_message
     lowered_message = message.lower()
+
+    # 修改前旧代码：审计持久化失败会落入普通 RUNTIME_FAILED。
+    # 问题：调用方可能自动重试已经发生过副作用的工具。
+    from pca.permissions.audit import AuditPersistenceError
+
+    if isinstance(exc, AuditPersistenceError):
+        return ToolErrorCode.AUDIT_FAILED
     checkpoint_failure_markers = (
         "checkpoint",
         "not a git repository",

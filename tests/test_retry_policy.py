@@ -57,6 +57,7 @@ def test_retry_policy_never_retries_permission_or_argument_failures() -> None:
         ToolErrorCode.PERMISSION_APPROVAL_REQUIRED,
         ToolErrorCode.INVALID_ARGUMENT,
         ToolErrorCode.UNKNOWN_TOOL,
+        ToolErrorCode.AUDIT_FAILED,
     )
 
     for error_code in non_retryable_codes:
